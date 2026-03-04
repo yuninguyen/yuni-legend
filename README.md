@@ -69,8 +69,8 @@ A powerful Laravel-based system for managing cashback/rebate accounts with real-
 ### Step 1: Clone Repository
 
 ```bash
-git clone https://github.com/yuninguyen/yuni-legend.git
-cd yuni-legend
+git clone https://github.com/yuninguyen/RebateOps.git
+cd RebateOps
 ```
 
 ### Step 2: Install Dependencies
