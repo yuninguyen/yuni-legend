@@ -16,24 +16,18 @@ class RebateTrackerObserver
     }
 
     // Hàm này tự chạy khi một RebateTracker mới được tạo ra
-    public function created(RebateTracker $tracker): void
+public function created(RebateTracker $tracker): void
     {
-        // Lấy dữ liệu (Bạn có thể điều chỉnh lại tên cột cho khớp với DB của bạn)
-        $userName = $tracker->user->name ?? 'N/A';
-        $platformName = $tracker->account->platform ?? 'N/A'; // Lấy platform từ account liên kết
+        SyncGoogleSheetJob::dispatch($tracker->id, get_class($tracker));
+    }
 
-        $data = [
-            $tracker->id,
-            $userName,
-            $platformName,
-            $tracker->rebate_amount,
-            $tracker->status,
-            $tracker->created_at->format('Y-m-d H:i:s'),
-        ];
+    public function updated(RebateTracker $tracker): void
+    {
+        SyncGoogleSheetJob::dispatch($tracker->id, get_class($tracker));
+    }
 
-        // Đẩy lên tab có tên là 'All_Rebate_Tracker' (Tham số thứ 2)
-        // Thay vì gọi thẳng, dùng Job để chạy ngầm
-        \App\Jobs\SyncGoogleSheetJob::dispatch($tracker->id, RebateTracker::class);
-
+    public function deleted(RebateTracker $tracker): void
+    {
+        SyncGoogleSheetJob::dispatch($tracker->id, get_class($tracker), 'delete');
     }
 }
