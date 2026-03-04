@@ -15,16 +15,14 @@ class Email extends Model
 
     // Cho phép lưu các cột này vào database
     protected $fillable = [
-        'status',   //  Cột status để lưu trạng thái của email (active, disabled, locked)
-        'email',    // Cột email để lưu địa chỉ email
-        'email_password',   // Cột email_password để lưu mật khẩu email
-        'recovery_email',   // Cột recovery_email để lưu email khôi phục (nếu có)
-        'two_factor_code',  // Cột 2FA code để lưu mã xác thực hai yếu tố (nếu có)
-        'email_created_at', // Cột ngày tạo email (nếu có)   
-        'note', // Cột note để lưu ghi chú về email
-        'provider', // Cột provider để lưu tên nhà cung cấp email (ví dụ: gmail, yahoo)
-        'accounts_count', // Cột đếm số lượng accounts liên quan
-        'accounts.platform', // Cột liệt kê số lượng accounts theo từng platform (ví dụ: Facebook, Instagram)
+        'status',
+        'email',
+        'email_password',
+        'recovery_email',
+        'two_factor_code',
+        'email_created_at',   
+        'note',
+        'provider',
     ];
 
     protected static function booted()
