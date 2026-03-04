@@ -32,12 +32,8 @@ class RebateTrackerObserver
         ];
 
         // Đẩy lên tab có tên là 'All_Rebate_Tracker' (Tham số thứ 2)
-        $this->sheetService->appendRow($data, 'All_Rebate_Tracker');
-        $this->sheetService->appendRow($data, 'Rakuten_Tracker');
-        $this->sheetService->appendRow($data, 'RetailMeNot_Tracker');
-        $this->sheetService->appendRow($data, 'JoinHoney_Tracker');
-        $this->sheetService->appendRow($data, 'ActiveJunky_Tracker');
-        $this->sheetService->appendRow($data, 'TopCashback_Tracker');
-        $this->sheetService->appendRow($data, 'Price_Tracker');
+        // Thay vì gọi thẳng, dùng Job để chạy ngầm
+        \App\Jobs\SyncGoogleSheetJob::dispatch($tracker->id, RebateTracker::class);
+
     }
 }
