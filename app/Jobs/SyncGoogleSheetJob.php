@@ -27,7 +27,7 @@ class SyncGoogleSheetJob implements ShouldQueue
     public function handle(GoogleSheetService $service): void
     {
         if ($this->action === 'delete') {
-        $service->deleteRowsByIds([(string)$this->recordId], $targetTab);
+        $service->deleteRowsByIds([(string)$this->recordId], $targetTabs);
         return;
     }
         try {
@@ -37,7 +37,7 @@ class SyncGoogleSheetJob implements ShouldQueue
 
             $headers = [];
             $formattedRow = [];
-            $targetTab = []; // Chuyển thành mảng để xử lý đa luồng
+            $targetTabs = []; // Chuyển thành mảng để xử lý đa luồng
 
             // 2. MAPPING: Xác định Resource và Tab dựa trên Model Class
             switch ($this->modelClass) {
