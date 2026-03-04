@@ -21,7 +21,7 @@ class SyncGoogleSheetJob implements ShouldQueue
     public function __construct(
         protected $recordId,
         protected $modelClass,
-        protected string $action = 'upsert'  // mặc định là upsert
+        protected string $action = 'upsert'
     ) {}
     
     public function handle(GoogleSheetService $service): void
@@ -32,12 +32,16 @@ class SyncGoogleSheetJob implements ShouldQueue
     }
         try {
             // 1. Tìm bản ghi cụ thể
-            $record = $this->modelClass::find($this->recordId);
-            if (!$record) return;
+            $record = method_exists($this->modelClass, 'withTrashed') 
+                ? $this->modelClass::withTrashed()->find($this->recordId) 
+                : $this->getRecordWithRelations();
+
+            if (!$record && $this->action !== 'delete') return;
 
             $headers = [];
             $formattedRow = [];
-            $targetTabs = []; // Chuyển thành mảng để xử lý đa luồng
+            // ĐÃ SỬA WARNING #1: Thống nhất dùng mảng $targetTabs
+            $targetTabs = []; 
 
             // 2. MAPPING: Xác định Resource và Tab dựa trên Model Class
             switch ($this->modelClass) {
@@ -78,17 +82,24 @@ class SyncGoogleSheetJob implements ShouldQueue
                     break;
             }
 
-            // 3. Thực hiện UPSERT (Chỉ cập nhật đúng 1 dòng này)
+            // Chuyển logic Delete xuống đây để mảng $targetTabs đã được gán giá trị
+            if ($this->action === 'delete') {
+                if (!empty($targetTabs)) {
+                    foreach ($targetTabs as $tabName) {
+                        $service->deleteRowsByIds([(string)$this->recordId], $tabName);
+                    }
+                }
+                return;
+            }
+
+            // 3. Thực hiện UPSERT
             if (!empty($targetTabs) && !empty($formattedRow)) {
                 foreach ($targetTabs as $tabName) {
-                $service->createSheetIfNotExist($tabName);
-
-                // upsertRows sẽ tự chèn Header nếu Sheet trống và update nếu trùng ID
-                $service->upsertRows([$formattedRow], $tabName, $headers);
-
-                // 4. ÁP DỤNG ĐỊNH DẠNG RIÊNG CHO TỪNG TAB
-                $this->applySpecificFormatting($service, $tabName);
-            }
+                    $service->createSheetIfNotExist($tabName);
+                    // Lệnh này đã gọi chuẩn 3 tham số theo bản vá CRITICAL #3 ở Service
+                    $service->upsertRows([$formattedRow], $tabName, $headers);
+                    $this->applySpecificFormatting($service, $tabName);
+                }
             }
         } catch (\Exception $e) {
             Log::error("Google Sheet Job Error [{$this->modelClass} ID: {$this->recordId}]: " . $e->getMessage());
