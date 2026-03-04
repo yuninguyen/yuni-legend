@@ -378,7 +378,7 @@ trait HasTrackerSchema
                                 Forms\Components\Select::make('state')
                                     ->label('State (US)')
                                     ->searchable()
-                                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                                    
                                         'AL' => 'Alabama',
                                         'AK' => 'Alaska',
                                         'AZ' => 'Arizona',
@@ -717,7 +717,7 @@ trait HasTrackerSchema
                         Tables\Actions\Action::make('quick_set_status')
                             ->form([
                                 Forms\Components\Select::make('status')
-                                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                                    >formatStateUsing(fn(string $state): string => match ($state) {
                                         'clicked'    => 'Clicked',
                                         'pending'    => 'Pending',
                                         'confirmed'  => 'Confirmed',
