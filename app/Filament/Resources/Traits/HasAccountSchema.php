@@ -100,7 +100,7 @@ trait HasAccountSchema
                         Forms\Components\Select::make('platform')
                             ->label('Platform')
                             ->placeholder('Rakuten, RetailMeNot, PayPal...')
-                            ->formatStateUsing(fn(string $state): string => match ($state) {
+                            ->options([
                                 'Rakuten' => 'Rakuten',
                                 'RetailMeNot' => 'RetailMeNot',
                                 'JoinHoney' => 'Join Honey',
@@ -133,7 +133,7 @@ trait HasAccountSchema
                                 'Ibotta' => 'Ibotta',
                                 'FetchRewards' => 'FetchRewards',
                                 'Checkout51' => 'Checkout51',
-                            })
+                            ])
                             ->required()
                             ->native(false), // Giúp giao diện đồng bộ đẹp hơn
 

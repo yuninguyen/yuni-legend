@@ -264,12 +264,12 @@ class EmailResource extends Resource
                 // 2. Bộ lọc theo Trạng thái (Live, Locked, Disabled)
                 SelectFilter::make('status')
                     ->label('Status')
-                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                    ->placeholder('All Status')
+                    ->options([
                         'active' => 'Live',
                         'disabled' => 'Disabled',
                         'locked' => 'Locked',
-                    })
-                    ->placeholder('All Status'),
+                    ]),
             ])
 
             // Giới hạn số cột hiển thị trên 1 hàng (ví dụ 4 cột cho 4 bộ lọc)

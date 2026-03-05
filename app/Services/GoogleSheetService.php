@@ -494,9 +494,11 @@ class GoogleSheetService
         // Nếu chưa có, gửi lệnh tạo mới
         $body = new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest([
             'requests' => [
-                'addSheet' => [
-                    'properties' => ['title' => $sheetName]
-                ]
+                new \Google\Service\Sheets\Request([
+                    'addSheet' => [
+                        'properties' => ['title' => $sheetName]
+                    ]
+                ])
             ]
         ]);
 

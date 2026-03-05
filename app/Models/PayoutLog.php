@@ -40,21 +40,8 @@ class PayoutLog extends Model
 
     protected static function booted()
     {
-        // 1. Logic cập nhật Balance (Chỉ chạy khi status đổi sang 'completed')
-        static::updated(function ($payoutLog) {
-            // Chỉ chạy khi trạng thái được chuyển từ 'pending' sang 'completed'
-            if ($payoutLog->isDirty('status') && $payoutLog->status === 'completed') {
-                $method = $payoutLog->payoutMethod;
 
-                if ($payoutLog->transaction_type === 'withdrawal') {
-                    $method->increment('current_balance', $payoutLog->net_amount_usd);
-                } elseif ($payoutLog->transaction_type === 'liquidation') {
-                    $method->decrement('current_balance', $payoutLog->amount_usd);
-                }
-            }
-        });
-
-        // 2. Logic đồng bộ Cha-Con & Google Sheets (Chạy mỗi khi nhấn Save/Create)
+        // Logic đồng bộ Cha-Con & Google Sheets (Chạy mỗi khi nhấn Save/Create)
         static::saved(function ($payoutLog) {
             // KIỂM TRA: Nếu là dòng con (liquidation)
             if ($payoutLog->transaction_type === 'liquidation' && $payoutLog->parent_id) {
@@ -74,7 +61,7 @@ class PayoutLog extends Model
                 }
             }
 
-            // 🟢 C. SYNC GOOGLE SHEETS (Dòng hiện tại): Luôn đẩy dòng vừa thao tác lên sheet
+            // YNC GOOGLE SHEETS (Dòng hiện tại): Luôn đẩy dòng vừa thao tác lên sheet
             // dispatch(new \App\Jobs\SyncPayoutToSheets($payoutLog));
         });
     }
