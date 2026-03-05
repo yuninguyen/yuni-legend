@@ -25,6 +25,8 @@ use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Actions\BulkAction;
 use Illuminate\Database\Eloquent\Collection;
 use Filament\Navigation\NavigationItem;
+use App\Filament\Traits\HasUsStates;
+
 
 use function Livewire\wrap;
 
@@ -736,27 +738,8 @@ trait HasAccountSchema
                         })
                         ->successNotificationTitle('Added successfully!'),
 
-                    Tables\Actions\EditAction::make()
-                        ->label('Edit')
-                        ->after(function ($record) {
-                            // FIX #1: Account không có Observer → phải sync thủ công sau Edit
-                            static::syncSingleAccountToSheet($record);
-                        }),
-                    Tables\Actions\DeleteAction::make()
-                        ->after(function ($record) {
-                            $sheetService = app(\App\Services\GoogleSheetService::class);
-
-                            // FIX #4: thêm ucfirst + null fallback → đúng tên tab
-                            $targetTab = ucfirst($record->platform ?: 'General') . '_Accounts';
-
-                            // Thực hiện xóa dòng dựa trên ID (Cột A)
-                            $sheetService->deleteRowsByIds([(string)$record->id], $targetTab);
-
-                            \Filament\Notifications\Notification::make()
-                                ->title('Account deleted from Google Sheet!')
-                                ->warning()
-                                ->send();
-                        }),
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\DeleteAction::make(),
 
                     Tables\Actions\Action::make('copy_full_info')
                         ->label('Copy')
@@ -877,6 +860,7 @@ trait HasAccountSchema
                         ->icon('heroicon-o-table-cells')
                         ->color('success')
                         ->action(function (Collection $records) {
+                            $sheetService = app(\App\Services\GoogleSheetService::class);
                             // FIX: Nhóm theo platform trước, rồi upsert từng tab 1 lần.
                             // Trước đây chỉ lấy platform của record đầu tiên → các platform khác bị đẩy sai tab.
                             $grouped = $records->groupBy(fn($r) => $r->platform ?: 'General');

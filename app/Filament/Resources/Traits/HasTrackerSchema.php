@@ -13,6 +13,7 @@ use Filament\Tables\Grouping\Group;
 use Illuminate\Support\HtmlString;
 use Filament\Support\Enums\FontWeight;
 use Illuminate\Database\Eloquent\Builder;
+use App\Filament\Resources\Traits\HasUsStates;
 
 trait HasTrackerSchema
 {
@@ -616,13 +617,13 @@ trait HasTrackerSchema
                         Tables\Actions\Action::make('quick_set_status')
                             ->form([
                                 Forms\Components\Select::make('status')
-                                    >formatStateUsing(fn(string $state): string => match ($state) {
+                                    ->options([
                                         'clicked'    => 'Clicked',
                                         'pending'    => 'Pending',
                                         'confirmed'  => 'Confirmed',
                                         'missing'    => 'Missing',
-                                        'ineligible' => 'Ineligible',
-                                    })
+                                        'ineligible' => 'Ineligible',                                     
+                                    ])
                                     ->default(fn($record) => $record->status)
                                     ->required(),
                             ])
@@ -854,36 +855,8 @@ trait HasTrackerSchema
                             $replica->status = 'clicked'; // Reset trạng thái về mặc định
                             $replica->rebate_amount = (float)$data['order_value'] * ($replica->cashback_percent / 100);
                         }),
-                    Tables\Actions\EditAction::make()
-                        ->after(function ($record) {
-                            // Mỗi khi Edit xong, gọi hàm Sync Single để đè dữ liệu mới lên Sheet
-                            static::syncSingleRecordToSheet($record);
-
-                            \Filament\Notifications\Notification::make()
-                                ->title('Updated & Synced to all Tabs!')
-                                ->success()
-                                ->send();
-                        }),
-                    Tables\Actions\DeleteAction::make()
-                        ->after(function ($record) {
-                            $sheetService = app(\App\Services\GoogleSheetService::class);
-                            $platform = $record->account?->platform ?: 'General';
-
-                            $targetTabs = [
-                                'All_Rebate_Tracker',
-                                ucfirst($platform) . '_Tracker', // FIX #2: ucfirst
-                            ];
-
-                            foreach ($targetTabs as $tab) {
-                                // Xóa dòng dựa trên ID ở tất cả các tab liên quan
-                                $sheetService->deleteRowsByIds([(string)$record->id], $tab);
-                            }
-
-                            \Filament\Notifications\Notification::make()
-                                ->title('Deleted & Synced to all Tabs!')
-                                ->success()
-                                ->send();
-                        }),
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\DeleteAction::make(),
                 ])
             ])
 
