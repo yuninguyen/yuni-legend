@@ -28,7 +28,7 @@ trait HasTrackerSchema
      */
     public function scopeWhereReadyForPayout(Builder $query)
     {
-        return $query->whereIn('status', ['pending', 'confirmed', 'Pending', 'Confirmed']);
+        return $query->whereIn('status', ['pending', 'confirmed']);
     }
 
     public static function form(Form $form): Form
@@ -134,12 +134,12 @@ trait HasTrackerSchema
                                             ->mapWithKeys(function ($account) {
                                                 // 1. Tính tổng PENDING (từ RebateTracker: status 'pending' hoặc 'clicked')
                                                 $pendingAmount = \App\Models\RebateTracker::where('account_id', $account->id)
-                                                    ->whereIn('status', ['pending', 'clicked', 'Pending', 'Clicked'])
+                                                    ->whereIn('status', ['pending', 'clicked'])
                                                     ->sum('rebate_amount') ?? 0;
 
                                                 // 2. Tính tổng CONFIRMED gốc (từ RebateTracker: status 'confirmed')
                                                 $totalConfirmed = \App\Models\RebateTracker::where('account_id', $account->id)
-                                                    ->whereIn('status', ['confirmed', 'Confirmed'])
+                                                    ->whereIn('status', ['confirmed'])
                                                     ->sum('rebate_amount') ?? 0;
 
                                                 // 3. Tính tổng ĐÃ RÚT (từ PayoutLog: sử dụng cột 'amount_usd')

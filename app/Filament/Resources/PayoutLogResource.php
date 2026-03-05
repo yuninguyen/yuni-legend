@@ -153,16 +153,18 @@ class PayoutLogResource extends Resource
                     // 🟢 FIX: Dùng find() để kích hoạt Observer cập nhật Balance ví
                     $log = PayoutLog::find($row[0]);
                     if ($log) {
+                        // 🟢 GẮN CỜ ẢO TRƯỚC KHI UPDATE ĐỂ BÁO CHO OBSERVER BIẾT
+                        $log->is_syncing_from_sheet = true;
+
                         $log->update([
                             'status' => strtolower(trim($row[$statusIdx] ?? 'pending')),         // Index 16 là Status
                             'note'   => trim($row[$noteIdx] ?? ''),                            // Index 17 là Note
-
-                            // Bạn có thể update thêm Code/PIN ở index 7, 8 nếu muốn
                         ]);
                         $count++;
                     }
                 }
             }
+
             \Filament\Notifications\Notification::make()
                 ->title("Synced {$count} records!")
                 ->success()
@@ -399,16 +401,8 @@ class PayoutLogResource extends Resource
                                     $set('amount_usd', 0);
                                     return;
                                 }
-
-                                // 2. Logic mới: Tính số dư Confirmed khả dụng
-                                // Tổng Confirmed từ RebateTracker
-                                // Tự động tính Confirmed khả dụng (đã trừ rút/hold) để điền sẵn vào ô nhập
-                                $confirmed = \App\Models\RebateTracker::where('account_id', $state)
-                                    ->whereIn('status', ['confirmed', 'Confirmed'])->sum('rebate_amount') ?? 0;
-                                $paid = \App\Models\PayoutLog::where('account_id', $state)
-                                    ->whereIn('transaction_type', ['withdrawal', 'hold'])->where('status', 'completed')->sum('amount_usd') ?? 0;
-
-                                $set('amount_usd', round(max(0, $confirmed - $paid), 2));
+                                // 🟢 FIX DRY: Gọi hàm Helper tính số dư (GỌN GÀNG, KHÔNG DƯ THỪA)
+                                $set('amount_usd', round(self::getAvailableBalance($state), 2));
                                 static::calculateNet($set, $get);
                             }),
 
@@ -481,17 +475,13 @@ class PayoutLogResource extends Resource
                                 $accId = $get('account_id');
                                 if (!$accId) return false;
 
-                                $confirmed = \App\Models\RebateTracker::where('account_id', $accId)
-                                    ->whereIn('status', ['confirmed', 'Confirmed'])->sum('rebate_amount') ?? 0;
-                                $paid = \App\Models\PayoutLog::where('account_id', $accId)
-                                    ->whereIn('transaction_type', ['withdrawal', 'hold'])
-                                    ->where('status', 'completed')->sum('amount_usd') ?? 0;
-
-                                $availableBalance = $confirmed - $paid;
+                                // 🟢 FIX DRY
+                                $availableBalance = self::getAvailableBalance($accId);
                                 $brand = \App\Models\Brand::where('slug', $value)->first();
 
                                 return ($brand && $brand->maximum_limit > 0 && $availableBalance > $brand->maximum_limit);
                             })
+
                             // 3. THÊM BOOST VÀ MAXIMUM VÀO MODAL TẠO NHANH (+)
                             ->createOptionForm([
                                 Forms\Components\Grid::make(2)
@@ -540,10 +530,8 @@ class PayoutLogResource extends Resource
                                     $brand = \App\Models\Brand::where('slug', $value)->first();
                                     if (!$brand || $brand->maximum_limit <= 0) return;
 
-                                    $accountId = $get('account_id');
-                                    $confirmed = \App\Models\RebateTracker::where('account_id', $accountId)->where('status', 'confirmed')->sum('rebate_amount') ?? 0;
-                                    $paid = \App\Models\PayoutLog::where('account_id', $accountId)->whereIn('transaction_type', ['withdrawal', 'hold'])->where('status', 'completed')->sum('amount_usd') ?? 0;
-                                    $balance = $confirmed - $paid;
+                                    // 🟢 FIX DRY
+                                    $balance = self::getAvailableBalance($get('account_id'));
 
                                     if ($balance > $brand->maximum_limit) {
                                         $fail("This Brand cannot be selected because the balance (\$ {$balance}) exceeds the allowed limit (\$ {$brand->maximum_limit}).");
@@ -601,34 +589,21 @@ class PayoutLogResource extends Resource
                                 $accountId = $get('account_id');
                                 if (!$accountId) return null;
 
-                                // 1. Tính Tổng tích lũy (Tổng tất cả Rebate hợp lệ: Clicked, Pending, Confirmed)
                                 $lifetimeTotal = \App\Models\RebateTracker::where('account_id', $accountId)
-                                    ->whereIn('status', ['pending', 'clicked', 'confirmed', 'Pending', 'Clicked', 'Confirmed'])
+                                    ->whereIn('status', ['pending', 'clicked', 'confirmed'])
                                     ->sum('rebate_amount') ?? 0;
 
-                                // 2. Tính Pending (Clicked + Pending)
                                 $pending = \App\Models\RebateTracker::where('account_id', $accountId)
-                                    ->whereIn('status', ['pending', 'clicked', 'Pending', 'Clicked'])
+                                    ->whereIn('status', ['pending', 'clicked'])
                                     ->sum('rebate_amount') ?? 0;
 
-                                // 3. Tính Confirmed thực tế (Tổng Confirmed - Tổng đã rút/hold)
-                                $totalConfirmed = \App\Models\RebateTracker::where('account_id', $accountId)
-                                    ->whereIn('status', ['confirmed', 'Confirmed'])
-                                    ->sum('rebate_amount') ?? 0;
+                                // 🟢 FIX DRY: Dùng luôn hàm Helper cho số Confirmed
+                                $availableConfirmed = self::getAvailableBalance($accountId);
 
-                                $paid = \App\Models\PayoutLog::where('account_id', $accountId)
-                                    ->whereIn('transaction_type', ['withdrawal', 'hold'])
-                                    ->where('status', 'completed')
-                                    ->sum('amount_usd') ?? 0;
-
-                                $availableConfirmed = max(0, $totalConfirmed - $paid);
-
-                                // Định dạng hiển thị
                                 $totalStr = number_format($lifetimeTotal, 2);
                                 $pendingStr = number_format($pending, 2);
                                 $confirmedStr = number_format($availableConfirmed, 2);
 
-                                // Trả về chuỗi Hint theo ý bạn
                                 return "Total: \${$totalStr} | Pending: \${$pendingStr} | Confirmed: \${$confirmedStr}";
                             })
                             ->hintColor('primary') // Màu xanh thương hiệu cho nổi bật
@@ -920,13 +895,29 @@ class PayoutLogResource extends Resource
                 // Only shows platforms that currently have records in PayoutLog
                 Tables\Filters\SelectFilter::make('platform')
                     ->label('Platform')
-                    ->options(
-                        fn() => \App\Models\Account::query()
+                    ->options(function () {
+                        $platforms = \App\Models\Account::query()
                             ->whereIn('id', \App\Models\PayoutLog::distinct()->pluck('account_id'))
                             ->pluck('platform', 'platform')
-                            ->mapWithKeys(fn($state) => [$state => strtoupper($state)])
-                            ->toArray()
-                    )
+                            ->mapWithKeys(fn($state) => [
+                                $state => self::$platform[$state] ?? ucwords(
+                                    // 1. Insert space before capital letters (JoinHoney -> Join Honey)
+                                    // 2. Replace underscores/hyphens with spaces (join_honey -> join honey)
+                                    preg_replace('/(?<!^)[A-Z]/', ' $0', str_replace(['_', '-'], ' ', $state))
+                                )
+                            ])
+                            ->toArray();
+
+                        // 🟢 2. FORMAT LẠI NHÃN (LABEL) NGAY BÊN TRONG HÀM OPTIONS
+                        $formattedOptions = [];
+                        foreach ($platforms as $p) {
+                            // Dùng mảng $platform từ Trait HasPlatform của bạn để map label, 
+                            // nếu không có thì giữ nguyên tên gốc
+                            $formattedOptions[$p] = self::$platform[$p] ?? $p;
+                        }
+
+                        return $formattedOptions;
+                    })
                     ->query(function (Builder $query, array $data): Builder {
                         return $query->when(
                             $data['value'],
@@ -1175,6 +1166,23 @@ class PayoutLogResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);;
+    }
+
+    // 🟢 HÀM HELPER: Tính số dư khả dụng duy nhất tại đây (DRY)
+    public static function getAvailableBalance($accountId): float
+    {
+        if (!$accountId) return 0.0;
+
+        $confirmed = \App\Models\RebateTracker::where('account_id', $accountId)
+            ->whereIn('status', ['confirmed'])
+            ->sum('rebate_amount') ?? 0;
+
+        $paid = \App\Models\PayoutLog::where('account_id', $accountId)
+            ->whereIn('transaction_type', ['withdrawal', 'hold'])
+            ->where('status', 'completed')
+            ->sum('amount_usd') ?? 0;
+
+        return max(0, $confirmed - $paid);
     }
 
     // Cập nhật hàm tính toán USD

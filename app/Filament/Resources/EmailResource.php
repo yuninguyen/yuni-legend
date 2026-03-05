@@ -78,7 +78,7 @@ class EmailResource extends Resource
                             ->required()
                             ->native(false),
 
-                        Forms\Components\DatePicker::make('email_created_at')
+                        Forms\Components\TextInput::make('email_created_at')
                             ->label('Date Created')
                             ->placeholder('dd/mm/yyyy')
                             ->displayFormat('d/m/Y') // Định dạng hiển thị khi nhập

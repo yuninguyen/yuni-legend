@@ -327,7 +327,7 @@ trait HasAccountSchema
                     ->alignment(Alignment::Center)
                     ->visible(static::class === \App\Filament\Resources\AccountResource::class)
                     ->formatStateUsing(fn($state) => $state ? (self::$platform[$state] ?? '') : 'N/A'),
-                    
+
                 // HIỂN THỊ EMAIL TỪ BẢNG LIÊN KẾT
                 // Lấy từ quan hệ email() trong Model Account
                 TextColumn::make('email.email')
@@ -578,14 +578,24 @@ trait HasAccountSchema
                 SelectFilter::make('platform')
                     ->label('Platform')
                     ->multiple() // Cho phép tích nhiều checkbox
-                    ->options(
-                        fn() => \App\Models\Account::query()
+                    ->options(function () {
+                        $platforms = \App\Models\Account::query()
                             ->distinct()
                             ->whereNotNull('platform')
                             ->pluck('platform', 'platform')
                             ->map(fn($label) => (string)$label)
-                            ->toArray()
-                    )
+                            ->toArray();
+
+                        // 🟢 2. FORMAT LẠI NHÃN (LABEL) NGAY BÊN TRONG HÀM OPTIONS
+                        $formattedOptions = [];
+                        foreach ($platforms as $p) {
+                            // Dùng mảng $platform từ Trait HasPlatform của bạn để map label, 
+                            // nếu không có thì giữ nguyên tên gốc
+                            $formattedOptions[$p] = self::$platform[$p] ?? $p;
+                        }
+
+                        return $formattedOptions;
+                    })
                     ->searchable(),
 
                 // Lọc Date Create theo Year
