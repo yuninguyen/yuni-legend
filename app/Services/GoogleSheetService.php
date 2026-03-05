@@ -231,25 +231,58 @@ class GoogleSheetService
     // ==========================================
     // TÍNH NĂNG: UPSERT (Tự động tìm ID để Update hoặc Append nếu mới)
     // ==========================================
+    /**
+     * FIX: Thêm tham số $headers để tự ghi hàng tiêu đề khi tab mới trống.
+     *
+     * Trước đây hàm chỉ nhận 2 tham số → $headers bị bỏ qua hoàn toàn khi gọi từ
+     * SyncGoogleSheetJob, HasTrackerSchema, HasAccountSchema, SyncAllToGoogleSheet.
+     * Hậu quả: mọi tab tạo mới đều không có hàng tiêu đề (header row).
+     *
+     * Logic mới:
+     *  - Đọc toàn bộ dữ liệu hiện có (1 API read call, không đổi).
+     *  - Nếu sheet trống VÀ $headers được cung cấp → prepend header vào appendData.
+     *  - Nếu hàng đầu đã là header (cột A = 'ID' hoặc giá trị không phải số) → bỏ qua.
+     *  - Tất cả rows còn lại vẫn chạy qua idMap để update-or-append như cũ.
+     */
     public function upsertRows(array $dataRows, ?string $sheetName = null, array $headers = [])
     {
         try {
             $targetSheet = $sheetName ?? $this->getFirstSheetName();
             $safeSheetName = "'" . str_replace("'", "''", $targetSheet) . "'";
 
-            $existingIds = $this->readSheet('A1:AC', $targetSheet);
+            // 1 API read call — không thay đổi so với trước
+            $existingData = $this->readSheet('A1:AC', $targetSheet);
 
             $idMap = [];
-            if (!empty($existingIds)) {
-                foreach ($existingIds as $index => $row) {
+            $sheetIsEmpty = empty($existingData);
+            $firstRowIsHeader = false;
+
+            if (!$sheetIsEmpty) {
+                $firstRow = $existingData[0] ?? [];
+                // Nhận diện header: cột A không phải số nguyên (vd: 'ID', 'Email'...)
+                $firstCell = trim($firstRow[0] ?? '');
+                $firstRowIsHeader = ($firstCell !== '' && !ctype_digit($firstCell));
+
+                foreach ($existingData as $index => $row) {
+                    // Bỏ qua hàng header khi xây idMap
+                    if ($index === 0 && $firstRowIsHeader) continue;
+
                     if (isset($row[0]) && trim($row[0]) !== '') {
-                        $idMap[(string)$row[0]] = $index + 1;
+                        // rowNumber trong Sheet = index (0-based) + 1 (1-based)
+                        // Nhưng nếu có header, data bắt đầu từ dòng 2 → +1 thêm
+                        $sheetRow = $firstRowIsHeader ? $index + 1 : $index + 1;
+                        $idMap[(string)$row[0]] = $sheetRow;
                     }
                 }
             }
 
             $updateData = [];
             $appendData = [];
+
+            // Nếu sheet trống và có headers → ghi header trước
+            if ($sheetIsEmpty && !empty($headers)) {
+                $appendData[] = array_values($headers);
+            }
 
             foreach ($dataRows as $rowData) {
                 $row = array_values((array)$rowData);
@@ -258,7 +291,7 @@ class GoogleSheetService
                 if (isset($idMap[$id])) {
                     $rowNumber = $idMap[$id];
                     $updateData[] = new \Google\Service\Sheets\ValueRange([
-                        'range' => "{$safeSheetName}!A{$rowNumber}",
+                        'range'  => "{$safeSheetName}!A{$rowNumber}",
                         'values' => [$row]
                     ]);
                 } else {
@@ -269,7 +302,7 @@ class GoogleSheetService
             if (!empty($updateData)) {
                 $batchRequest = new \Google\Service\Sheets\BatchUpdateValuesRequest([
                     'valueInputOption' => 'RAW',
-                    'data' => $updateData
+                    'data'             => $updateData
                 ]);
                 $this->service->spreadsheets_values->batchUpdate($this->spreadsheetId, $batchRequest);
             }
@@ -284,15 +317,21 @@ class GoogleSheetService
                 );
             }
 
+            Log::info('upsertRows completed', [
+                'sheet'    => $targetSheet,
+                'updated'  => count($updateData),
+                'appended' => count($appendData),
+            ]);
+
             return [
-                'updated' => count($updateData),
-                'appended' => count($appendData)
+                'updated'  => count($updateData),
+                'appended' => count($appendData),
             ];
         } catch (\Google\Service\Exception $e) {
             Log::error('Google Sheets API Error - Upsert Rows', [
-                'error' => $e->getMessage(),
+                'error'     => $e->getMessage(),
                 'row_count' => count($dataRows),
-                'sheet' => $sheetName
+                'sheet'     => $sheetName
             ]);
             throw new \Exception('Failed to upsert data to Google Sheets: ' . $e->getMessage());
         } catch (\Exception $e) {
@@ -558,4 +597,5 @@ class GoogleSheetService
 
     // ==========================================
 }
+
 
