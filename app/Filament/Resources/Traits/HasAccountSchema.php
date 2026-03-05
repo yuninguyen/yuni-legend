@@ -1135,11 +1135,8 @@ trait HasAccountSchema
         //$sheetService->formatColumnsAsClip($targetTab, 17, 18); // Personal Info (R)
     }
 
-    public static function bootHasAccountSchema()
-    {
-        static::saved(function ($model) {
-            // Tự động gọi hàm sync mỗi khi nhấn Save trên Filament
-            \App\Jobs\SyncGoogleSheetJob::dispatch($model->id, get_class($model));
-        });
-    }
+    // bootHasAccountSchema ĐÃ XÓA (FIX #7):
+    // Sync Account lên Sheet được thực hiện qua Observer hoặc gọi trực tiếp
+    // syncSingleAccountToSheet() trong action. Không dùng boot() để tránh
+    // double-dispatch nếu sau này thêm AccountObserver.
 }
