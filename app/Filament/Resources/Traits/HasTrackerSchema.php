@@ -985,10 +985,13 @@ trait HasTrackerSchema
                         ->color('success')
                         ->requiresConfirmation()
                         ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
-                            foreach ($records as $record) {
-                                $record->update(['status' => 'confirmed']);
-                                static::syncSingleRecordToSheet($record); // Đồng bộ từng dòng
-                            }
+                            // ✅ SAU: 1 query DB + groupBy platform + 1 lần upsertRows mỗi tab
+\App\Models\RebateTracker::whereIn('id', $ids)->update(['status' => 'confirmed']); // 1 query
+$grouped = $records->groupBy(fn($r) => $r->account?->platform ?: 'General');
+foreach ($grouped as $platform => $items) {
+    $sheetService->upsertRows($rows, 'All_Rebate_Tracker', static::$trackerHeaders);     // 1 API call
+    $sheetService->upsertRows($rows, ucfirst($platform).'_Tracker', static::$trackerHeaders); // 1 API call
+}
                             \Filament\Notifications\Notification::make()->title('Updated & synchronized!')->success()->send();
                         }),
 
@@ -998,10 +1001,13 @@ trait HasTrackerSchema
                         ->icon('heroicon-o-clock')
                         ->color('info')
                         ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
-                            foreach ($records as $record) {
-                                $record->update(['status' => 'pending']);
-                                static::syncSingleRecordToSheet($record); // Đồng bộ từng dòng
-                            }
+                            // ✅ SAU: 1 query DB + groupBy platform + 1 lần upsertRows mỗi tab
+\App\Models\RebateTracker::whereIn('id', $ids)->update(['status' => 'pending']); // 1 query
+$grouped = $records->groupBy(fn($r) => $r->account?->platform ?: 'General');
+foreach ($grouped as $platform => $items) {
+    $sheetService->upsertRows($rows, 'All_Rebate_Tracker', static::$trackerHeaders);     // 1 API call
+    $sheetService->upsertRows($rows, ucfirst($platform).'_Tracker', static::$trackerHeaders); // 1 API call
+}
                             \Filament\Notifications\Notification::make()->title('Updated & synchronized!')->success()->send();
                         }),
 
