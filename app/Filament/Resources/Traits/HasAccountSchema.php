@@ -873,27 +873,39 @@ trait HasAccountSchema
                         ->icon('heroicon-o-table-cells')
                         ->color('success')
                         ->action(function (Collection $records) {
-                            $rows = [];
-                            foreach ($records as $record) {
-                                $rows[] = static::formatAccountForSheet($record);
+                            // FIX: Nhóm theo platform trước, rồi upsert từng tab 1 lần.
+                            // Trước đây chỉ lấy platform của record đầu tiên → các platform khác bị đẩy sai tab.
+                            $grouped = $records->groupBy(fn($r) => $r->platform ?: 'General');
+
+                            $totalUpdated  = 0;
+                            $totalAppended = 0;
+
+                            foreach ($grouped as $platform => $items) {
+                                $targetTab = ucfirst($platform) . '_Accounts';
+
+                                // Gom toàn bộ rows của platform này thành 1 mảng — 1 lần gọi API duy nhất
+                                $rows = $items
+                                    ->map(fn($r) => static::formatAccountForSheet($r))
+                                    ->values()
+                                    ->toArray();
+
+                                $sheetService->createSheetIfNotExist($targetTab);
+
+                                // FIX #3 (BulkAction): Truyền $headers để tab mới có hàng tiêu đề
+                                $result = $sheetService->upsertRows($rows, $targetTab, static::$accountHeaders);
+
+                                // Ép định dạng Clip
+                                $sheetService->formatColumnsAsClip($targetTab, 5, 6);   // Note Email (F)
+                                $sheetService->formatColumnsAsClip($targetTab, 14, 15); // Platform Note (O)
+                                $sheetService->formatColumnsAsClip($targetTab, 17, 18); // Personal Info (R)
+
+                                $totalUpdated  += $result['updated'];
+                                $totalAppended += $result['appended'];
                             }
-
-                            $sheetService = app(\App\Services\GoogleSheetService::class);
-
-                            // Xác định Tab (Lấy từ bản ghi đầu tiên trong danh sách chọn)
-                            $firstRecord = $records->first();
-                            $targetTab = $firstRecord->platform . '_Accounts';
-
-                            $result = $sheetService->upsertRows($rows, $targetTab);
-
-                            // Ép định dạng Clip
-                            $sheetService->formatColumnsAsClip($targetTab, 5, 6);   // Note Email (F)
-                            $sheetService->formatColumnsAsClip($targetTab, 14, 15); // Platform Note (O)
-                            $sheetService->formatColumnsAsClip($targetTab, 17, 18); // Personal Info (R)
 
                             \Filament\Notifications\Notification::make()
                                 ->title('Accounts Synced!')
-                                ->body("Updated {$result['updated']} and added {$result['appended']} to {$targetTab}.")
+                                ->body("Updated {$totalUpdated}, Appended {$totalAppended} across " . $grouped->count() . ' tab(s).')
                                 ->success()
                                 ->send();
                         })
