@@ -14,11 +14,14 @@ use Illuminate\Support\HtmlString;
 use Filament\Support\Enums\FontWeight;
 use Illuminate\Database\Eloquent\Builder;
 use App\Filament\Resources\Traits\HasUsStates;
+use App\Filament\Resources\Traits\HasPlatform;
 
 trait HasTrackerSchema
 {
     // FIX #8: $usStates được kế thừa từ HasUsStates — KHÔNG khai báo lại ở đây.
     use HasUsStates;
+    // Dùng chung $platforms từ HasPlatform thay vì khai báo lại ở đây.
+    use HasPlatform;
 
     /**
      * Scope lọc các bản ghi đang ở trạng thái có thể rút tiền
@@ -55,15 +58,38 @@ trait HasTrackerSchema
                                 // SELECT PLATFORM
                                 Forms\Components\Select::make('platform')
                                     ->label('Platform')
-                                    ->options(function ($get, $record) {
+                                    ->options(self::$platform)
+                                    ->options(function (Forms\Get $get, $record) {
                                         // Ưu tiên User đang chọn, nếu không có lấy User từ bản ghi cũ
                                         $userId = $get('user_id') ?? $record?->user_id;
-                                        if (!$userId) return [];
 
-                                        return \App\Models\Account::where('user_id', $userId)
+                                        // 1. Lấy tất cả Platform gốc mà bạn đã cấu hình trong Trait
+                                        $allPlatforms = self::$platform; // Ví dụ: ['amazon' => 'Amazon', 'ebay' => 'eBay']
+
+                                        // 2. Nếu Admin chưa chọn user nào ở ô trên, hiện toàn bộ platform
+                                        if (!$userId) {
+                                            return $allPlatforms;
+                                        }
+
+                                        // 3. Nếu ĐÃ chọn User: Quét xem user đó đang có tài khoản ở những Platform nào
+                                        $activePlatformKeys = \App\Models\Account::where('user_id', $userId)
+                                            ->whereNotNull('platform')
                                             ->distinct()
-                                            ->pluck('platform', 'platform')
-                                            ->mapWithKeys(fn($p) => [$p => ucfirst((string)$p)]);
+                                            ->pluck('platform')
+                                            ->toArray();
+
+                                        // 4. Lọc cái mảng gốc (self::$platform), chỉ giữ lại những platform mà User đó có
+                                        $filteredPlatforms = [];
+                                        foreach ($activePlatformKeys as $key) {
+                                            if (isset($allPlatforms[$key])) {
+                                                $filteredPlatforms[$key] = $allPlatforms[$key];
+                                            } else {
+                                                // Đề phòng db có chữ lạ chưa định nghĩa trong Trait
+                                                $filteredPlatforms[$key] = ucfirst((string)$key);
+                                            }
+                                        }
+
+                                        return $filteredPlatforms;
                                     })
                                     ->live()
                                     ->required()
@@ -77,13 +103,13 @@ trait HasTrackerSchema
                                         return null;
                                     })
                                     // ÉP NẠP DỮ LIỆU KHI EDIT
-                                    ->afterStateHydrated(function ($state, $set, $record) {
+                                    ->afterStateHydrated(function ($state, Forms\Set $set, $record) {
                                         if ($record && !$state) {
                                             // Lấy platform từ account liên kết nếu field platform trên form đang trống
                                             $set('platform', $record->account?->platform);
                                         }
                                     })
-                                    ->afterStateUpdated(function ($set) {
+                                    ->afterStateUpdated(function (Forms\Set $set) {
                                         $set('account_email', null);
                                         $set('account_password_display', null);
                                     })
@@ -361,7 +387,8 @@ trait HasTrackerSchema
                         // Platform (Lấy từ quan hệ: account -> platform)
                         \Filament\Infolists\Components\TextEntry::make('account.platform')
                             ->label('Platform')
-                            ->placeholder('N/A'),
+                            ->placeholder('N/A')
+                            ->formatStateUsing(fn($state) => $state ? (self::$platform[$state] ?? '') : 'N/A'),
                         // User (Để hiện tên thay vì ID số 1)
                         \Filament\Infolists\Components\TextEntry::make('user.name')
                             ->label('User')
@@ -540,6 +567,7 @@ trait HasTrackerSchema
                     ->searchable(query: function ($query, $search) {
                         $query->whereHas('account', fn($q) => $q->where('platform', 'like', "%{$search}%"));
                     })
+                    ->formatStateUsing(fn($state) => $state ? (self::$platform[$state] ?? '') : 'N/A')
                     ->visible(static::class === \App\Filament\Resources\RebateTrackerResource::class),
 
                 // 1. STORE (Đẩy lùi vào để phân cấp)
@@ -622,7 +650,7 @@ trait HasTrackerSchema
                                         'pending'    => 'Pending',
                                         'confirmed'  => 'Confirmed',
                                         'missing'    => 'Missing',
-                                        'ineligible' => 'Ineligible',                                     
+                                        'ineligible' => 'Ineligible',
                                     ])
                                     ->default(fn($record) => $record->status)
                                     ->required(),
@@ -719,11 +747,21 @@ trait HasTrackerSchema
                             ->distinct()
                             ->pluck('account_id');
 
-                        return \App\Models\Account::whereIn('id', $activeAccountIds)
+                        $platforms = \App\Models\Account::whereIn('id', $activeAccountIds)
                             ->whereNotNull('platform')
                             ->distinct()
-                            ->pluck('platform', 'platform')
+                            ->pluck('platform') // Chỉ pluck 1 cột để lấy mảng value
                             ->toArray();
+
+                        // 🟢 2. FORMAT LẠI NHÃN (LABEL) NGAY BÊN TRONG HÀM OPTIONS
+                        $formattedOptions = [];
+                        foreach ($platforms as $p) {
+                            // Dùng mảng $platform từ Trait HasPlatform của bạn để map label, 
+                            // nếu không có thì giữ nguyên tên gốc
+                            $formattedOptions[$p] = self::$platform[$p] ?? $p;
+                        }
+
+                        return $formattedOptions;
                     })
                     ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data) {
                         if (!empty($data['value'])) {

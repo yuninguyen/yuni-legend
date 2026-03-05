@@ -65,8 +65,7 @@ class EmailResource extends Resource
                             ->email(),
 
                         Forms\Components\TextInput::make('two_factor_code')
-                            ->label('2FA Code')
-                            ->placeholder('Nhập mã 2FA hoặc Recovery code...'),
+                            ->label('2FA Code/Recovery code'),
 
                         Forms\Components\select::make('status')
                             ->label('Status')
@@ -81,7 +80,7 @@ class EmailResource extends Resource
 
                         Forms\Components\DatePicker::make('email_created_at')
                             ->label('Date Created')
-                            ->placeholder('Chọn ngày tạo account dd/mm/yyyy')
+                            ->placeholder('dd/mm/yyyy')
                             ->displayFormat('d/m/Y') // Định dạng hiển thị khi nhập
                             ->format('Y-m-d') // Định dạng chuẩn để lưu vào MySQL
                             ->native(true) // Dùng giao diện hiện đại của Filament
@@ -91,8 +90,8 @@ class EmailResource extends Resource
 
                         // ĐÂY LÀ CỘT NOTE BẠN VỪA YÊU CẦU
                         Forms\Components\Textarea::make('note')
-                            ->label('Ghi chú Email')
-                            ->placeholder('Lưu ý riêng cho email này...')
+                            ->label('Note')
+                            ->placeholder('Please note this email specifically if there are any issues...')
                             ->columnSpanFull()
 
                     ])->columns(2), // Chia 2 cột cho cân đối

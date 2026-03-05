@@ -958,10 +958,49 @@ class PayoutLogResource extends Resource
                 // 2. LỌC THEO THỜI GIAN (TỪ NGÀY - ĐẾN NGÀY)
                 Tables\Filters\Filter::make('created_at')
                     ->form([
-                        Forms\Components\DatePicker::make('created_from')
-                            ->label('From Date'),
-                        Forms\Components\DatePicker::make('created_until')
-                            ->label('To Date'),
+                        Forms\Components\TextInput::make('created_from')
+                            ->label('From Date')
+                            ->placeholder('dd/mm/yyyy')
+                            //->displayFormat('d/m/Y') // Định dạng hiển thị khi nhập
+                            //->format('Y-m-d') // Định dạng chuẩn để lưu vào MySQL
+                            //->native(false) // Dùng giao diện hiện đại của Filament
+                            ->nullable() // Cho phép để trống
+                            ->default(null) // Đảm bảo không tự động lấy ngày hiện tại
+                            ->mask('99/99/9999') // Tạo khuôn dd/mm/yyyy khi gõ
+                            ->rules(['date_format:d/m/Y'])
+                            //->dehydrated(true), // Đảm bảo trường này được gửi về backend
+                            //->live(),  // Đồng bộ dữ liệu ngay lập tức
+                            ->dehydrateStateUsing(function ($state) {
+                                if (blank($state)) return null;
+                                try {
+                                    // Dịch từ chuẩn VN (d/m/Y) sang chuẩn Quốc tế (Y-m-d) để MySQL hiểu
+                                    return \Carbon\Carbon::createFromFormat('d/m/Y', $state)->format('Y-m-d');
+                                } catch (\Exception $e) {
+                                    return null;
+                                }
+                            }),
+
+                        Forms\Components\TextInput::make('created_until')
+                            ->label('To Date')
+                            ->placeholder('dd/mm/yyyy')
+                            //->displayFormat('d/m/Y') // Định dạng hiển thị khi nhập
+                            //->format('Y-m-d') // Định dạng chuẩn để lưu vào MySQL
+                            //->native(false) // Dùng giao diện hiện đại của Filament
+                            ->nullable() // Cho phép để trống
+                            ->default(null) // Đảm bảo không tự động lấy ngày hiện tại
+                            ->mask('99/99/9999') // Tạo khuôn dd/mm/yyyy khi gõ
+                            ->rules(['date_format:d/m/Y'])
+                            //->dehydrated(true), // Đảm bảo trường này được gửi về backend
+                            //->live(),  // Đồng bộ dữ liệu ngay lập tức
+                            ->dehydrateStateUsing(function ($state) {
+                                if (blank($state)) return null;
+                                try {
+                                    // Dịch từ chuẩn VN (d/m/Y) sang chuẩn Quốc tế (Y-m-d) để MySQL hiểu
+                                    return \Carbon\Carbon::createFromFormat('d/m/Y', $state)->format('Y-m-d');
+                                } catch (\Exception $e) {
+                                    return null;
+                                }
+                            }),
                     ])
                     ->columns(2)     // QUAN TRỌNG: Dàn ngang 2 ô Date bên trong
                     ->columnSpan(2)  // QUAN TRỌNG: Khối thời gian này chiếm 2 cột của Layout tổng

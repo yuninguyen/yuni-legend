@@ -286,7 +286,14 @@ class PayoutMethodResource extends Resource
                             ->schema([
                                 Forms\Components\Grid::make(3)->schema([
                                     Forms\Components\TextInput::make('full_name')->label('Full name'),
-                                    Forms\Components\TextInput::make('dob')->label('Date of Birth'),
+                                    Forms\Components\TextInput::make('dob')
+                                        ->label('Date of Birth')
+                                        ->placeholder('dd/mm/yyyy')
+                                        ->displayFormat('d/m/Y')
+                                        ->format('Y-m-d') // Định dạng chuẩn để lưu vào MySQL
+                                        ->native(false)
+                                        ->nullable() // Cho phép để trống
+                                        ->default(null),
                                     Forms\Components\TextInput::make('ssn')->label('SSN / Tax ID'),
                                     Forms\Components\TextInput::make('phone')->label('Phone number'),
                                     Forms\Components\Textarea::make('address')
@@ -406,7 +413,10 @@ class PayoutMethodResource extends Resource
                             ->schema([
                                 Infolists\Components\Grid::make(3)->schema([
                                     Infolists\Components\TextEntry::make('full_name')->label('Full Name')->copyable(),
-                                    Infolists\Components\TextEntry::make('dob')->label('Date of Birth'),
+                                    Infolists\Components\TextEntry::make('dob')
+                                        ->label('Date of Birth')
+                                        ->dateTime('d/m/Y')
+                                        ->placeholder('N/A'),
                                     Infolists\Components\TextEntry::make('ssn')->label('SSN / Tax ID')->copyable(),
                                     Infolists\Components\TextEntry::make('phone')->label('Phone')->copyable(),
                                     Infolists\Components\TextEntry::make('address')->label('Address')->columnSpan(2),

@@ -26,7 +26,7 @@ use Filament\Tables\Actions\BulkAction;
 use Illuminate\Database\Eloquent\Collection;
 use Filament\Navigation\NavigationItem;
 use App\Filament\Resources\Traits\HasUsStates;
-
+use App\Filament\Resources\Traits\HasPlatform;
 
 use function Livewire\wrap;
 
@@ -37,6 +37,9 @@ trait HasAccountSchema
 
     // Dùng chung $usStates từ HasUsStates thay vì khai báo lại ở đây.
     use HasUsStates;
+    // Dùng chung $platforms từ HasPlatform thay vì khai báo lại ở đây.
+    use HasPlatform;
+
 
     public static function form(Form $form): Form
     {
@@ -48,40 +51,7 @@ trait HasAccountSchema
                         Forms\Components\Select::make('platform')
                             ->label('Platform')
                             ->placeholder('Rakuten, RetailMeNot, PayPal...')
-                            ->options([
-                                'Rakuten' => 'Rakuten',
-                                'RetailMeNot' => 'RetailMeNot',
-                                'JoinHoney' => 'Join Honey',
-                                'Price' => 'Price.com',
-                                'TopCashback' => 'TopCashback',
-                                'ActiveJunky' => 'Active Junky',
-                                'PayPal' => 'PayPal',
-                                'Amazon' => 'Amazon',
-                                'Netflix' => 'Netflix',
-                                'Facebook' => 'Facebook',
-                                'Instagram' => 'Instagram',
-                                'Twitter' => 'Twitter',
-                                'TikTok' => 'TikTok',
-                                'Discord' => 'Discord',
-                                'Pinterest' => 'Pinterest',
-                                'Reddit' => 'Reddit',
-                                'Snapchat' => 'Snapchat',
-                                'LinkedIn' => 'LinkedIn',
-                                'Spotify' => 'Spotify',
-                                'Telegram' => 'Telegram',
-                                'Tumblr' => 'Tumblr',
-                                'YouTube' => 'YouTube',
-                                'eBay' => 'eBay',
-                                'Etsy' => 'Etsy',
-                                'Swagbucks' => 'Swagbucks',
-                                'InboxDollars' => 'InboxDollars',
-                                'MyPoints' => 'MyPoints',
-                                'Drop' => 'Drop',
-                                'Dosh' => 'Dosh',
-                                'Ibotta' => 'Ibotta',
-                                'FetchRewards' => 'FetchRewards',
-                                'Checkout51' => 'Checkout51',
-                            ])
+                            ->options(self::$platform)
                             ->required()
                             ->native(false), // Giúp giao diện đồng bộ đẹp hơn
 
@@ -127,13 +97,13 @@ trait HasAccountSchema
                             ->options(self::$usStates),
 
                         Forms\Components\TextInput::make('device')
-                            ->label('Device/Antidetect')
+                            ->label('Device/Antidetect Create')
                             ->placeholder('iPhone 13, Windows 10, BitBrowser...'),
 
                         Forms\Components\Textarea::make('paypal_info')
                             ->label('PayPal Information')
-                            ->placeholder('Full name, Full address...')
-                            ->columnSpanFull(),
+                            ->placeholder('Full name, Full address...'),
+                        //->columnSpanFull(),
 
                         Forms\Components\Textarea::make('device_linked_paypal')
                             ->label('Device/Antidetect Linked PayPal')
@@ -163,32 +133,54 @@ trait HasAccountSchema
                             ->preload(),
 
                         //Thêm ngày tạo tài khoản
-                        Forms\Components\DatePicker::make('account_created_at')
+                        Forms\Components\TextInput::make('account_created_at')
                             ->label('Date Create')
-                            ->placeholder('dd/mm/yyyy (Để trống nếu chưa có)')
-                            ->displayFormat('d/m/Y') // Định dạng hiển thị khi nhập
-                            ->format('Y-m-d') // Định dạng chuẩn để lưu vào MySQL
-                            ->native(false) // Dùng giao diện hiện đại của Filament
+                            ->placeholder('dd/mm/yyyy (Leave blank if it doesn\'t exist)')
+                            //->displayFormat('d/m/Y') // Định dạng hiển thị khi nhập
+                            //->format('Y-m-d') // Định dạng chuẩn để lưu vào MySQL
+                            //->native(false) // Dùng giao diện hiện đại của Filament
                             ->nullable() // Cho phép để trống
-                            ->default(null), // Đảm bảo không tự động lấy ngày hiện tại
-                        //->dehydrated(true), // Đảm bảo trường này được gửi về backend
-                        //->live(),  // Đồng bộ dữ liệu ngay lập tức,
+                            ->default(null) // Đảm bảo không tự động lấy ngày hiện tại
+                            ->mask('99/99/9999') // Tạo khuôn dd/mm/yyyy khi gõ
+                            ->rules(['date_format:d/m/Y'])
+                            //->dehydrated(true), // Đảm bảo trường này được gửi về backend
+                            //->live(),  // Đồng bộ dữ liệu ngay lập tức,
+                            ->dehydrateStateUsing(function ($state) {
+                                if (blank($state)) return null;
+                                try {
+                                    // Dịch từ chuẩn VN (d/m/Y) sang chuẩn Quốc tế (Y-m-d) để MySQL hiểu
+                                    return \Carbon\Carbon::createFromFormat('d/m/Y', $state)->format('Y-m-d');
+                                } catch (\Exception $e) {
+                                    return null;
+                                }
+                            }),
 
                         //Thêm ngày linked paypal
-                        Forms\Components\DatePicker::make('paypal_linked_at')
+                        Forms\Components\TextInput::make('paypal_linked_at')
                             ->label('Date Linked PayPal')
-                            ->placeholder('dd/mm/yyyy (Để trống nếu chưa có)')
-                            ->displayFormat('d/m/Y')
-                            ->format('Y-m-d') // Định dạng chuẩn để lưu vào MySQL
-                            ->native(false)
+                            ->placeholder('dd/mm/yyyy (Leave blank if it doesn\'t exist)')
+                            //->displayFormat('d/m/Y') // Định dạng hiển thị khi nhập
+                            //->format('Y-m-d') // Định dạng chuẩn để lưu vào MySQL
+                            //->native(false) // Dùng giao diện hiện đại của Filament
                             ->nullable() // Cho phép để trống
-                            ->default(null), // Đảm bảo không tự động lấy ngày hiện tại
-                        //->dehydrated(true), // Đảm bảo trường này được gửi về backend
-                        //->live(),  // Đồng bộ dữ liệu ngay lập tức,
+                            ->default(null) // Đảm bảo không tự động lấy ngày hiện tại
+                            ->mask('99/99/9999') // Tạo khuôn dd/mm/yyyy khi gõ
+                            ->rules(['date_format:d/m/Y'])
+                            //->dehydrated(true), // Đảm bảo trường này được gửi về backend
+                            //->live(),  // Đồng bộ dữ liệu ngay lập tức,
+                            ->dehydrateStateUsing(function ($state) {
+                                if (blank($state)) return null;
+                                try {
+                                    // Dịch từ chuẩn VN (d/m/Y) sang chuẩn Quốc tế (Y-m-d) để MySQL hiểu
+                                    return \Carbon\Carbon::createFromFormat('d/m/Y', $state)->format('Y-m-d');
+                                } catch (\Exception $e) {
+                                    return null;
+                                }
+                            }),
 
                         Forms\Components\Textarea::make('note')
-                            ->label('Ghi chú')
-                            ->placeholder('Nhập lưu ý đặc biệt cho tài khoản này...')
+                            ->label('Note')
+                            ->placeholder('Enter any special notes for this account if applicable...')
                             ->columnSpanFull(), // Chiếm trọn 2 cột nếu bạn đang chia grid
                         // -----------------------------------
                     ])
@@ -242,7 +234,8 @@ trait HasAccountSchema
                     ->schema([
                         \Filament\Infolists\Components\TextEntry::make('platform')
                             ->label('Platform')
-                            ->placeholder('N/A'),
+                            ->placeholder('N/A')
+                            ->formatStateUsing(fn($state) => $state ? (self::$platform[$state] ?? '') : 'N/A'),
                         \Filament\Infolists\Components\TextEntry::make('password')
                             ->label('Platform Password')
                             ->placeholder('N/A'),
@@ -332,8 +325,9 @@ trait HasAccountSchema
                 Tables\Columns\TextColumn::make('platform')
                     ->searchable()
                     ->alignment(Alignment::Center)
-                    ->visible(static::class === \App\Filament\Resources\AccountResource::class),
-
+                    ->visible(static::class === \App\Filament\Resources\AccountResource::class)
+                    ->formatStateUsing(fn($state) => $state ? (self::$platform[$state] ?? '') : 'N/A'),
+                    
                 // HIỂN THỊ EMAIL TỪ BẢNG LIÊN KẾT
                 // Lấy từ quan hệ email() trong Model Account
                 TextColumn::make('email.email')
@@ -407,7 +401,7 @@ trait HasAccountSchema
                 // Column Gộp: Metadata (States, Device, PayPal Information)
                 TextColumn::make('state')
                     ->label('Source Information')
-                    ->width('25%')
+                    ->width('250px')
                     ->alignment(Alignment::Center)
                     ->toggleable()
                     ->copyable()
@@ -426,7 +420,7 @@ trait HasAccountSchema
                         $linked = $record->paypal_linked_at ? $record->paypal_linked_at->format('d/m/Y') : 'N/A';
 
                         return "
-                            <div style='text-align: left; font-size: 13px; line-height: 1.6; max-width: 250px; padding-left: 5px;'>
+                            <div style='justity-content: flex-start !important; text-align: left; font-size: 13px; line-height: 1.6; max-width: 250px; padding-left: 5px;'>
                                 <div style='margin-bottom: 2px;'>
                                     <span style='color: #64748b;'>State:</span> 
                                     <span style='color: #1e293b; font-weight: 500;'>{$stateDisplay}</span>
@@ -694,14 +688,27 @@ trait HasAccountSchema
                         ->form([
                             Forms\Components\Grid::make(2)
                                 ->schema([
-                                    Forms\Components\DatePicker::make('transaction_date')
+                                    Forms\Components\TextInput::make('transaction_date')
                                         ->label('Transaction date')
                                         ->placeholder('dd/mm/yyyy')
-                                        ->displayFormat('d/m/Y')
-                                        ->format('Y-m-d') // Định dạng chuẩn để lưu vào MySQL
-                                        ->native(false)
+                                        //->displayFormat('d/m/Y')
+                                        //->format('Y-m-d') // Định dạng chuẩn để lưu vào MySQL
+                                        //->native(false)
                                         ->nullable() // Cho phép để trống
-                                        ->default(null), // Đảm bảo không tự động lấy ngày hiện tại
+                                        ->default(null) // Đảm bảo không tự động lấy ngày hiện tại
+                                        ->mask('99/99/9999') // Tạo khuôn dd/mm/yyyy khi gõ
+                                        ->rules(['date_format:d/m/Y'])
+                                        //->dehydrated(true), // Đảm bảo trường này được gửi về backend
+                                        //->live(),  // Đồng bộ dữ liệu ngay lập tức,
+                                        ->dehydrateStateUsing(function ($state) {
+                                            if (blank($state)) return null;
+                                            try {
+                                                // Dịch từ chuẩn VN (d/m/Y) sang chuẩn Quốc tế (Y-m-d) để MySQL hiểu
+                                                return \Carbon\Carbon::createFromFormat('d/m/Y', $state)->format('Y-m-d');
+                                            } catch (\Exception $e) {
+                                                return null;
+                                            }
+                                        }),
 
                                     Forms\Components\TextInput::make('store_name')
                                         ->label('Store Name')
