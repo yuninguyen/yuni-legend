@@ -37,13 +37,20 @@ class Account extends Model
         'account_created_at' => 'date',
     ];
 
-    protected $attributes = [
-        'status' => '["active"]', // Đặt giá trị mặc định là một mảng JSON
-    ];
+    protected static function booted()
+    {
+        static::creating(function ($account) {
+            // Nếu không truyền status lúc tạo, tự động set mảng ['active']
+            if (empty($account->status)) {
+                $account->status = ['active'];
+            }
+        });
+    }
 
     public function getFilamentName(): string
     {
-        return "{$this->email_id} - " . strtoupper($this->platform);
+        $platform = $this->platform ?: 'General';
+        return "{$this->email_id} - " . strtoupper($platform);
     }
 
     // Cấu hình theo dõi toàn bộ các cột được phép điền
