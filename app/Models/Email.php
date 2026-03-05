@@ -6,10 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Traits\LogsActivity; // Bật tính năng Log
 use Spatie\Activitylog\LogOptions;          // Tùy chọn Log
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Email extends Model
 {
     use LogsActivity; // Kích hoạt máy quay cho Email
+    use SoftDeletes;
+
 
     public $timestamps = false; // Tắt tự động cập nhật created_at và updated_at
 

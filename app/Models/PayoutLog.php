@@ -8,11 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Traits\LogsActivity; // Bật tính năng Log
 use Spatie\Activitylog\LogOptions;          // Tùy chọn Log
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PayoutLog extends Model
 {
     use LogsActivity; // Kích hoạt máy quay cho PayoutLog
 
+    use SoftDeletes;
     protected $fillable = [
         // --- Các trường định danh ---
         'user_id',              // 🟢 MỚI: Người thực hiện giao dịch

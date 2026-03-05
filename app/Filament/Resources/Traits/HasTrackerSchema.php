@@ -860,6 +860,7 @@ trait HasTrackerSchema
                             ->when($data['payout_from'], fn($q, $date) => $q->whereDate('payout_date', '>=', $date))
                             ->when($data['payout_to'], fn($q, $date) => $q->whereDate('payout_date', '<=', $date));
                     }),
+                Tables\Filters\TrashedFilter::make(), // 🟢 BẬT TÍNH NĂNG THÙNG RÁC
             ])
             // 1. ÉP BỘ LỌC HIỂN THỊ LỘ THIÊN LÊN TRÊN CÙNG
             ->filtersLayout(\Filament\Tables\Enums\FiltersLayout::AboveContent)
@@ -893,6 +894,7 @@ trait HasTrackerSchema
                             $replica->status = 'clicked'; // Reset trạng thái về mặc định
                             $replica->rebate_amount = (float)$data['order_value'] * ($replica->cashback_percent / 100);
                         }),
+                    Tables\Actions\RestoreAction::make(), // 🟢 Nút khôi phục dòng bị xóa
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\DeleteAction::make(),
                 ])
@@ -990,7 +992,7 @@ trait HasTrackerSchema
                             \Filament\Notifications\Notification::make()->title('Updated & synchronized!')->success()->send();
                         }),
 
-
+                    Tables\Actions\RestoreBulkAction::make(),     // 🟢 Khôi phục nhiều dòng
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);

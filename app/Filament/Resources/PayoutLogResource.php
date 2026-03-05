@@ -1005,7 +1005,9 @@ class PayoutLogResource extends Resource
                                 $data['created_until'],
                                 fn(Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
                             );
-                    })
+                    }),
+
+                Tables\Filters\TrashedFilter::make(), // 🟢 BẬT TÍNH NĂNG THÙNG RÁC
             ])
             // THÊM DÒNG NÀY ĐỂ ĐƯA FILTER RA NGOÀI:
             ->filtersLayout(\Filament\Tables\Enums\FiltersLayout::AboveContent)
@@ -1107,6 +1109,7 @@ class PayoutLogResource extends Resource
                     ->icon('heroicon-o-eye')
                     ->color('gray'), // Màu xám nhẹ nhàng, không lấn át nút cam,
                 Tables\Actions\ActionGroup::make([
+                    Tables\Actions\RestoreAction::make(), // 🟢 Nút khôi phục dòng bị xóa
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\DeleteAction::make(),
                 ]),
@@ -1163,6 +1166,8 @@ class PayoutLogResource extends Resource
                                 \App\Jobs\SyncGoogleSheetJob::dispatch($record->id, get_class($record));
                             }
                         }),
+
+                    Tables\Actions\RestoreBulkAction::make(),     // 🟢 Khôi phục nhiều dòng
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);;

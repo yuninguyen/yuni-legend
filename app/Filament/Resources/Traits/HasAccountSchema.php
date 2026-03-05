@@ -677,6 +677,7 @@ trait HasAccountSchema
                             ->success()
                             ->send();
                     }),
+                Tables\Filters\TrashedFilter::make(), // 🟢 BẬT TÍNH NĂNG THÙNG RÁC
 
                 // Nút Xem chi tiết (Hình con mắt) hiện ra bên ngoài
                 Tables\Actions\ViewAction::make()
@@ -755,6 +756,7 @@ trait HasAccountSchema
                         })
                         ->successNotificationTitle('Added successfully!'),
 
+                    Tables\Actions\RestoreAction::make(), // 🟢 Nút khôi phục dòng bị xóa
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\DeleteAction::make(),
 
@@ -1032,7 +1034,7 @@ trait HasAccountSchema
                                 ->send();
                         })
                         ->deselectRecordsAfterCompletion(), // Tự động bỏ chọn sau khi copy xong
-
+                    Tables\Actions\RestoreBulkAction::make(),     // 🟢 Khôi phục nhiều dòng
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);

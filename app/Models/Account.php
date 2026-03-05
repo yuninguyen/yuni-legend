@@ -7,10 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Traits\LogsActivity; // Bật tính năng Log
 use Spatie\Activitylog\LogOptions;          // Tùy chọn Log
 use App\Policies\AccountPolicy;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Account extends Model
 {
     use LogsActivity; // Kích hoạt máy quay cho Account
+    use SoftDeletes;
 
     public $timestamps = true; // Đảm bảo vẫn dùng timestamp
 

@@ -6,11 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Traits\LogsActivity; // Bật tính năng Log
 use Spatie\Activitylog\LogOptions;          // Tùy chọn Log
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class RebateTracker extends Model
 {
 
     use LogsActivity; // Kích hoạt "máy quay" cho RebateTracker
+
+    use SoftDeletes;
 
     protected $fillable = [
         'account_id',

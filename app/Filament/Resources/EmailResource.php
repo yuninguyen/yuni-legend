@@ -269,6 +269,7 @@ class EmailResource extends Resource
                         'disabled' => 'Disabled',
                         'locked' => 'Locked',
                     ]),
+                Tables\Filters\TrashedFilter::make(), // 🟢 BẬT TÍNH NĂNG THÙNG RÁC
             ])
 
             // Giới hạn số cột hiển thị trên 1 hàng (ví dụ 4 cột cho 4 bộ lọc)
@@ -279,9 +280,6 @@ class EmailResource extends Resource
 
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\EditAction::make()
-                        ->label('Edit'),
-
                     // Hiển thị trực tiếp nút Copy
                     Tables\Actions\Action::make('copy_full_info')
                         ->label('Copy')
@@ -333,6 +331,9 @@ class EmailResource extends Resource
                                 ->success()
                                 ->send();
                         }),
+                    Tables\Actions\RestoreAction::make(), // 🟢 Nút khôi phục dòng bị xóa
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\DeleteAction::make(),
                 ])
             ])
 
@@ -457,7 +458,8 @@ class EmailResource extends Resource
 
 
                         ->deselectRecordsAfterCompletion(), // Tự động bỏ chọn sau khi copy xong
-
+                    // 🟢 Khôi phục nhiều dòng
+                    Tables\Actions\RestoreBulkAction::make(),     
                     // Delete Selected    
                     Tables\Actions\DeleteBulkAction::make(),
                 ])

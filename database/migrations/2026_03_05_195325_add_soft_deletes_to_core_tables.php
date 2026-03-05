@@ -12,7 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('core_tables', function (Blueprint $table) {
-            //
+            Schema::table('emails', fn(Blueprint $table) => $table->softDeletes());
+            Schema::table('accounts', fn(Blueprint $table) => $table->softDeletes());
+            Schema::table('rebate_trackers', fn(Blueprint $table) => $table->softDeletes());
+            Schema::table('payout_logs', fn(Blueprint $table) => $table->softDeletes());
         });
     }
 
@@ -22,7 +25,10 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('core_tables', function (Blueprint $table) {
-            //
+            Schema::table('emails', fn(Blueprint $table) => $table->dropSoftDeletes());
+            Schema::table('accounts', fn(Blueprint $table) => $table->dropSoftDeletes());
+            Schema::table('rebate_trackers', fn(Blueprint $table) => $table->dropSoftDeletes());
+            Schema::table('payout_logs', fn(Blueprint $table) => $table->dropSoftDeletes());
         });
     }
 };
