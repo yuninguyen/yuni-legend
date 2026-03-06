@@ -38,139 +38,81 @@ trait HasTrackerSchema
                 // SECTION 1: Account & Platform
                 Forms\Components\Section::make('Account & Platform')
                     ->schema([
-                        Forms\Components\Grid::make(4)
+                        Forms\Components\Grid::make(12)
                             ->schema([
-                                // USER
+                                // 1. USER (Chỉ Admin thấy)
                                 Forms\Components\Select::make('user_id')
                                     ->label('User')
                                     ->relationship('user', 'name')
-                                    ->default(auth()->id())
+                                    ->default(fn() => auth()->id())
+                                    ->hidden(fn() => !auth()->user()?->isAdmin())
+                                    ->dehydrated(true)
                                     ->searchable()
                                     ->preload()
-                                    ->live() // Sử dụng live() để các field sau nhận diện thay đổi ngay
+                                    ->live()
                                     ->afterStateUpdated(function ($set) {
                                         $set('platform', null);
                                         $set('account_email', null);
                                         $set('account_password_display', null);
                                     })
-                                    ->columnSpan(1),
+                                    // Admin chiếm 3 phần, Staff không chiếm phần nào (ẩn)
+                                    ->columnSpan(auth()->user()?->isAdmin() ? 3 : 0),
 
-                                // SELECT PLATFORM
+                                // 2. SELECT PLATFORM (Làm nhỏ lại cho Staff)
                                 Forms\Components\Select::make('platform')
                                     ->label('Platform')
                                     ->options(self::$platform)
                                     ->options(function (Forms\Get $get, $record) {
-                                        // Ưu tiên User đang chọn, nếu không có lấy User từ bản ghi cũ
                                         $userId = $get('user_id') ?? $record?->user_id;
+                                        $allPlatforms = self::$platform;
+                                        if (!$userId) return $allPlatforms;
 
-                                        // 1. Lấy tất cả Platform gốc mà bạn đã cấu hình trong Trait
-                                        $allPlatforms = self::$platform; // Ví dụ: ['amazon' => 'Amazon', 'ebay' => 'eBay']
-
-                                        // 2. Nếu Admin chưa chọn user nào ở ô trên, hiện toàn bộ platform
-                                        if (!$userId) {
-                                            return $allPlatforms;
-                                        }
-
-                                        // 3. Nếu ĐÃ chọn User: Quét xem user đó đang có tài khoản ở những Platform nào
                                         $activePlatformKeys = \App\Models\Account::where('user_id', $userId)
                                             ->whereNotNull('platform')
                                             ->distinct()
                                             ->pluck('platform')
                                             ->toArray();
 
-                                        // 4. Lọc cái mảng gốc (self::$platform), chỉ giữ lại những platform mà User đó có
                                         $filteredPlatforms = [];
                                         foreach ($activePlatformKeys as $key) {
-                                            if (isset($allPlatforms[$key])) {
-                                                $filteredPlatforms[$key] = $allPlatforms[$key];
-                                            } else {
-                                                // Đề phòng db có chữ lạ chưa định nghĩa trong Trait
-                                                $filteredPlatforms[$key] = ucfirst((string)$key);
-                                            }
+                                            $filteredPlatforms[$key] = $allPlatforms[$key] ?? ucfirst((string)$key);
                                         }
-
                                         return $filteredPlatforms;
                                     })
                                     ->live()
                                     ->required()
-                                    // HIỆN THÔNG BÁO LỖI DƯỚI Ô PLATFORM NẾU CẦN
-                                    ->helperText(function ($record) {
-                                        if ($record && $record->account && $record->account->user_id === null) {
-                                            return new \Illuminate\Support\HtmlString(
-                                                '<span class="text-danger-600 font-bold animate-pulse">⚠️ Holder: N/A. Please click "Get Account" in Platform to fix!</span>'
-                                            );
-                                        }
-                                        return null;
-                                    })
-                                    // ÉP NẠP DỮ LIỆU KHI EDIT
-                                    ->afterStateHydrated(function ($state, Forms\Set $set, $record) {
-                                        if ($record && !$state) {
-                                            // Lấy platform từ account liên kết nếu field platform trên form đang trống
-                                            $set('platform', $record->account?->platform);
-                                        }
-                                    })
                                     ->afterStateUpdated(function (Forms\Set $set) {
                                         $set('account_email', null);
                                         $set('account_password_display', null);
                                     })
-                                    ->columnSpan(1),
+                                    // 🟢 Staff: Chiếm 2/12 | Admin: Chiếm 3/12
+                                    ->columnSpan(auth()->user()?->isAdmin() ? 4 : 3),
 
-                                // SELECT EMAIL
+                                // 3. SELECT EMAIL (Chiếm không gian lớn nhất cho Staff)
                                 Forms\Components\Select::make('account_email')
                                     ->label('Select Account Email')
                                     ->options(function ($get, $record) {
                                         $userId = $get('user_id') ?? $record?->user_id;
-                                        // Quan trọng: Phải lấy được platform hiện tại
-                                        $platform = $get('platform')
-                                            ?? ($get('account_id') ? \App\Models\Account::find($get('account_id'))?->platform : null)
-                                            ?? $record?->account?->platform;
-
+                                        $platform = $get('platform') ?? $record?->account?->platform;
                                         if (!$userId || !$platform) return [];
 
-                                        // 🟢 BÙA CHỐNG N+1 QUERY Ở ĐÂY:
-                                        // Dùng withSum() để gom 3 câu lệnh tính toán vào chung 1 lần gọi DB
                                         return \App\Models\Account::where('user_id', $userId)
                                             ->where('platform', $platform)
                                             ->with('email')
-                                            ->withSum([
-                                                'rebateTrackers as pending_amount' => fn($q) => $q->whereIn('status', ['pending', 'clicked'])
-                                            ], 'rebate_amount')
-                                            ->withSum([
-                                                'rebateTrackers as confirmed_amount' => fn($q) => $q->whereIn('status', ['confirmed'])
-                                            ], 'rebate_amount')
-                                            ->withSum([
-                                                'payoutLogs as paid_amount' => fn($q) => $q->whereIn('transaction_type', ['withdrawal', 'hold'])
-                                                    ->where('status', 'completed')
-                                            ], 'amount_usd')
+                                            ->withSum(['rebateTrackers as pending_amount' => fn($q) => $q->whereIn('status', ['pending', 'clicked'])], 'rebate_amount')
+                                            ->withSum(['rebateTrackers as confirmed_amount' => fn($q) => $q->whereIn('status', ['confirmed'])], 'rebate_amount')
+                                            ->withSum(['payoutLogs as paid_amount' => fn($q) => $q->whereIn('transaction_type', ['withdrawal', 'hold'])->where('status', 'completed')], 'amount_usd')
                                             ->get()
                                             ->mapWithKeys(function ($account) {
-                                                // 🟢 Lấy thẳng dữ liệu đã được tính sẵn siêu nhanh từ DB
-                                                $pendingAmount = $account->pending_amount ?? 0;
-                                                $totalConfirmed = $account->confirmed_amount ?? 0;
-                                                $paidAmount = $account->paid_amount ?? 0;
-
-                                                // Số dư khả dụng thực tế
-                                                $availableConfirmed = max(0, $totalConfirmed - $paidAmount);
-
+                                                $pending = number_format($account->pending_amount ?? 0, 2);
+                                                $available = number_format(max(0, ($account->confirmed_amount ?? 0) - ($account->paid_amount ?? 0)), 2);
                                                 $email = $account->email?->email ?? 'N/A';
-                                                $pendingStr = number_format($pendingAmount, 2);
-                                                $confirmedStr = number_format($availableConfirmed, 2);
-
-                                                return [$email => "{$email} ➔ [Pending: \${$pendingStr}] - [Confirmed: \${$confirmedStr}]"];
+                                                return [$email => "{$email} ➔ [Pending: \${$pending}] - [Confỉmmed: \${$available}]"];
                                             });
                                     })
                                     ->searchable()
                                     ->live()
                                     ->required()
-                                    // ÉP NẠP DỮ LIỆU KHI EDIT
-                                    ->afterStateHydrated(function ($state, $set, $record) {
-                                        if ($record && !$state) {
-                                            // Lấy email thực tế từ quan hệ account
-                                            $set('account_email', $record->account?->email?->email);
-                                            // Nạp luôn password display cho đồng bộ
-                                            $set('account_password_display', $record->account?->password);
-                                        }
-                                    })
                                     ->afterStateUpdated(function ($state, $get, $set) {
                                         if (!$state) {
                                             $set('account_id', null);
@@ -181,57 +123,36 @@ trait HasTrackerSchema
                                             ->where('user_id', $get('user_id'))
                                             ->where('platform', $get('platform'))
                                             ->first();
-
                                         if ($account) {
                                             $set('account_id', $account->id);
                                             $set('account_password_display', $account->password);
                                         }
                                     })
-                                    ->columnSpan(1),
+                                    // 🟢 Staff: Chiếm 8/12 (Rất rộng) | Admin: Chiếm 3/12
+                                    ->columnSpan(auth()->user()?->isAdmin() ? 3 : 6),
 
-                                // SHOW PASSWORD
+                                // 4. SHOW PASSWORD (Làm nhỏ lại cho Staff)
                                 Forms\Components\TextInput::make('account_password_display')
-                                    ->label('Account Password')
+                                    ->label('Password')
                                     ->readonly()
                                     ->password()
                                     ->revealable()
                                     ->dehydrated(false)
-                                    ->formatStateUsing(fn($record) => $record?->account?->password)
-                                    ->suffixAction(
-                                        Forms\Components\Actions\Action::make('copyPassword')
-                                            ->icon('heroicon-m-clipboard')
-                                            ->color('warning')
-                                            ->action(function (Forms\Get $get, $livewire) {
-                                                $accountId = $get('account_id');
-                                                $password = \App\Models\Account::find($accountId)?->password;
+                                    // 🟢 Staff: Chiếm 2/12 | Admin: Chiếm 3/12
+                                    ->columnSpan(auth()->user()?->isAdmin() ? 3 : 3),
+                            ]),
 
-                                                if ($password) {
-                                                    $livewire->dispatch('copy-to-clipboard', text: $password);
-
-                                                    \Filament\Notifications\Notification::make()
-                                                        ->title('Copied!')
-                                                        ->success()
-                                                        ->send();
-                                                }
-                                            })
-                                    )
-                                    ->columnSpan(1),
-                            ])
-                            ->columns(2),
-
-                        // STATUS DISPLAY & TRACKING 
+                        // PHẦN HIỂN THỊ TRẠNG THÁI (Giữ nguyên logic của Sếp)
                         Forms\Components\Placeholder::make('account_status_display')
                             ->label('Account Status Tracking')
                             ->visible(fn($get) => $get('account_email'))
                             ->content(function ($get) {
+                                // ... (Giữ nguyên toàn bộ nội dung HtmlString bên trong của Sếp)
                                 $emailState = $get('account_email');
                                 $account = \App\Models\Account::whereHas('email', fn($q) => $q->where('email', $emailState))->first();
-
                                 if (!$account) return new \Illuminate\Support\HtmlString("<div class='text-danger'>⚠️ No account found</div>");
-
                                 $statuses = (array) $account->status;
                                 if (empty($statuses)) return "No status available.";
-
                                 $htmlResult = collect($statuses)->map(function ($status, $index) use ($statuses) {
                                     $color = match ($status) {
                                         'active' => '#6b7280',
@@ -242,28 +163,26 @@ trait HasTrackerSchema
                                         'limited', 'banned' => '#ef4444',
                                         default => '#6b7280'
                                     };
-
                                     $label = match ($status) {
-                                        'used'             => 'In Use',
-                                        'limited'          => 'PayPal Limited',
-                                        'linked'           => 'Linked PayPal',
-                                        'unlinked'         => 'Unlinked PayPal',
-                                        'not_linked'       => 'Not Linked to PayPal',
+                                        'used' => 'In Use',
+                                        'limited' => 'PayPal Limited',
+                                        'linked' => 'Linked PayPal',
+                                        'unlinked' => 'Unlinked PayPal',
+                                        'not_linked' => 'Not Linked to PayPal',
                                         'no_paypal_needed' => 'No PayPal Required',
-                                        default            => ucfirst(str_replace('_', ' ', (string)$status)),
+                                        default => ucfirst(str_replace('_', ' ', (string)$status))
                                     };
-
                                     $arrow = ($index < count($statuses) - 1) ? " <span style='color: #d1d5db; margin: 0 4px;'>→</span> " : "";
                                     return "<span style='color: {$color}; font-weight: 800; font-size: 0.85rem;'>{$label}</span>{$arrow}";
                                 })->implode('');
-
                                 return new \Illuminate\Support\HtmlString("<div style='padding:12px; background:#f0f9ff; border-radius:8px;'>{$htmlResult}</div>");
                             })
                             ->columnSpanFull(),
 
-                        // Account ID
                         Forms\Components\Hidden::make('account_id')->required(),
-                    ])->columnSpanFull(),
+                    ])
+                    // 🟢 KẾT QUẢ CUỐI CÙNG: Staff nhìn thấy 3 ô trên 1 hàng ngang (Tỉ lệ 2-8-2)
+                    ->columns(auth()->user()?->isAdmin() ? 4 : 1),
 
                 // SECTION 2: Order Details
                 Forms\Components\Section::make('Order Details & Rebate')
@@ -804,6 +723,7 @@ trait HasTrackerSchema
                 // Bộ lọc theo User (CHỈ HIỆN USER ĐÃ CÓ ĐƠN)
                 Tables\Filters\SelectFilter::make('user_id')
                     ->label('User')
+                    ->visible(fn() => auth()->user()?->isAdmin()) // 🟢 ẨN KHỎI NHÂN VIÊN
                     ->options(function () {
                         // 1. Quét lấy danh sách user_id đang thực sự có đơn
                         $activeUserIds = \App\Models\RebateTracker::whereNotNull('user_id')

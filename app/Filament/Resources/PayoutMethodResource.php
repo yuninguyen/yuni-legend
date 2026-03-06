@@ -38,15 +38,24 @@ class PayoutMethodResource extends Resource
     protected static ?string $navigationLabel = 'Payout Method';
     protected static ?int $navigationSort = 1;
 
+    // 🟢 1. ẨN HOÀN TOÀN MENU BÊN TRÁI ĐỐI VỚI STAFF
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()?->isAdmin() ?? false;
+    }
+
+    // 🟢 2. CHẶN TRUY CẬP TRỰC TIẾP TỪ URL (Chống Staff tự gõ link)
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->isAdmin() ?? false;
+    }
+
+    // 🟢 3. FIX LỖI TYPE ERROR SẬP WEB (Luôn phải return Builder)
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
-        $user = auth()->user();
-
-        // Nếu là Admin -> Cho xem tất cả mọi thứ (Sử dụng logic từ Model User)
-        if ($user && method_exists($user, 'isAdmin') && $user->isAdmin()) {
-            return $query;
-        } // Nếu là Staff bình thường -> Chỉ cho xem Account
+        // Vì Staff đã bị chặn từ vòng gửi xe ở 2 hàm trên rồi, 
+        // nên ở đây ta chỉ cần trả về mặc định cho Admin xài là xong!
+        return parent::getEloquentQuery();
     }
 
     // 🟢 QUY TẮC 1: HEADER DUY NHẤT

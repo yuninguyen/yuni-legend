@@ -34,6 +34,19 @@ class EmailResource extends Resource
     // Thêm dòng này để Email luôn nằm trên Account
     protected static ?int $navigationSort = 1;
 
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        // Admin được xem toàn bộ hòm thư
+        if (auth()->user()?->isAdmin()) {
+            return $query;
+        }
+
+        // 🟢 TUYỆT CHIÊU: Staff chỉ xem được những Email có gắn với Account do chính họ quản lý
+        return $query->whereHas('accounts', fn($q) => $q->where('user_id', auth()->id()));
+    }
+
     // Thêm dòng này để hệ thống ghi nhớ bộ lọc vào Session
     public static function shouldPersistTableFiltersInSession(): bool
     {
@@ -273,7 +286,7 @@ class EmailResource extends Resource
             ])
 
             // Giới hạn số cột hiển thị trên 1 hàng (ví dụ 4 cột cho 4 bộ lọc)
-            ->filtersFormColumns(3)
+            ->filtersFormColumns(4)
 
             // HIỂN THỊ DÀN HÀNG NGANG TRÊN ĐẦU BẢNG
             ->filtersLayout(FiltersLayout::AboveContent)
@@ -459,7 +472,7 @@ class EmailResource extends Resource
 
                         ->deselectRecordsAfterCompletion(), // Tự động bỏ chọn sau khi copy xong
                     // 🟢 Khôi phục nhiều dòng
-                    Tables\Actions\RestoreBulkAction::make(),     
+                    Tables\Actions\RestoreBulkAction::make(),
                     // Delete Selected    
                     Tables\Actions\DeleteBulkAction::make(),
                 ])

@@ -41,10 +41,14 @@ class RebateTrackerResource extends Resource
         $query = parent::getEloquentQuery();
         $user = auth()->user();
 
-        // Nếu là Admin -> Cho xem tất cả mọi thứ (Sử dụng logic từ Model User)
+        // Nếu là Admin -> Cho xem tất cả mọi thứ
         if ($user && method_exists($user, 'isAdmin') && $user->isAdmin()) {
             return $query;
-        } // Nếu là Staff bình thường -> Chỉ cho xem Account
+        }
+
+        // 🟢 THÊM DÒNG CHỐT CHẶN NÀY ĐỂ FIX LỖI SẬP WEB:
+        // Nhân viên bình thường -> Chỉ xem được đơn do chính họ tạo
+        return $query->where('user_id', $user->id);
     }
 
     public static function getRelations(): array

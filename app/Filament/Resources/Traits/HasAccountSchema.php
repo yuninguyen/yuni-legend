@@ -623,9 +623,22 @@ trait HasAccountSchema
                         );
                     }),
 
+                // THÊM BỘ LỌC MỚI: Dành cho nhân viên lọc nhanh tài khoản của mình
+                Tables\Filters\TernaryFilter::make('my_accounts')
+                    ->label('Account Ownership')
+                    ->placeholder('All Accounts')
+                    ->trueLabel('My Accounts')
+                    ->falseLabel('Unassigned')
+                    ->queries(
+                        true: fn(Builder $query) => $query->where('user_id', auth()->id()),
+                        false: fn(Builder $query) => $query->whereNull('user_id'),
+                        blank: fn(Builder $query) => $query,
+                    ),
+
                 //Lọc Holder (Quản lý nhân sự)
                 SelectFilter::make('user_id')
                     ->label('Holder')
+                    ->visible(fn() => auth()->user()?->isAdmin()) // 🟢 CHỈ ADMIN MỚI THẤY
                     ->options(function () {
                         // Lấy danh sách tất cả User
                         return \App\Models\User::query()
@@ -648,12 +661,13 @@ trait HasAccountSchema
                     })
                     ->searchable()
                     ->preload(),
+                Tables\Filters\TrashedFilter::make(), // 🟢 BẬT TÍNH NĂNG THÙNG RÁC
 
             ])
 
 
             // Giới hạn số cột hiển thị trên 1 hàng (ví dụ 4 cột cho 4 bộ lọc)
-            ->filtersFormColumns(5)
+            ->filtersFormColumns(3)
 
             // HIỂN THỊ DÀN HÀNG NGANG TRÊN ĐẦU BẢNG
             ->filtersLayout(FiltersLayout::AboveContent)
@@ -677,7 +691,7 @@ trait HasAccountSchema
                             ->success()
                             ->send();
                     }),
-                Tables\Filters\TrashedFilter::make(), // 🟢 BẬT TÍNH NĂNG THÙNG RÁC
+
 
                 // Nút Xem chi tiết (Hình con mắt) hiện ra bên ngoài
                 Tables\Actions\ViewAction::make()

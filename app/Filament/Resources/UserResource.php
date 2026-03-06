@@ -22,6 +22,19 @@ class UserResource extends Resource
     protected static ?int $navigationSort = 1; // Hiện trên Activity Log
     protected static ?string $navigationLabel = 'Users';
 
+    // 🟢 1. ẨN MENU BÊN TRÁI: Chỉ Admin mới thấy menu "Users"
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()?->isAdmin() ?? false;
+    }
+
+    // 🟢 2. CHẶN TRUY CẬP TRỰC TIẾP TỪ URL (Bảo mật 2 lớp)
+    // Đề phòng trường hợp nhân viên tự gõ đuôi "/users" lên thanh địa chỉ web
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->isAdmin() ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -49,7 +62,7 @@ class UserResource extends Resource
                             ->label('Role')
                             ->options([
                                 'admin' => 'Admin',
-                                'holder' => 'Holder',
+                                'staff' => 'Staff',
                             ])
                             ->default('holder')
                             ->required()
@@ -86,7 +99,7 @@ class UserResource extends Resource
                     ->label('Role')
                     ->formatStateUsing(fn(string $state): string => match ($state) {
                         'admin' => 'Administrator',
-                        'holder' => 'Holder',
+                        'staff' => 'Staff',
                         default => $state,
                     })
                     ->sortable(),

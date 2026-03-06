@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\FontWeight;
 use Illuminate\Database\Eloquent\Model;
+use Filament\Forms\Get;
 
 class PayoutLogResource extends Resource
 {
@@ -32,12 +33,29 @@ class PayoutLogResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery();
+
+        // 1. Khóa chặt dòng Con luôn nằm ngay dưới dòng Cha tương ứng của nó
+        $query->orderByRaw('COALESCE(parent_id, id) DESC')->orderBy('id', 'ASC');
+
+        // 🟢 THÊM LẠI DÒNG NÀY: Phục hồi bùa đếm dòng con để hiện chữ Exchanged!
+        $query->withCount('children');
+
         $user = auth()->user();
 
-        // Nếu là Admin -> Cho xem tất cả mọi thứ (Sử dụng logic từ Model User)
+        // 2. Nếu là Admin -> Cho xem tất cả
         if ($user && method_exists($user, 'isAdmin') && $user->isAdmin()) {
             return $query;
-        } // Nếu là Staff bình thường -> Chỉ cho xem Account
+        }
+
+        // 3. Chốt chặn cho Staff
+        return $query->where(function ($q) use ($user) {
+            $q->where('payout_logs.user_id', $user->id)
+                ->orWhereIn('payout_logs.parent_id', function ($subQuery) use ($user) {
+                    $subQuery->select('id')
+                        ->from('payout_logs')
+                        ->where('user_id', $user->id);
+                });
+        });
     }
 
     /**
@@ -348,8 +366,14 @@ class PayoutLogResource extends Resource
                             ->placeholder('Select User')
                             ->options(\App\Models\User::all()->pluck('name', 'id'))
                             ->searchable()
+                            // 🟢 THIẾU DÒNG NÀY: Tự động gán ID của người đang đăng nhập
+                            ->default(fn() => auth()->id())
+                            // TUYỆT CHIÊU TÀNG HÌNH: Ẩn hoàn toàn khỏi mắt nhân viên
+                            ->hidden(fn() => !auth()->user()?->isAdmin())
+                            // BẮT BUỘC CÓ: Ép hệ thống CÓ LƯU ID này vào DB dù ô bị ẩn
+                            ->dehydrated(true)
                             ->required()
-                            ->live() // Quan trọng: Để kích hoạt việc load lại ô Account bên dưới
+                            ->live() // Kích hoạt việc load lại ô Account bên dưới
                             ->afterStateUpdated(fn($set) => $set('account_id', null)), // Reset ô Account khi đổi User
 
                         // CHỌN ACCOUNT (Phụ thuộc vào User ở trên)
@@ -357,32 +381,28 @@ class PayoutLogResource extends Resource
                             ->label('Source Account')
                             ->options(function (Forms\Get $get, ?\App\Models\PayoutLog $record) {
                                 $userId = $get('user_id');
-
-                                // Nếu không có userId (ở trang Create), trả về mảng rỗng ngay
                                 if (!$userId) return [];
 
-                                $query = \App\Models\Account::query()
-                                    ->where('user_id', $userId);
-
-                                // MẸO: Nếu đang ở trang Edit, phải gộp cả cái Account đang chọn vào 
-                                // để tránh lỗi "không tìm thấy label" nếu status nó đã đổi.
-                                if ($record && $record->account_id) {
-                                    $query->where(function ($q) use ($record) {
-                                        $q->whereHas('rebateTrackers', fn($rt) => $rt->whereIn('status', ['pending', 'confirmed']))
-                                            ->orWhere('id', $record->account_id);
-                                    });
-                                } else {
-                                    $query->whereHas('rebateTrackers', fn($rt) => $rt->whereIn('status', ['pending', 'confirmed']));
-                                }
+                                $query = \App\Models\Account::query()->where('user_id', $userId);
 
                                 return $query->with('email')
                                     ->get()
+                                    // 🟢 CỐT LÕI NẰM Ở ĐÂY: Lọc bỏ tài khoản $0
+                                    ->filter(function ($acc) use ($record) {
+                                        // Giữ lại account nếu đang sửa đơn cũ
+                                        if ($record && $record->account_id === $acc->id) return true;
+
+                                        // Chỉ cho phép hiển thị các account có số dư > 0
+                                        return self::getAvailableBalance($acc->id) > 0;
+                                    })
                                     ->mapWithKeys(function ($acc) {
-                                        // Ép kiểu chắc chắn là String, không cho phép Null lọt vào
                                         $email = (string) ($acc->email?->email ?? 'No Email');
                                         $platform = (string) strtoupper($acc->platform ?? 'N/A');
 
-                                        return [$acc->id => "{$email} - {$platform}"];
+                                        // Hiển thị thêm số dư bên cạnh tên để nhân viên tự tin chọn
+                                        $balance = number_format(self::getAvailableBalance($acc->id), 2);
+
+                                        return [$acc->id => "{$email} - {$platform} (\${$balance})"];
                                     })
                                     ->toArray();
                             })
@@ -390,24 +410,23 @@ class PayoutLogResource extends Resource
                             ->preload()
                             ->required()
                             ->live()
-                            ->disabled(fn(Forms\Get $get) => !$get('user_id')) // Chỉ bật khi đã có User
+                            ->disabled(fn(Forms\Get $get) => !$get('user_id'))
                             ->placeholder(fn(Forms\Get $get) => !$get('user_id') ? 'Please select a User first...' : 'Select an Account.')
-                            // 🟢 KHI ĐỔI ACCOUNT: Tự động xóa Brand cũ để tránh râu ông nọ cắm cằm bà kia
                             ->afterStateUpdated(function ($state, $set, $get) {
-                                // 1. Logic cũ của bạn: Xóa Brand để tránh nhầm lẫn
                                 $set('gc_brand', null);
-
                                 if (!$state) {
                                     $set('amount_usd', 0);
                                     return;
                                 }
-                                // 🟢 FIX DRY: Gọi hàm Helper tính số dư (GỌN GÀNG, KHÔNG DƯ THỪA)
                                 $set('amount_usd', round(self::getAvailableBalance($state), 2));
                                 static::calculateNet($set, $get);
                             }),
 
                         // CHỌN ASSET
-                        Forms\Components\Select::make('asset_type')
+                        // 1. Ô CHỌN ASSET TYPE (Cực kỳ quan trọng: Phải có ->live())
+                        // Khi Sếp thêm ->live(), hệ thống sẽ "lắng nghe" sự thay đổi ở ô này 
+                        // để lập tức biến đổi các ô bên dưới mà không cần load lại trang.
+                        Forms\Components\Select::make('asset_type') // (Hoặc tên cột Sếp đang dùng)
                             ->label('Asset Type')
                             ->options([
                                 'paypal' => 'PayPal',
@@ -432,14 +451,21 @@ class PayoutLogResource extends Resource
                         Forms\Components\Select::make('payout_method_id')
                             ->label('Target Wallet')
                             ->options(PayoutMethod::pluck('name', 'id')) // Chỉ cần 1 dòng này
-
+                            // 🟢 Ẩn Ví mục tiêu đối với Staff khi chọn PayPal (Gift Card vốn dĩ đã ẩn sẵn)
+                            ->hidden(
+                                fn(Get $get) =>
+                                $get('asset_type') === 'gift_card' ||
+                                    (!auth()->user()?->isAdmin() && $get('asset_type') === 'paypal')
+                            )
                             // Mờ đi khi là Gift Card
                             ->disabled(fn($get) => $get('asset_type') === 'gift_card')
 
                             // Không lưu vào DB nếu là Gift Card (để đảm bảo cột này null trong database)
                             ->dehydrated(fn($get) => $get('asset_type') !== 'gift_card')
-                            ->visible(fn($get) => $get('asset_type') === 'paypal')
-                            ->required(fn($get) => $get('asset_type') === 'paypal'),
+                            //->visible(fn($get) => $get('asset_type') === 'paypal')
+                            ->required(fn($get) => $get('asset_type') === 'paypal')
+                            // Chỉ bắt buộc với Admin khi chọn PayPal
+                            ->required(fn(Get $get) => auth()->user()?->isAdmin() && $get('asset_type') === 'paypal'),
 
                         // CHỌN BRAND
                         Forms\Components\Select::make('gc_brand')
@@ -562,7 +588,11 @@ class PayoutLogResource extends Resource
                                 ],
                                 default => [],
                             })
-                            ->required()
+                            // 🟢 Ẩn khỏi Staff khi chọn PayPal
+                            ->hidden(fn(Get $get) => !auth()->user()?->isAdmin() && $get('asset_type') === 'paypal')
+                            ->default('withdrawal') // Mặc định rút tiền để DB không bị lỗi null
+                            ->dehydrated(true)
+                            ->required(fn(Get $get) => auth()->user()?->isAdmin() || $get('asset_type') !== 'paypal')
                             ->live(),
 
                         Forms\Components\Select::make('status')
@@ -571,8 +601,19 @@ class PayoutLogResource extends Resource
                                 'completed' => 'Completed',
                                 'rejected' => 'Rejected',
                             ])
-                            ->required()
-                            ->default('pending'),
+                            ->default('pending')
+                            // 🟢 Tàng hình hoàn toàn với Staff, tự động lưu Pending
+                            ->hidden(fn() => !auth()->user()?->isAdmin())
+                            ->dehydrated(true)
+                            ->required(),
+
+                        // 🟢 THÊM Ô NOTE ĐỂ DÁN LINK CLAIM PAYPAL
+                        Forms\Components\Textarea::make('note')
+                            ->label(fn(Get $get) => $get('asset_type') === 'paypal' ? 'Link Claim PayPal' : 'Note')
+                            ->helperText(fn(Get $get) => $get('asset_type') === 'paypal' ? '💡 If you are using PayPal VN, please paste the Claim Link here. PayPal US users can skip this step.' : '')
+                            // Sếp gắn chính xác dòng của Sếp vào đây:
+                            ->visible(fn(Get $get) => $get('asset_type') === 'paypal')
+                            ->columnSpanFull(),
 
                     ])->columns(2),
 
@@ -668,27 +709,14 @@ class PayoutLogResource extends Resource
             // Trong phần Table configuration
             ->recordAction(null) // Tắt click action
             ->recordUrl(null)    // Tắt URL navigation
-            // 🟢 BƯỚC 1: Sửa lỗi ViewAction. Alias phải là 'payout_logs' để trùng với tên bảng gốc
-            ->query(function () {
-                // 1. Đưa withCount vào thẳng subQuery bên trong
-                $subQuery = PayoutLog::query()
-                    ->select('*')
-                    ->selectRaw('COALESCE(parent_id, id) as group_id')
-                    ->withCount('children'); // 🟢 CHUYỂN BÙA CHỐNG N+1 VÀO ĐÂY
-
-                // 2. Query bên ngoài chỉ việc gọi lại mà không bị lỗi Expression
-                return PayoutLog::query()
-                    ->fromSub($subQuery, 'payout_logs');
-            })
-
             // 🟢 BƯỚC 2: Sửa từ code của bạn (Dùng group_id để không bao giờ bị lỗi NULL)
-            ->groups([
+            /*->groups([
                 Tables\Grouping\Group::make('group_id')
                     ->label('Original Transaction')
                     ->getTitleFromRecordUsing(fn($record) => $record->parent_id ? "Original ID #" . $record->parent_id : "Original ID #" . $record->id)
                     ->collapsible(),
             ])
-            ->defaultGroup('group_id')
+            ->defaultGroup('group_id') */
 
             // 🟢 BƯỚC 3: Hiệu ứng thụt lề và đổi màu cho dòng con (Liquidation)
             // Dòng con: Có vạch xanh, thụt lề nhẹ
@@ -929,6 +957,7 @@ class PayoutLogResource extends Resource
                 // Only shows Users who are actually linked to the logs in the list
                 Tables\Filters\SelectFilter::make('user_id')
                     ->label('User')
+                    ->visible(fn() => auth()->user()?->isAdmin()) // 🟢 ẨN KHỎI NHÂN VIÊN
                     ->options(
                         fn() => \App\Models\User::query()
                             ->whereIn('id', \App\Models\PayoutLog::distinct()->pluck('user_id'))
@@ -1011,7 +1040,8 @@ class PayoutLogResource extends Resource
             ])
             // THÊM DÒNG NÀY ĐỂ ĐƯA FILTER RA NGOÀI:
             ->filtersLayout(\Filament\Tables\Enums\FiltersLayout::AboveContent)
-            ->filtersFormColumns(3) // QUAN TRỌNG: Tổng Layout là 3 cột (Status [1] + Date [2] = 3)
+            // 🟢 THAY ĐỔI DÒNG NÀY: Admin hiện 3 cột, Staff hiện 5 cột
+            ->filtersFormColumns(auth()->user()?->isAdmin() ? 3 : 5) // QUAN TRỌNG: Tổng Layout là 3 cột (Status [1] + Date [2] = 3)
             ->actions([
                 //Nút Exchange to VND ở cột Transaction Type
                 Tables\Actions\Action::make('currency_exchange')

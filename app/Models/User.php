@@ -38,7 +38,7 @@ class User extends Authenticatable implements FilamentUser
     {
         // Cho phép Admin và Staff được phép đăng nhập vào Panel
         // Bạn có thể sửa điều kiện này tùy theo cách bạn phân quyền trong DB
-        return $this->isAdmin() || $this->role === 'staff';
+        return in_array($this->role, ['admin', 'staff']);
 
         // Hoặc đơn giản nhất (cho phép TẤT CẢ mọi người trong bảng users đăng nhập):
         // return true; 
