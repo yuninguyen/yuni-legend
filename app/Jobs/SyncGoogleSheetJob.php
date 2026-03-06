@@ -14,6 +14,11 @@ class SyncGoogleSheetJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    // 🟢 THÊM 3 DÒNG NÀY ĐỂ JOB TỰ ĐỘNG THỬ LẠI KHI GOOGLE LỖI
+    public int $tries = 3;      // Thử lại tối đa 3 lần
+    public int $backoff = 60;   // Đợi 60 giây giữa các lần thử
+    public int $timeout = 30;   // Ngắt Job nếu chạy quá 30 giây để tránh treo máy chủ
+
     /**
      * @param int         $recordId   ID của bản ghi cần sync
      * @param string      $modelClass Tên Class của Model
@@ -153,26 +158,22 @@ class SyncGoogleSheetJob implements ShouldQueue
     {
         if ($tabName === 'Payout_Logs') {
             $service->formatColumnsAsClip($tabName, 16, 17);
-
         } elseif ($tabName === 'Payout_Methods') {
             $service->formatColumnsAsClip($tabName, 4, 8);
             $service->formatColumnsAsClip($tabName, 25, 26);
             $service->applyFormattingWithRules($tabName, 24, [
                 'Limited' => ['red' => 1.0, 'green' => 0.8, 'blue' => 0.8],
             ]);
-
         } elseif ($tabName === 'Emails') {
             $service->formatColumnsAsClip($tabName, 2, 3);
             $service->applyFormattingWithRules($tabName, 1, [
                 'Live'     => ['red' => 0.85, 'green' => 0.95, 'blue' => 0.85],
                 'Disabled' => ['red' => 1.0,  'green' => 0.8,  'blue' => 0.8],
             ]);
-
         } elseif (str_ends_with($tabName, '_Accounts')) {
             $service->formatColumnsAsClip($tabName, 5, 6);
             $service->formatColumnsAsClip($tabName, 14, 15);
             $service->formatColumnsAsClip($tabName, 17, 18);
-
         } elseif (str_contains($tabName, '_Tracker')) {
             $service->formatColumnsAsClip($tabName, 5, 6);
             $service->formatColumnsAsClip($tabName, 15, 16);

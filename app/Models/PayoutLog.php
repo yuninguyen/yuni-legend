@@ -49,7 +49,14 @@ class PayoutLog extends Model
         'gc_pin'  => 'encrypted',
     ];
 
-    
+    /**
+     * MỚI: Liên kết tài khoản này với các lịch sử rút tiền (Để tối ưu N+1 Query)
+     */
+    public function payoutLogs()
+    {
+        return $this->hasMany(\App\Models\PayoutLog::class, 'account_id');
+    }
+
     // Cấu hình theo dõi toàn bộ các cột được phép điền
     public function getActivitylogOptions(): LogOptions
     {
@@ -59,34 +66,6 @@ class PayoutLog extends Model
             ->dontSubmitEmptyLogs();
     }
 
-
-    protected static function booted()
-    {
-
-        // Logic đồng bộ Cha-Con & Google Sheets (Chạy mỗi khi nhấn Save/Create)
-        static::saved(function ($payoutLog) {
-            // KIỂM TRA: Nếu là dòng con (liquidation)
-            if ($payoutLog->transaction_type === 'liquidation' && $payoutLog->parent_id) {
-                $parent = $payoutLog->parent;
-
-                if ($parent) {
-                    // 🟢 A. CẬP NHẬT WEBSITE: Chỉ update cha khi tỷ giá hoặc tổng tiền ở con thay đổi
-                    if ($payoutLog->wasChanged(['exchange_rate', 'total_vnd']) || $payoutLog->wasRecentlyCreated) {
-                        $parent->updateQuietly([
-                            'exchange_rate' => $payoutLog->exchange_rate,
-                            'total_vnd' => $payoutLog->total_vnd,
-                        ]);
-
-                        // 🟢 B. SYNC GOOGLE SHEETS (Dòng Cha): Đẩy bản cập nhật của cha lên sheet
-                        // dispatch(new \App\Jobs\SyncPayoutToSheets($parent));
-                    }
-                }
-            }
-
-            // YNC GOOGLE SHEETS (Dòng hiện tại): Luôn đẩy dòng vừa thao tác lên sheet
-            // dispatch(new \App\Jobs\SyncPayoutToSheets($payoutLog));
-        });
-    }
 
     public function user(): BelongsTo
     {

@@ -127,36 +127,35 @@ trait HasTrackerSchema
 
                                         if (!$userId || !$platform) return [];
 
+                                        // 🟢 BÙA CHỐNG N+1 QUERY Ở ĐÂY:
+                                        // Dùng withSum() để gom 3 câu lệnh tính toán vào chung 1 lần gọi DB
                                         return \App\Models\Account::where('user_id', $userId)
                                             ->where('platform', $platform)
                                             ->with('email')
+                                            ->withSum([
+                                                'rebateTrackers as pending_amount' => fn($q) => $q->whereIn('status', ['pending', 'clicked'])
+                                            ], 'rebate_amount')
+                                            ->withSum([
+                                                'rebateTrackers as confirmed_amount' => fn($q) => $q->whereIn('status', ['confirmed'])
+                                            ], 'rebate_amount')
+                                            ->withSum([
+                                                'payoutLogs as paid_amount' => fn($q) => $q->whereIn('transaction_type', ['withdrawal', 'hold'])
+                                                                                         ->where('status', 'completed')
+                                            ], 'amount_usd')
                                             ->get()
                                             ->mapWithKeys(function ($account) {
-                                                // 1. Tính tổng PENDING (từ RebateTracker: status 'pending' hoặc 'clicked')
-                                                $pendingAmount = \App\Models\RebateTracker::where('account_id', $account->id)
-                                                    ->whereIn('status', ['pending', 'clicked'])
-                                                    ->sum('rebate_amount') ?? 0;
+                                                // 🟢 Lấy thẳng dữ liệu đã được tính sẵn siêu nhanh từ DB
+                                                $pendingAmount = $account->pending_amount ?? 0;
+                                                $totalConfirmed = $account->confirmed_amount ?? 0;
+                                                $paidAmount = $account->paid_amount ?? 0;
 
-                                                // 2. Tính tổng CONFIRMED gốc (từ RebateTracker: status 'confirmed')
-                                                $totalConfirmed = \App\Models\RebateTracker::where('account_id', $account->id)
-                                                    ->whereIn('status', ['confirmed'])
-                                                    ->sum('rebate_amount') ?? 0;
-
-                                                // 3. Tính tổng ĐÃ RÚT (từ PayoutLog: sử dụng cột 'amount_usd')
-                                                // 💡 Chỉ tính các giao dịch loại 'Withdrawal' (Rút tiền từ web về ví)
-                                                $paidAmount = \App\Models\PayoutLog::where('account_id', $account->id)
-                                                    ->whereIn('transaction_type', ['withdrawal', 'hold']) // 🟢 Chấp nhận cả 2 loại rút
-                                                    ->where('status', 'completed')
-                                                    ->sum('amount_usd') ?? 0;
-
-                                                // 4. Số dư khả dụng thực tế = Tổng xác nhận - Tổng đã rút
+                                                // Số dư khả dụng thực tế
                                                 $availableConfirmed = max(0, $totalConfirmed - $paidAmount);
 
                                                 $email = $account->email?->email ?? 'N/A';
                                                 $pendingStr = number_format($pendingAmount, 2);
                                                 $confirmedStr = number_format($availableConfirmed, 2);
 
-                                                // Hiển thị: email@gmail.com ➔ [P: $10.00] - [C: $5.00]
                                                 return [$email => "{$email} ➔ [Pending: \${$pendingStr}] - [Confirmed: \${$confirmedStr}]"];
                                             });
                                     })

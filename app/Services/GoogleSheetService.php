@@ -234,7 +234,7 @@ class GoogleSheetService
     // ==========================================
     // TÍNH NĂNG: UPSERT (Tự động tìm ID để Update hoặc Append nếu mới)
     // ==========================================
-    public function upsertRows(array $dataRows, ?string $sheetName = null)
+    public function upsertRows(array $dataRows, ?string $sheetName = null, ?array $headers = null)
     {
         try {
             $targetSheet = $sheetName ?? $this->getFirstSheetName();
@@ -544,17 +544,17 @@ class GoogleSheetService
     }
 
     /**
-     * Hàm phụ trợ lấy ID số của Tab (SheetId) từ tên Tab
+     * 🟢 Lấy ID từ Cache thay vì gọi API liên tục
      */
     private function getSheetIdByName(string $sheetName)
     {
-        $spreadsheet = $this->service->spreadsheets->get($this->spreadsheetId);
-        foreach ($spreadsheet->getSheets() as $sheet) {
-            if ($sheet->getProperties()->getTitle() === $sheetName) {
-                return $sheet->getProperties()->getSheetId();
-            }
+        $sheets = $this->getCachedSheetInfo();
+
+        if (!isset($sheets[$sheetName])) {
+            throw new \Exception("Tab not found: {$sheetName}");
         }
-        throw new \Exception("Không tìm thấy Tab: {$sheetName}");
+
+        return $sheets[$sheetName];
     }
 
     // --- KẾT THÚC ---
