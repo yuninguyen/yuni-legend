@@ -1,0 +1,13 @@
+[phases.install]
+cmds = ["composer install --no-dev --optimize-autoloader --no-interaction"]
+
+[phases.build]
+cmds = [
+    "php artisan config:cache",
+    "php artisan route:cache",
+    "php artisan view:cache",
+    "php artisan event:cache"
+]
+
+[start]
+cmd = "bash scripts/railway-start.sh"
