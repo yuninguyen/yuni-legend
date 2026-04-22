@@ -241,7 +241,7 @@ class GoogleSheetService
             $targetSheet = $sheetName ?? $this->getFirstSheetName();
             $safeSheetName = "'" . str_replace("'", "''", $targetSheet) . "'";
 
-            $existingIds = $this->readSheet('A2:AC', $targetSheet);
+            $existingIds = $this->readSheet('A2:A', $targetSheet);
 
             $idMap = [];
             if (!empty($existingIds)) {
@@ -377,7 +377,7 @@ class GoogleSheetService
             if ($sheetId === null)
                 return;
 
-            $existingData = $this->readSheet('A1:AC', $targetSheet);
+            $existingData = $this->readSheet('A1:A', $targetSheet);
             $indicesToDelete = [];
 
             if (!empty($existingData)) {
@@ -521,6 +521,10 @@ class GoogleSheetService
     public function applyFormattingWithRules(string $sheetName, int $statusColIndex, array $rules)
     {
         $sheetId = $this->getSheetIdByName($sheetName);
+        if ($sheetId === null) {
+            return;
+        }
+
         $colLetter = chr(65 + $statusColIndex);
 
         // 1. Lấy danh sách các lệnh XÓA Rule cũ (để tránh tích lũy vô hạn - BUG #2)
@@ -602,15 +606,11 @@ class GoogleSheetService
     /**
      * ðŸŸ¢ Láº¥y ID tá»« Cache thay vÃ¬ gá»i API liÃªn tá»¥c
      */
-    private function getSheetIdByName(string $sheetName)
+    private function getSheetIdByName(string $sheetName): ?int
     {
         $sheets = $this->getCachedSheetInfo();
 
-        if (!isset($sheets[$sheetName])) {
-            throw new \Exception("Tab not found: {$sheetName}");
-        }
-
-        return $sheets[$sheetName];
+        return $sheets[$sheetName] ?? null;
     }
 
     // --- KẾT THÚC ---

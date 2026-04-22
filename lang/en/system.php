@@ -123,6 +123,7 @@ return [
         'revenue_split' => 'Disbursement',
         'revenue_split_list' => 'Disbursement',
         'status' => 'Status',
+        'email_status' => 'Email Status',
         'total_vnd' => 'Total (VND)',
         'description' => 'Description',
         'rebate_amount_usd' => 'Rebate Amount ($)',

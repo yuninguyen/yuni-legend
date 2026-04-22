@@ -21,10 +21,12 @@ use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\IconPosition;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use App\Filament\Resources\Shared\ActivitiesRelationManager;
 
 class PayoutLogResource extends Resource
 {
+    use \App\Filament\Resources\Traits\HasPlatformCache;
     protected static ?string $model = PayoutLog::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
@@ -57,7 +59,8 @@ class PayoutLogResource extends Resource
             ->selectRaw("CONCAT(account_id, '_', COALESCE(gc_brand, 'none'), '_', COALESCE(parent_id, id)) as group_key")
             ->withCount('children')
             ->withSum(['children as children_sum' => fn($q) => $q->whereNull('deleted_at')], 'amount_usd')
-            ->withSum(['children as settled_children_sum' => fn($q) => $q->whereNotNull('user_payment_id')], 'amount_usd');
+            ->withSum(['children as settled_children_sum' => fn($q) => $q->whereNotNull('user_payment_id')], 'amount_usd')
+            ->with(['user', 'payoutMethod', 'account.email']); // 🟢 TỐI ƯU: Tránh N+1
 
         // 2. Khóa chặt thứ tự sắp xếp Cha - Con (Đã fix lỗi SQL Sum cho Sếp)
         $query->orderByRaw('COALESCE(parent_id, id) DESC')->orderBy('id', 'ASC');
@@ -585,7 +588,7 @@ class PayoutLogResource extends Resource
                             ->hidden(fn(Get $get) => !auth()->user()?->isAdmin() && $get('asset_type') === 'paypal')
                             ->default('withdrawal') // Mặc định rút tiền để DB không bị lỗi null
                             ->dehydrated(true)
-                            ->required(fn(Get $get) => auth()->user()?->isAdmin() || $get('asset_type') !== 'paypal')
+                            ->required(fn($get) => auth()->user()?->isAdmin() || $get('asset_type') !== 'paypal')
                             ->live(),
 
                         Forms\Components\Select::make('status')
@@ -718,7 +721,7 @@ class PayoutLogResource extends Resource
                 // Date - Platform
                 Tables\Columns\TextColumn::make('created_at')
                     ->label(__('system.labels.date'))
-                    ->dateTime('d/m/Y H:i')
+                    ->dateTime('d/m/Y')
                     ->alignment(Alignment::Center),
 
                 // Account Email - Platform
@@ -753,10 +756,6 @@ class PayoutLogResource extends Resource
                                     <span style='color: #9ca3af;'>" . __('system.labels.user') . ":</span> 
                                     <span style='font-weight: 500; color: #4b5563;'>$userName</span>
                                 </div>
-                                <div style='font-size: 12px; color: #6b7280; display: flex; align-items: center; gap: 4px;'>
-                                    <span style='color: #9ca3af;'>" . __('system.labels.platform') . ":</span> 
-                                    <span style='font-weight: 500; color: #4b5563;'>$platform</span>
-                                </div>
                             </div>
                         ";
                     })
@@ -764,8 +763,8 @@ class PayoutLogResource extends Resource
                     ->searchable(query: function ($query, string $search) {
                         $query->whereHas('account', function ($q) use ($search) {
                             $q->where('platform', 'like', "%{$search}%")
-                                ->orWhereHas('email', function ($q2) use ($search) {
-                                    $q2->where('email', 'like', "%{$search}%");
+                            ->orWhereHas('email', function ($q2) use ($search) {
+                                $q2->where('email', 'like', "%{$search}%");
                                 });
                         });
                     }),
@@ -799,7 +798,7 @@ class PayoutLogResource extends Resource
                     })
                     ->state(function ($record) {
                         if ($record->asset_type === 'paypal') {
-                            $walletName = $record->payoutMethod?->name ?? 'N/A';
+                            $walletName = e($record->payoutMethod?->name ?? 'N/A');
 
                             return "<div style='line-height: 1.7;'>
                                         <div style='margin-bottom: 4px;'>
@@ -817,11 +816,11 @@ class PayoutLogResource extends Resource
                         $brand = match ($brand) {
                             'victoria\'s_secret', 'victorias-secret' => 'Victoria\'s Secret',
                             'visa' => 'Visa/Mastercard',
-                            default => ucwords(str_replace(['_', '-'], ' ', $brand ?? __('system.n/a')))
+                            default => e(ucwords(str_replace(['_', '-'], ' ', $brand ?? __('system.n/a'))))
                         };
 
-                        $code = $record->gc_code ?? '---';
-                        $pin = $record->gc_pin ?? '---';
+                        $code = e($record->gc_code ?? '---');
+                        $pin = e($record->gc_pin ?? '---');
                         return "
                                 <div style='line-height: 1.7;'>
                                 <div style='margin-bottom: 4px;'>
@@ -929,30 +928,13 @@ class PayoutLogResource extends Resource
                     ->prefix('$')
                     ->color('warning')
                     ->weight(\Filament\Support\Enums\FontWeight::Bold)
-                    ->alignment(Alignment::Center)
-                    ->summarize(
-                        Tables\Columns\Summarizers\Sum::make()
-                            ->label('')
-                            ->prefix('$')
-                            ->numeric(2, '.', ',')
-                            // 🟢 CHỈ TÍNH DÒNG CHA: Tránh cộng dồn cả dòng Liquidation con vào tổng USD
-                            ->query(fn($query) => $query->whereNull('payout_logs.parent_id'))
-                    ),
+                    ->alignment(Alignment::Center),
                 Tables\Columns\TextColumn::make('total_vnd')
                     ->label(__('system.labels.total_vnd'))
                     ->placeholder('')
                     ->visible(fn() => auth()->user()?->isAdmin() || auth()->user()?->isFinance()) // 🟢 HIỆN CHO ADMIN & FINANCE
                     ->formatStateUsing(fn($record, $state) => $record->transaction_type === 'liquidation' ? '₫' . number_format($state, 0, ',', '.') : '')
-                    ->alignment(Alignment::Center)
-                    // 🟢 TỔNG KẾT VND
-                    ->summarize(
-                        Tables\Columns\Summarizers\Sum::make()
-                            ->label('')
-                            ->prefix('₫')
-                            ->numeric(0, ',', '.')
-                            // 🟢 CHỈ TÍNH DÒNG CON: Tránh cộng dồn các dòng Withdrawal (Pending) vào tổng VND
-                            ->query(fn($query) => $query->where('payout_logs.transaction_type', 'liquidation'))
-                    ),
+                    ->alignment(Alignment::Center),
                 Tables\Columns\TextColumn::make('status')
                     ->label(__('system.labels.status'))
                     ->badge()
@@ -1291,6 +1273,33 @@ class PayoutLogResource extends Resource
                             ->dehydrateStateUsing(fn($state) => (float) str_replace('.', '', $state ?? '0')),
                     ])
                     ->action(function ($record, array $data) {
+                        $exchangeCreated = false;
+
+                        DB::transaction(function () use ($record, $data, &$exchangeCreated) {
+                        $record = \App\Models\PayoutLog::query()
+                            ->lockForUpdate()
+                            ->find($record->id);
+
+                        if (!$record) {
+                            return;
+                        }
+
+                        $existingLiquidation = \App\Models\PayoutLog::query()
+                            ->where('parent_id', $record->id)
+                            ->where('transaction_type', 'liquidation')
+                            ->where('status', 'completed')
+                            ->lockForUpdate()
+                            ->first();
+
+                        if ($record->user_payment_id !== null || $existingLiquidation !== null) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Exchange failed!')
+                                ->body('This payout log has already been liquidated or settled.')
+                                ->danger()
+                                ->send();
+                            return;
+                        }
+
                         // 🟢 LÀM SẠCH DỮ LIỆU TRƯỚC KHI LƯU
                         $cleanRate = (float) str_replace(['.', ','], '', $data['exchange_rate']);
                         $cleanVnd = (float) str_replace(['.', ','], '', $data['total_vnd']);
@@ -1347,10 +1356,16 @@ class PayoutLogResource extends Resource
                                 __('system.labels.liquidity_from_id') . $record->id,
                         ]);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Exchange successful!')
-                            ->success()
-                            ->send();
+                        $exchangeCreated = true;
+
+                        });
+
+                        if ($exchangeCreated) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Exchange successful!')
+                                ->success()
+                                ->send();
+                        }
                     }),
 
                 // Nút Xem chi tiết (Hình con mắt) hiện ra bên ngoài
@@ -1447,9 +1462,17 @@ class PayoutLogResource extends Resource
                                 ->helperText('💡 Percentage of the total value to pay the user (e.g. 35% of USD * Rate).'),
                         ])
                         ->action(function (\Illuminate\Database\Eloquent\Collection $records, array $data) {
+                            $paymentGenerated = false;
+
+                            DB::transaction(function () use ($records, $data, &$paymentGenerated) {
 
                             // 1. Chỉ lọc đơn hợp lệ: Đã Completed và Chưa bị chốt sổ
-                            $validSelected = $records->where('status', 'completed')->whereNull('user_payment_id');
+                            // 🚀 SECURITY FIX: Dùng lockForUpdate() để tránh tranh chấp khi có 2 admin cùng bấm nút
+                            $validSelected = \App\Models\PayoutLog::whereIn('id', $records->pluck('id'))
+                                ->where('status', 'completed')
+                                ->whereNull('user_payment_id')
+                                ->lockForUpdate()
+                                ->get();
 
                             if ($validSelected->isEmpty()) {
                                 \Filament\Notifications\Notification::make()
@@ -1465,7 +1488,10 @@ class PayoutLogResource extends Resource
 
                             // Lấy lại danh sách các đơn Gốc (Parent) sạch sẽ từ Database
                             // 🟢 FIX: Cho phép lấy Parent kể cả khi Parent ĐÃ bị settled, để giải quyết các Child tới sau
-                            $parentLogs = \App\Models\PayoutLog::whereIn('id', $parentIds)->get();
+                            $parentLogs = \App\Models\PayoutLog::whereIn('id', $parentIds)
+                                ->with(['account', 'payoutMethod'])
+                                ->lockForUpdate()
+                                ->get();
 
                             // 2. GOM NHÓM THÔNG MINH (Chỉ gom các đơn Gốc)
                             $groupedLogs = $parentLogs->groupBy(function ($log) {
@@ -1482,7 +1508,7 @@ class PayoutLogResource extends Resource
                                 $firstLog = $logs->first();
                                 $sourceName = '';
                                 $platformRaw = $firstLog->account?->platform ?? 'unknown';
-                                $platformName = \App\Filament\Resources\Traits\HasPlatform::$platform[$platformRaw] ?? strtoupper($platformRaw);
+                                $platformName = static::getPlatformName($platformRaw);
 
                                 if ($firstLog->asset_type === 'gift_card') {
                                     $brandRecord = \App\Models\Brand::where('slug', $firstLog->gc_brand)->first();
@@ -1504,6 +1530,7 @@ class PayoutLogResource extends Resource
                                         ->where('transaction_type', 'liquidation')
                                         ->where('status', 'completed')
                                         ->whereNull('user_payment_id')
+                                        ->lockForUpdate()
                                         ->get();
 
                                     $usd = 0;
@@ -1564,6 +1591,8 @@ class PayoutLogResource extends Resource
                                     'status' => 'pending',
                                 ]);
 
+                                $paymentGenerated = true;
+
                                 // 5. CẬP NHẬT ID PHIẾU LƯƠNG ĐỂ KHÓA ĐƠN
                                 \App\Models\PayoutLog::whereIn('id', $parentIdsToUpdate)->update(['user_payment_id' => $payment->id]);
 
@@ -1572,11 +1601,15 @@ class PayoutLogResource extends Resource
                                 }
                             }
 
-                            \Filament\Notifications\Notification::make()
-                                ->title('Settlement Successful!')
-                                ->body('Payout rates and profits have been calculated correctly.')
-                                ->success()
-                                ->send();
+                            });
+
+                            if ($paymentGenerated) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Settlement Successful!')
+                                    ->body('Payout rates and profits have been calculated correctly.')
+                                    ->success()
+                                    ->send();
+                            }
                         })
                         ->deselectRecordsAfterCompletion(),
 
@@ -1625,7 +1658,29 @@ class PayoutLogResource extends Resource
                     ->label(__('system.labels.account'))
                     ->collapsible()
                     ->getTitleFromRecordUsing(function ($record) {
-                        return $record->account?->email?->email ?? __('system.n/a');
+                        $email = $record->account?->email?->email ?? __('system.n/a');
+                        $platform = static::getPlatformName($record->account?->platform);
+                        
+                        // 🟢 TÍNH TỔNG CHO HEADER (Do phiên bản Filament này chưa hỗ trợ ->summary() trên Group)
+                        $parts = explode('_', $record->group_key);
+                        $accountId = $parts[0] ?? null;
+                        $brand = $parts[1] ?? 'none';
+                        $parentOrId = $parts[2] ?? null;
+
+                        $baseQuery = \App\Models\PayoutLog::query()
+                            ->where('account_id', $accountId)
+                            ->where(function ($q) use ($parentOrId) {
+                                $q->where('id', $parentOrId)->orWhere('parent_id', $parentOrId);
+                            })
+                            ->when($brand !== 'none', fn($q) => $q->where('gc_brand', $brand), fn($q) => $q->whereNull('gc_brand'));
+
+                        $totalUsd = (clone $baseQuery)->whereNull('parent_id')->sum('net_amount_usd');
+                        $totalVnd = (clone $baseQuery)->where('transaction_type', 'liquidation')->sum('total_vnd');
+
+                        $usdStr = '$' . number_format($totalUsd, 2);
+                        $vndStr = '₫' . number_format($totalVnd, 0, ',', '.');
+
+                        return "{$email} | {$platform} | Total: {$usdStr} | {$vndStr}";
                     })
                     ->getKeyFromRecordUsing(fn($record) => $record->group_key)
                     ->scopeQueryByKeyUsing(function (Builder $query, $key) {

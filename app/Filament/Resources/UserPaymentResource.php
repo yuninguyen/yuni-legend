@@ -141,7 +141,7 @@ class UserPaymentResource extends Resource
                     ->description(function ($record) {
                         // 🟢 DÒNG 2: Danh sách email account
                         $emails = $record->payoutLogs->map(fn($log) => $log->account?->email?->email)->filter()->unique();
-                        $emailList = $emails->isNotEmpty() ? $emails->implode(', ') : __('system.n/a');
+                        $emailList = $emails->isNotEmpty() ? e($emails->implode(', ')) : __('system.n/a');
                         $accLine = "📧 Account: {$emailList}";
 
                         // 🟢 DÒNG 3: Tỉ giá (Market rate & Payout rate)
@@ -334,7 +334,9 @@ class UserPaymentResource extends Resource
                                 ->required(),
                         ])
                         ->action(function (\Illuminate\Database\Eloquent\Collection $records, array $data): void {
-                            $records->each->update(['batch_id' => $data['batch_id']]);
+                            \Illuminate\Support\Facades\DB::transaction(function () use ($records, $data) {
+                                $records->each->update(['batch_id' => $data['batch_id']]);
+                            });
                         })
                         ->deselectRecordsAfterCompletion()
                         ->visible(fn() => auth()->user()?->isAdmin() || auth()->user()?->isFinance()),
@@ -346,7 +348,9 @@ class UserPaymentResource extends Resource
                         ->color('warning')
                         ->requiresConfirmation()
                         ->action(function (\Illuminate\Database\Eloquent\Collection $records): void {
-                            $records->each->update(['batch_id' => null]);
+                            \Illuminate\Support\Facades\DB::transaction(function () use ($records) {
+                                $records->each->update(['batch_id' => null]);
+                            });
                         })
                         ->deselectRecordsAfterCompletion()
                         ->visible(fn() => auth()->user()?->isAdmin() || auth()->user()?->isFinance()),
@@ -367,11 +371,13 @@ class UserPaymentResource extends Resource
                                 ->label(__('system.labels.note_for_all')),
                         ])
                         ->action(function (\Illuminate\Database\Eloquent\Collection $records, array $data): void {
-                            $records->each->update([
-                                'status' => 'paid',
-                                'payment_proof' => $data['payment_proof'] ?? null,
-                                'note' => $data['note'] ?? null,
-                            ]);
+                            \Illuminate\Support\Facades\DB::transaction(function () use ($records, $data) {
+                                $records->each->update([
+                                    'status' => 'paid',
+                                    'payment_proof' => $data['payment_proof'] ?? null,
+                                    'note' => $data['note'] ?? null,
+                                ]);
+                            });
                         })
                         ->deselectRecordsAfterCompletion()
                         ->visible(fn() => auth()->user()?->isAdmin() || auth()->user()?->isFinance()),

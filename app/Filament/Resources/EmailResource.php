@@ -21,6 +21,7 @@ use Filament\Tables\Enums\FiltersLayout;
 
 class EmailResource extends Resource
 {
+    use \App\Filament\Resources\Traits\HasPlatformCache;
 
     protected static ?string $model = Email::class;
     protected static ?string $title = "email";
@@ -420,13 +421,6 @@ class EmailResource extends Resource
                         ->action(fn(\Illuminate\Database\Eloquent\Collection $records) => $records->each->update(['email_created_at' => null])),
 
                     // Exported Seclected
-                    \Filament\Tables\Actions\ExportBulkAction::make()
-                        ->exporter(\App\Filament\Exports\EmailExporter::class)
-                        ->label(__('system.actions.export_selected'))
-                        ->icon('heroicon-m-arrow-down-tray')
-                        ->color('success')
-                        ->visible(fn() => auth()->user()?->isAdmin())
-                        ->deselectRecordsAfterCompletion(),
 
                     // Copy Selected
                     Tables\Actions\BulkAction::make('copy_email_selected')
@@ -434,6 +428,9 @@ class EmailResource extends Resource
                         ->icon('heroicon-m-clipboard-document-list')
                         ->color('warning')
                         ->action(function (\Illuminate\Database\Eloquent\Collection $records, $livewire) {
+                            // 🟢 TỐI ƯU: Load Map 1 lần duy nhất ra bên ngoài Loop để tránh N+1 Query
+                            $platforms_map = \App\Models\Platform::pluck('name', 'slug')->toArray();
+
                             // 1. Tạo hàng tiêu đề (Header)
                             $header = " | ID | Status | Year Create | Email Address | Email Password | Recovery Email | 2FA Code | Email Note | Provider | Usage | Platforms | ";
                             $output = $header . "\n";
@@ -452,7 +449,8 @@ class EmailResource extends Resource
                                 $note = e($record->note ?? __('system.n/a')); // Đồng bộ đúng trường 'note'
                                 $provider = $record->provider ? ucfirst($record->provider) : 'Other';
                                 $usage = $record->accounts_count > 0 ? "{$record->accounts_count}" : __('system.n/a');
-                                $platforms_map = \App\Models\Platform::pluck('name', 'slug')->toArray();
+                                
+                                // Đã có map phía trên
                                 $platforms = $record->accounts->pluck('platform')->map(fn($s) => $platforms_map[$s] ?? $s)->implode(', ') ?: __('system.n/a'); // Lấy danh sách platform đang dùng email này
                 
                                 // Định dạng thông tin cho từng email

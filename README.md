@@ -21,8 +21,9 @@ RebateOps is a professional, high-performance internal tool built with **Laravel
 ### 🛡️ Financial Integrity & Security
 - **Smart Record Locking**: Automated locking of Payout Logs once they are generated into a Disbursement. Parents are intelligently locked only when their child transactions are fully settled.
 - **Data Integrity Safeguards**: Restricted bulk actions (Delete, Mark as Completed) for settled records to prevent accidental financial discrepancies.
-- **Pessimistic Locking**: Prevents race conditions on wallet balances using `lockForUpdate()`.
+- **Pessimistic Locking**: Prevents race conditions on wallet balances using `lockForUpdate()`. Exchange and Settlement actions lock the full economic group (parent + liquidation children) before computing totals — concurrent requests block on the lock rather than racing.
 - **Atomic Transactions**: All balance changes follow a strict safety pattern within DB transactions.
+- **Safe Soft-Delete Cascade**: Soft-deleting a `UserPayment` (Disbursement) automatically unlinks all associated `PayoutLog` rows (`user_payment_id → null`), preventing logs from being stranded as settled with no recovery path.
 - **Advanced Data Recovery**: **SoftDeletes** implemented across all core models, with "Restore" and "Force Delete" capabilities for authorized Admins.
 - **At-Rest Encryption**: Sensitive data (Gift Card codes, passwords) are encrypted using Laravel's native encryption.
 
@@ -48,7 +49,7 @@ RebateOps is designed for team collaboration with strictly scoped access.
 
 ### 💹 Finance (The Auditor)
 - **Financial Oversight**: Specialized Dashboard showing only the system profit and payroll analysis (`AdminUserEarningsTable`).
-- **Read-Only Auditor Model**: Access to all accounts, emails, and payout logs (Admin-parity visibility) but explicitly barred from editing, deleting, or exporting data.
+- **Financial Control**: Full access to Payout Logs, Payout Methods, and Disbursement — can create, edit, delete, and restore records to ensure financial reconciliation accuracy.
 - **Zero Friction**: Navigation is streamlined to hide operational trackers, keeping focus on financial reconciliation.
 
 ### 👤 Staff (The Operator)
@@ -119,6 +120,7 @@ REBATEOPS
 - [x] v5.3: Core Localization (VI/EN) & UI Density Optimization
 - [x] v5.4: Advanced Data Recovery (Restore / Force Delete)
 - [x] v5.4.1: Security Patch — Policy registration, operator precedence, cascade forceDelete, email validation
+- [x] v5.4.2: Concurrency Hardening — `lockForUpdate()` on Exchange & Settlement group scope; soft-delete cascade unlinks PayoutLogs
 - [ ] v5.5: Automated Profit/Loss Analytics
 - [ ] v5.6: Bulk Image Processing for Payment Proofs
 - [ ] v5.7: REST API for External Automation
@@ -129,7 +131,7 @@ REBATEOPS
 | Role | Emails | Accounts | Trackers | Payout Logs | Payout Methods | Disbursement |
 |------|--------|----------|----------|-------------|----------------|--------------|
 | **Admin** | Full | Full | Full | Full | Full | Full |
-| **Finance** | View | View | Hidden | View | View | Full |
+| **Finance** | View | View | Hidden | Full | Full | Full |
 | **Staff** | Own only | Own only | Own only | Own only | Hidden | View own |
 
 ---

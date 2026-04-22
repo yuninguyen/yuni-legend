@@ -17,8 +17,17 @@ class UserPayment extends Model
     protected static function booted()
     {
         static::deleting(function ($payment) {
-            // 🟢 TỰ ĐỘNG GIẢI PHÓNG: Khi xóa giao dịch quyết toán, các đơn rút tiền con được trả về trạng thái tự do để chốt sổ lại
-            $payment->payoutLogs()->update(['user_payment_id' => null]);
+            if ($payment->isForceDeleting()) {
+                return;
+            }
+
+            $payment->payoutLogs()->withTrashed()->update(['user_payment_id' => null]);
+        });
+
+        // Giữ nguyên hook forceDelete hiện có để các liên kết còn sót lại
+        // vẫn được giải phóng trước khi bản ghi bị xóa hẳn.
+        static::forceDeleting(function ($payment) {
+            $payment->payoutLogs()->withTrashed()->update(['user_payment_id' => null]);
         });
     }
 
@@ -72,9 +81,9 @@ class UserPayment extends Model
     // 🟢 ACCESSOR: Tính tổng tiền của cả Batch để hiện trên tiêu đề Group
     public function getTotalVndPayoutForBatchAttribute(): float
     {
-        if (empty($this->batch_id)) return $this->total_vnd;
+        if (empty($this->batch_id))
+            return $this->total_vnd;
 
         return static::where('batch_id', $this->batch_id)->sum('total_vnd');
     }
 }
-

@@ -540,7 +540,7 @@ class PayoutMethodResource extends Resource
                     ->width('250px')
                     ->html()
                     ->state(function ($record) {
-                        $name = $record->name;
+                        $name = e($record->name);
                         $type = strtoupper(str_replace('_', ' ', $record->type));
 
                         // Màu sắc cho Type giống như logic cũ của bạn
@@ -582,14 +582,14 @@ class PayoutMethodResource extends Resource
                             'device' => __('system.payout_methods.fields.device'),
                         ];
 
-                        $val = fn($v) => $v ?: $na;
+                        $val = fn($v) => $v ? e($v) : $na;
 
                         return
                             "<===== ACCOUNT =====>\n" .
                             "{$labels['email']}: " . $val($record->email) . " | {$labels['pass']}: " . $val($record->password) . "\n" .
                             "{$labels['paypal']}: " . $val($record->paypal_account) . " | {$labels['paypal_pass']}: " . $val($record->paypal_password) . "\n" .
                             "{$labels['auth']}: " . $val($record->auth_code) . "\n" .
-                            "{$labels['status']}: " . (__('system.status.' . $record->status) ?: $record->status) . "\n" .
+                            "{$labels['status']}: " . (__('system.status.' . $record->status) ?: e($record->status)) . "\n" .
                             "{$labels['note']}: " . $val($record->note) . "\n" .
                             "<===== PERSONAL INFORMATION =====>\n" .
                             "{$labels['name']}: " . $val($record->full_name) . "\n" .
@@ -619,18 +619,18 @@ class PayoutMethodResource extends Resource
                             'limited' => __('system.status.paypal_limited'),
                             'restored' => __('system.status.live'),
                             'permanently_limited' => __('system.status.banned'),
-                            default => ucwords($record->status),
+                            default => e(ucwords($record->status)),
                         };
 
                         $na = __('system.n/a');
-                        $payPalAccount = $record->paypal_account ?: $na;
-                        $paypalPassword = $record->paypal_password ?: $na;
-                        $authcode = $record->auth_code ?: $na;
-                        $fullName = $record->full_name ?: $na;
+                        $payPalAccount = $record->paypal_account ? e($record->paypal_account) : $na;
+                        $paypalPassword = $record->paypal_password ? e($record->paypal_password) : $na;
+                        $authcode = $record->auth_code ? e($record->auth_code) : $na;
+                        $fullName = $record->full_name ? e($record->full_name) : $na;
                         $dob = $record->dob ? \Carbon\Carbon::parse($record->dob)->format('d/m/Y') : $na;
-                        $ssn = $record->ssn ?: $na;
-                        $phone = $record->phone ?: $na;
-                        $address = $record->address ?: $na;
+                        $ssn = $record->ssn ? e($record->ssn) : $na;
+                        $phone = $record->phone ? e($record->phone) : $na;
+                        $address = $record->address ? e($record->address) : $na;
 
                         $labels = [
                             'paypal' => __('system.payout_methods.fields.paypal_account'),

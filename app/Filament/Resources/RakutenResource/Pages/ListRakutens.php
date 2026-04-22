@@ -32,14 +32,6 @@ class ListRakutens extends ListRecords
                 // 🟢 CHỈ HIỆN CHO ADMIN
                 ->visible(fn() => auth()->user()?->isAdmin()),
 
-            // Nút Export
-            \Filament\Actions\ExportAction::make()
-                ->exporter(\App\Filament\Exports\AccountExporter::class)
-                ->label('Export All Data')
-                ->color('info')
-                ->icon('heroicon-o-arrow-down-tray')
-                // 🟢 CHỈ HIỆN CHO ADMIN
-                ->visible(fn() => auth()->user()?->isAdmin()),
 
             $this->getSyncToSheetAction('syncAccounts', 'Accounts'),
 

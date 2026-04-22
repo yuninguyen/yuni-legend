@@ -14,15 +14,18 @@ use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Infolists\Infolist;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Enums\FiltersLayout;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Js;
 use Filament\Forms\Components\Select;
 use Filament\Tables\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Actions\BulkAction;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Tables\Enums\FiltersLayout;
+use Illuminate\Support\HtmlString;
 use Illuminate\Database\Eloquent\Collection;
 use Filament\Navigation\NavigationItem;
 use App\Filament\Resources\Traits\HasUsStates;
@@ -35,6 +38,7 @@ trait HasAccountSchema
 
     use HasUsStates;
     use HasPlatform;
+    use HasPlatformCache;
 
 
     public static function form(Form $form): Form
@@ -230,7 +234,7 @@ trait HasAccountSchema
                         \Filament\Infolists\Components\TextEntry::make('platform')
                             ->label(__('system.labels.platform'))
                             ->placeholder(__('system.n/a'))
-                            ->formatStateUsing(fn($state) => $state ? (\App\Models\Platform::where('slug', $state)->value('name') ?? $state) : 'N/A'),
+                            ->formatStateUsing(fn($state) => $state ? static::getPlatformName($state) : 'N/A'),
                         \Filament\Infolists\Components\TextEntry::make('password')
                             ->label(__('system.labels.password'))
                             ->placeholder(__('system.n/a')),
@@ -310,6 +314,7 @@ trait HasAccountSchema
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn(Builder $query) => $query->with(['email', 'user'])) // 🟢 TỐI ƯU: Eager Load để tránh N+1
             ->recordUrl(null)
             ->columns([
                 Tables\Columns\TextColumn::make('id')
@@ -328,7 +333,7 @@ trait HasAccountSchema
                     ->extraHeaderAttributes(['style' => 'width: 80px; min-width: 80px'])
                     ->extraAttributes(['style' => 'width: 80px; min-width: 80px'])
                     ->visible(static::class === \App\Filament\Resources\AccountResource::class)
-                    ->formatStateUsing(fn($state) => $state ? (\App\Models\Platform::where('slug', $state)->value('name') ?? $state) : 'N/A'),
+                    ->formatStateUsing(fn($state) => $state ? static::getPlatformName($state) : 'N/A'),
 
                 TextColumn::make('email.email')
                     ->label(__('system.labels.email_address'))
@@ -358,65 +363,65 @@ trait HasAccountSchema
                         };
 
                         return "
-                            <div x-data='{ copied: null }' style='text-align: left; line-height: 1.6; padding-left: 0;'>
-                                <div style='margin-bottom: 2px;'>
-                                    <span style='color: #1e293b; font-weight: 700; cursor: pointer; position: relative;' 
-                                          x-on:click.stop.prevent='window.navigator.clipboard.writeText(\"{$email}\"); copied = \"email\"; setTimeout(() => copied = null, 5000)'
-                                          onclick='event.stopPropagation();'>
+                            <div x-data=\"{ copied: null }\" style=\"text-align: left; line-height: 1.6; padding-left: 0;\">
+                                <div style=\"margin-bottom: 2px;\">
+                                    <span style=\"color: #1e293b; font-weight: 700; cursor: pointer; position: relative;\" 
+                                          x-on:click.stop.prevent=\"window.navigator.clipboard.writeText(" . e(Js::from($email)) . "); copied = 'email'; setTimeout(() => copied = null, 5000)\"
+                                          onclick=\"event.stopPropagation();\">
                                         {$email}
-                                        <span x-show='copied === \"email\"' x-cloak style='display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;'>✓ " . __('system.labels.copied') . "</span>
+                                        <span x-show=\"copied === 'email'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ " . __('system.labels.copied') . "</span>
                                     </span>
                                 </div>
 
-                                <div style='margin-bottom: 2px;'>
-                                    <span style='color: #64748b;'>" . __('system.labels.password_account') . ": </span> 
-                                    <span style='color: #1e293b; cursor: pointer; position: relative;' 
-                                          x-on:click.stop.prevent='window.navigator.clipboard.writeText(\"{$platformPass}\"); copied = \"platform\"; setTimeout(() => copied = null, 5000)'
-                                          onclick='event.stopPropagation();'>
+                                <div style=\"margin-bottom: 2px;\">
+                                    <span style=\"color: #64748b;\">" . __('system.labels.password_account') . ": </span> 
+                                    <span style=\"color: #1e293b; cursor: pointer; position: relative;\" 
+                                          x-on:click.stop.prevent=\"window.navigator.clipboard.writeText(" . e(Js::from($platformPass)) . "); copied = 'platform'; setTimeout(() => copied = null, 5000)\"
+                                          onclick=\"event.stopPropagation();\">
                                         {$platformPass}
-                                        <span x-show='copied === \"platform\"' x-cloak style='display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;'>✓ " . __('system.labels.copied') . "</span>
+                                        <span x-show=\"copied === 'platform'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ " . __('system.labels.copied') . "</span>
                                     </span>
                                 </div>
                                 
-                                <div style='margin-bottom: 2px;'>
-                                    <span style='color: #64748b;'>" . __('system.labels.password_email') . ": </span> 
-                                    <span style='color: #1e293b; cursor: pointer; position: relative;' 
-                                          x-on:click.stop.prevent='window.navigator.clipboard.writeText(\"{$pass}\"); copied = \"pass\"; setTimeout(() => copied = null, 5000)'
-                                          onclick='event.stopPropagation();'>
+                                <div style=\"margin-bottom: 2px;\">
+                                    <span style=\"color: #64748b;\">" . __('system.labels.password_email') . ": </span> 
+                                    <span style=\"color: #1e293b; cursor: pointer; position: relative;\" 
+                                          x-on:click.stop.prevent=\"window.navigator.clipboard.writeText(" . e(Js::from($pass)) . "); copied = 'pass'; setTimeout(() => copied = null, 5000)\"
+                                          onclick=\"event.stopPropagation();\">
                                         {$pass}
-                                        <span x-show='copied === \"pass\"' x-cloak style='display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;'>✓ " . __('system.labels.copied') . "</span>
+                                        <span x-show=\"copied === 'pass'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ " . __('system.labels.copied') . "</span>
                                     </span>
                                 </div>
 
-                                <div style='margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: wrap;'>
-                                    <span style='color: #64748b;'>" . __('system.labels.recovery_email') . ": </span> 
-                                    <span style='color: #1e293b; cursor: pointer; position: relative;' 
-                                          x-on:click.stop.prevent='window.navigator.clipboard.writeText(\"{$rec}\"); copied = \"rec\"; setTimeout(() => copied = null, 5000)'
-                                          onclick='event.stopPropagation();'>
+                                <div style=\"margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: wrap;\">
+                                    <span style=\"color: #64748b;\">" . __('system.labels.recovery_email') . ": </span> 
+                                    <span style=\"color: #1e293b; cursor: pointer; position: relative;\" 
+                                          x-on:click.stop.prevent=\"window.navigator.clipboard.writeText(" . e(Js::from($rec)) . "); copied = 'rec'; setTimeout(() => copied = null, 5000)\"
+                                          onclick=\"event.stopPropagation();\">
                                         {$rec}
-                                        <span x-show='copied === \"rec\"' x-cloak style='display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;'>✓ " . __('system.labels.copied') . "</span>
+                                        <span x-show=\"copied === 'rec'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ " . __('system.labels.copied') . "</span>
                                     </span>
                                 </div>
 
-                                <div style='margin-bottom: 2px;'>
-                                    <span style='color: #64748b;'>" . __('system.labels.two_factor_code') . ": </span> 
-                                    <span style='color: #1e293b; cursor: pointer; position: relative;' 
-                                          x-on:click.stop.prevent='window.navigator.clipboard.writeText(\"{$twoFA}\"); copied = \"twoFA\"; setTimeout(() => copied = null, 5000)'
-                                          onclick='event.stopPropagation();'>
+                                <div style=\"margin-bottom: 2px;\">
+                                    <span style=\"color: #64748b;\">" . __('system.labels.two_factor_code') . ": </span> 
+                                    <span style=\"color: #1e293b; cursor: pointer; position: relative;\" 
+                                          x-on:click.stop.prevent=\"window.navigator.clipboard.writeText(" . e(Js::from($twoFA)) . "); copied = 'twoFA'; setTimeout(() => copied = null, 5000)\"
+                                          onclick=\"event.stopPropagation();\">
                                         {$twoFA}
-                                        <span x-show='copied === \"twoFA\"' x-cloak style='display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;'>✓ " . __('system.labels.copied') . "</span>
+                                        <span x-show=\"copied === 'twoFA'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ " . __('system.labels.copied') . "</span>
                                     </span>
                                 </div>
-                            
-                                <div style='margin-top: 8px; padding-top: 4px; border-top: 1px solid #f1f5f9; line-height: 1.8;'>
-                                    <div style='margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: wrap;'>
-                                        <span style='color: #64748b;'>" . __('system.labels.status') . ": </span> 
-                                        <span style='color: {$emailstatusLabelsColor};'>{$emailstatusLabels}</span>
+                                    
+                                <div style=\"margin-top: 8px; padding-top: 4px; border-top: 1px solid #f1f5f9; line-height: 1.8;\">
+                                    <div style=\"margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: wrap;\">
+                                        <span style=\"color: #64748b;\">" . __('system.labels.status') . ": </span> 
+                                        <span style=\"color: {$emailstatusLabelsColor};\">{$emailstatusLabels}</span>
                                     </div>
 
-                                    <div style='margin-bottom: 2px;'>
-                                        <span style='color: #64748b;'>" . __('system.labels.note') . ": </span> 
-                                        <span style='color: #1e293b;'>{$emailNote}</span>
+                                    <div style=\"margin-bottom: 2px;\">
+                                        <span style=\"color: #64748b;\">" . __('system.labels.note') . ": </span> 
+                                        <span style=\"color: #1e293b;\">{$emailNote}</span>
                                     </div>
                                 </div>
                             </div>
@@ -551,7 +556,7 @@ trait HasAccountSchema
             ->persistFiltersInSession()
             ->filters([
                 SelectFilter::make('email_status')
-                    ->label(__('system.labels.status'))
+                    ->label(__('system.labels.email_status'))
                     ->options([
                         'active' => __('system.status.live'),
                         'disabled' => __('system.status.disabled'),
@@ -635,7 +640,7 @@ trait HasAccountSchema
                     ->preload(),
                 Tables\Filters\TrashedFilter::make(),
             ])
-            ->filtersFormColumns(fn() => auth()->user()?->role === 'operator' ? 5 : 3)
+            ->filtersFormColumns(fn() => auth()->user()?->isAdmin() ? 6 : 4)
             ->filtersLayout(FiltersLayout::AboveContent)
             ->actions([
                 Tables\Actions\Action::make('get_account')
@@ -869,13 +874,6 @@ trait HasAccountSchema
                         })
                         ->deselectRecordsAfterCompletion(),
 
-                    \Filament\Tables\Actions\ExportBulkAction::make()
-                        ->exporter(\App\Filament\Exports\AccountExporter::class)
-                        ->label(__('system.actions.export_selected'))
-                        ->icon('heroicon-m-arrow-down-tray')
-                        ->color('success')
-                        ->visible(fn() => auth()->user()?->isAdmin())
-                        ->deselectRecordsAfterCompletion(),
 
                     Tables\Actions\BulkAction::make('clear_date_create_selected')
                         ->label(__('system.actions.clear_date_create'))

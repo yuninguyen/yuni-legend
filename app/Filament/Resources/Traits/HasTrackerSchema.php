@@ -21,8 +21,8 @@ trait HasTrackerSchema
 {
     // FIX #8: $usStates được kế thừa từ HasUsStates — KHÔNG khai báo lại ở đây.
     use HasUsStates;
-    // Dùng chung $platforms từ HasPlatform thay vì khai báo lại ở đây.
     use HasPlatform;
+    use HasPlatformCache;
 
     /**
      * Scope lọc các bản ghi đang ở trạng thái có thể rút tiền
@@ -355,7 +355,7 @@ trait HasTrackerSchema
                         \Filament\Infolists\Components\TextEntry::make('account.platform')
                             ->label(__('system.labels.platform'))
                             ->placeholder('N/A')
-                            ->formatStateUsing(fn($state) => $state ? (\App\Models\Platform::where('slug', $state)->value('name') ?? $state) : 'N/A'),
+                            ->formatStateUsing(fn($state) => $state ? static::getPlatformName($state) : 'N/A'),
                         // User (Để hiện tên thay vì ID số 1)
                         \Filament\Infolists\Components\TextEntry::make('user.name')
                             ->label(__('system.labels.user'))
@@ -519,14 +519,24 @@ trait HasTrackerSchema
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn(Builder $query) => $query->with(['account.email', 'user'])) // 🟢 TỐI ƯU: Tránh N+1
             ->defaultGroup('account_id')
             ->groups([
                 Group::make('account_id')
                     ->label(__('system.labels.account_email'))
                     ->collapsible()
                     ->getTitleFromRecordUsing(function ($record) {
-                        // Hàng Header bây giờ CHỈ HIỆN EMAIL
-                        return $record->account?->email?->email ?? 'N/A';
+                        $email = $record->account?->email?->email ?? 'N/A';
+                        $platform = static::getPlatformName($record->account?->platform);
+                        
+                        // 🟢 TÍNH TỔNG CHO HEADER (Do phiên bản này chưa hỗ trợ ->summary() trên Group)
+                        $totalRebate = \App\Models\RebateTracker::query()
+                            ->where('account_id', $record->account_id)
+                            ->sum('rebate_amount');
+
+                        $rebateStr = '$' . number_format($totalRebate, 2);
+
+                        return "{$email} | {$platform} | Total: {$rebateStr}";
                     }),
             ])
             ->columns([
@@ -539,8 +549,8 @@ trait HasTrackerSchema
                     ->searchable(query: function ($query, $search) {
                         $query->whereHas('account', fn($q) => $q->where('platform', 'like', "%{$search}%"));
                     })
-                    ->formatStateUsing(fn($state) => $state ? (\App\Models\Platform::where('slug', $state)->value('name') ?? $state) : 'N/A')
-                    ->visible(static::class === \App\Filament\Resources\RebateTrackerResource::class),
+                    ->formatStateUsing(fn($state) => $state ? static::getPlatformName($state) : 'N/A')
+                    ->visible(false),
 
                 // 1. STORE (Đẩy lùi vào để phân cấp)
                 Tables\Columns\TextColumn::make('store_name')
@@ -573,15 +583,7 @@ trait HasTrackerSchema
                     ->money('USD')
                     ->color('success')
                     ->weight('bold')
-                    ->alignment(Alignment::Center)
-                    // Summarize này sẽ tự động hiển thị ở dòng tổng của GROUP (Header/Footer)
-                    // và nó sẽ LUÔN THẲNG HÀNG với cột này.
-                    ->summarize(
-                        Tables\Columns\Summarizers\Sum::make()
-                            // 1. Xóa bỏ chữ "Summary" ở cột Account (cột đầu bảng)
-                            ->label('') // Triệt tiêu chữ "Summary" mặc định của Filament
-                            ->money('USD')
-                    ),
+                    ->alignment(Alignment::Center),
 
                 // 5. STATUS
                 Tables\Columns\TextColumn::make('status')

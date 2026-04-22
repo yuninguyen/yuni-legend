@@ -122,6 +122,7 @@ return [
         'revenue_split' => 'Thanh toán',
         'revenue_split_list' => 'Thanh toán',
         'status' => 'Trạng thái',
+        'email_status' => 'Trạng thái Email',
         'total_vnd' => 'Tổng cộng (VND)',
         'description' => 'Mô tả',
         'rebate_amount_usd' => 'Số tiền Rebate ($)',

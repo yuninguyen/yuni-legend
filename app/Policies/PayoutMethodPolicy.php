@@ -17,12 +17,12 @@ class PayoutMethodPolicy
 
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->isAdmin() || $user->isFinance();
     }
 
     public function view(User $user, PayoutMethod $method): bool
     {
-        return true;
+        return $user->isAdmin() || $user->isFinance();
     }
 
     public function create(User $user): bool
