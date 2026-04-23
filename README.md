@@ -73,7 +73,7 @@ REBATEOPS
 ├── WALLET & PAYOUTS      # Financial Layer
 │   ├── Payout Logs       # Withdrawals & Liquidations
 │   ├── Payout Methods    # Virtual Wallets
-│   └── Disbursement      # Payroll
+│   └── Disbursement      # Disbursement (User Payments) Payroll
 ├── LOGS                  # Audit Trail (Admin only)
 │   └── Activity Logs     # System audit
 └── SETTINGS              # System Core (Admin only)
@@ -87,9 +87,9 @@ REBATEOPS
 ## 🛠️ Technical Setup
 
 ### Requirements
-- **PHP** 8.2+
+- **PHP** 8.4+ (Production) / 8.2+ (Dev)
 - **Composer** & **Node.js**
-- **SQLite** (Dev) or **MySQL** (Prod)
+- **SQLite** (Dev & Production-ready)
 - **Google Cloud Console** access for Sheets API
 
 ### Installation
@@ -121,9 +121,7 @@ REBATEOPS
 - [x] v5.4: Advanced Data Recovery (Restore / Force Delete)
 - [x] v5.4.1: Security Patch — Policy registration, operator precedence, cascade forceDelete, email validation
 - [x] v5.4.2: Concurrency Hardening — `lockForUpdate()` on Exchange & Settlement group scope; soft-delete cascade unlinks PayoutLogs
-- [ ] v5.5: Automated Profit/Loss Analytics
-- [ ] v5.6: Bulk Image Processing for Payment Proofs
-- [ ] v5.7: REST API for External Automation
+- [x] v5.4.3: Railway Production Stability — SQLite compatibility refactor (CONCAT/YEAR), forced HTTPS, anti-SEO hardening, and disbursement slug update.
 ---
 
 ## 🔐 Security & Access Control
