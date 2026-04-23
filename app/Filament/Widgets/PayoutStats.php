@@ -53,7 +53,7 @@ class PayoutStats extends BaseWidget
         }
 
         // --- TÍNH TOÁN CARD 1: CONFIRMED (Từ RebateTracker) ---
-        $totalConfirmedUsd = (clone $rebateQuery)->where('status', 'Confirmed')
+        $totalConfirmedUsd = (clone $rebateQuery)->where('status', 'confirmed')
             ->sum('rebate_amount');
 
         // --- TÍNH TOÁN CARD 2: PAID USD (Tổng tiền thực nhận từ Withdrawal và Hold) ---
