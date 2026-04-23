@@ -3,7 +3,10 @@
     "name": "laravel/laravel",
     "type": "project",
     "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "keywords": [
+        "laravel",
+        "framework"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.2",
@@ -14,7 +17,9 @@
         "laravel/tinker": "^2.10.1",
         "openspout/openspout": "^4.32",
         "spatie/laravel-activitylog": "^4.12",
-        "z3d0x/filament-logger": "*"
+        "z3d0x/filament-logger": "*",
+        "ext-intl": "*",
+        "ext-zip": "*"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
