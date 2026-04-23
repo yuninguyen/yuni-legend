@@ -308,7 +308,10 @@ class EmailResource extends Resource
                     ->options(function () {
                         return \App\Models\Email::query()
                             ->whereNotNull('email_created_at')
-                            ->selectRaw('YEAR(email_created_at) as year')
+                            ->selectRaw(match (\Illuminate\Support\Facades\DB::getDriverName()) {
+                                'sqlite' => "strftime('%Y', email_created_at) as year",
+                                default => "YEAR(email_created_at) as year",
+                            })
                             ->distinct()
                             ->orderBy('year', 'desc')
                             ->pluck('year', 'year')
@@ -449,7 +452,7 @@ class EmailResource extends Resource
                                 $note = e($record->note ?? __('system.n/a')); // Đồng bộ đúng trường 'note'
                                 $provider = $record->provider ? ucfirst($record->provider) : 'Other';
                                 $usage = $record->accounts_count > 0 ? "{$record->accounts_count}" : __('system.n/a');
-                                
+
                                 // Đã có map phía trên
                                 $platforms = $record->accounts->pluck('platform')->map(fn($s) => $platforms_map[$s] ?? $s)->implode(', ') ?: __('system.n/a'); // Lấy danh sách platform đang dùng email này
                 

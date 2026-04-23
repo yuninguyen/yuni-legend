@@ -593,7 +593,10 @@ trait HasAccountSchema
                             ->multiple()
                             ->options(function () {
                                 return \App\Models\Account::query()
-                                    ->selectRaw('YEAR(account_created_at) as year')
+                                    ->selectRaw(match (\Illuminate\Support\Facades\DB::getDriverName()) {
+                                        'sqlite' => "strftime('%Y', account_created_at) as year",
+                                        default => "YEAR(account_created_at) as year",
+                                    })
                                     ->whereNotNull('account_created_at')
                                     ->distinct()
                                     ->orderBy('year', 'desc')

@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Blade;
 class UserPaymentResource extends Resource
 {
     protected static ?string $model = UserPayment::class;
+    protected static ?string $slug = 'disbursement';
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
     // protected static ?string $navigationGroup = 'Wallet & Payouts'; // Filament sẽ lấy text này so khớp với AdminPanelProvider đã localize
@@ -63,7 +64,10 @@ class UserPaymentResource extends Resource
             ->leftJoin('users', 'user_payments.user_id', '=', 'users.id')
             ->select('user_payments.*')
             // 🟢 FIX SQL ALIAS: Dùng selectRaw để chỉ định rõ tên cột cho Grouping/Ordering hoạt động được
-            ->selectRaw("CONCAT(COALESCE(users.name, 'Unknown User'), ' | Batch: ', COALESCE(user_payments.batch_id, 'N/A')) as user_batch_label")
+            ->selectRaw(match (\Illuminate\Support\Facades\DB::getDriverName()) {
+                'sqlite' => "COALESCE(users.name, 'Unknown User') || ' | Batch: ' || COALESCE(user_payments.batch_id, 'N/A') as user_batch_label",
+                default => "CONCAT(COALESCE(users.name, 'Unknown User'), ' | Batch: ', COALESCE(user_payments.batch_id, 'N/A')) as user_batch_label",
+            })
             ->selectRaw("COALESCE(user_payments.batch_id, 'no_batch') as batch_label")
             ->reorder()
             ->orderByRaw('user_payments.status = "pending" DESC')
