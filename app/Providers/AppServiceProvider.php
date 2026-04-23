@@ -23,6 +23,7 @@ use BezhanSalleh\FilamentLanguageSwitch\LanguageSwitch;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -39,6 +40,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (config('app.env') === 'production') {
+            URL::forceScheme('https');
+        }
+
         LanguageSwitch::configureUsing(function (LanguageSwitch $switch) {
             $switch->locales(['en', 'vi']);
         });
