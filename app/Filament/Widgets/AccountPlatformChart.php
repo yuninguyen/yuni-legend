@@ -162,17 +162,25 @@ class AccountPlatformChart extends ChartWidget
 
         // 2. Chi tiết User breakdown (Admin thấy tất cả, Staff chỉ thấy chính mình — clickable)
         $currentUser = auth()->user();
-        $allUsers = $isAdmin 
+        $allUsers = $isAdmin
             ? User::whereNot('role', 'finance')->orderBy('name')->get()
             : collect([$currentUser]);
 
         if (true) {
+            $rawLive = "SUM(CASE WHEN JSON_CONTAINS(status, '\"active\"') OR JSON_CONTAINS(status, '\"used\"') THEN 1 ELSE 0 END) as live_count";
+            $rawBanned = "SUM(CASE WHEN JSON_CONTAINS(status, '\"banned\"') THEN 1 ELSE 0 END) as banned_count";
+
+            if (DB::getDriverName() === 'sqlite') {
+                $rawLive = "SUM(CASE WHEN status LIKE '%\"active\"%' OR status LIKE '%\"used\"%' THEN 1 ELSE 0 END) as live_count";
+                $rawBanned = "SUM(CASE WHEN status LIKE '%\"banned\"%' THEN 1 ELSE 0 END) as banned_count";
+            }
+
             $accountCounts = Account::query()
                 ->select(
                     'user_id',
                     DB::raw('COUNT(*) as total_count'),
-                    DB::raw("SUM(CASE WHEN JSON_CONTAINS(status, '\"active\"') OR JSON_CONTAINS(status, '\"used\"') THEN 1 ELSE 0 END) as live_count"),
-                    DB::raw("SUM(CASE WHEN JSON_CONTAINS(status, '\"banned\"') THEN 1 ELSE 0 END) as banned_count"),
+                    DB::raw($rawLive),
+                    DB::raw($rawBanned),
                 )
                 ->whereNotNull('user_id')
                 ->groupBy('user_id')

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 class AccountOverview extends BaseWidget
 {
     protected int|string|array $columnSpan = 'full';
-    
+
     public static function canView(): bool
     {
         return !auth()->user()?->isFinance();
@@ -125,6 +125,14 @@ class AccountOverview extends BaseWidget
         };
 
         // Truy vấn dữ liệu chi tiết: Tính số account mỗi user nắm, trên từng platform
+        $rawLive = "SUM(CASE WHEN JSON_CONTAINS(accounts.status, '\"active\"') OR JSON_CONTAINS(accounts.status, '\"used\"') THEN 1 ELSE 0 END) as live_count";
+        $rawBanned = "SUM(CASE WHEN JSON_CONTAINS(accounts.status, '\"banned\"') THEN 1 ELSE 0 END) as banned_count";
+
+        if (DB::getDriverName() === 'sqlite') {
+            $rawLive = "SUM(CASE WHEN accounts.status LIKE '%\"active\"%' OR accounts.status LIKE '%\"used\"%' THEN 1 ELSE 0 END) as live_count";
+            $rawBanned = "SUM(CASE WHEN accounts.status LIKE '%\"banned\"%' THEN 1 ELSE 0 END) as banned_count";
+        }
+
         $userPlatformData = Account::query()
             ->join('users', 'accounts.user_id', '=', 'users.id')
             ->select(
@@ -132,8 +140,8 @@ class AccountOverview extends BaseWidget
                 'accounts.user_id',
                 'users.name as user_name',
                 DB::raw('COUNT(*) as total_count'),
-                DB::raw("SUM(CASE WHEN JSON_CONTAINS(accounts.status, '\"active\"') OR JSON_CONTAINS(accounts.status, '\"used\"') THEN 1 ELSE 0 END) as live_count"),
-                DB::raw("SUM(CASE WHEN JSON_CONTAINS(accounts.status, '\"banned\"') THEN 1 ELSE 0 END) as banned_count"),
+                DB::raw($rawLive),
+                DB::raw($rawBanned),
             )
             ->whereNotNull('accounts.user_id')
             ->groupBy('accounts.platform', 'accounts.user_id', 'users.name')
@@ -156,13 +164,21 @@ class AccountOverview extends BaseWidget
             // Admin: hiển thị tổng GLOBAL
             [$globalLive, $globalBanned, $globalUnassigned] = $countGlobalStats(Account::query());
 
+            $rawLive = "SUM(CASE WHEN JSON_CONTAINS(status, '\"active\"') OR JSON_CONTAINS(status, '\"used\"') THEN 1 ELSE 0 END) as live_count";
+            $rawBanned = "SUM(CASE WHEN JSON_CONTAINS(status, '\"banned\"') THEN 1 ELSE 0 END) as banned_count";
+
+            if (DB::getDriverName() === 'sqlite') {
+                $rawLive = "SUM(CASE WHEN status LIKE '%\"active\"%' OR status LIKE '%\"used\"%' THEN 1 ELSE 0 END) as live_count";
+                $rawBanned = "SUM(CASE WHEN status LIKE '%\"banned\"%' THEN 1 ELSE 0 END) as banned_count";
+            }
+
             $allUsersGlobalData = Account::query()
                 ->join('users', 'accounts.user_id', '=', 'users.id')
                 ->select(
                     'accounts.user_id',
                     DB::raw('COUNT(*) as total_count'),
-                    DB::raw("SUM(CASE WHEN JSON_CONTAINS(accounts.status, '\"active\"') OR JSON_CONTAINS(accounts.status, '\"used\"') THEN 1 ELSE 0 END) as live_count"),
-                    DB::raw("SUM(CASE WHEN JSON_CONTAINS(accounts.status, '\"banned\"') THEN 1 ELSE 0 END) as banned_count"),
+                    DB::raw($rawLive),
+                    DB::raw($rawBanned),
                 )
                 ->whereNotNull('accounts.user_id')
                 ->groupBy('accounts.user_id')
@@ -188,7 +204,7 @@ class AccountOverview extends BaseWidget
 
             // Chỉ liệt kê chính user này bên dưới giống Admin
             $personalDataMap = collect([
-                $userId => (object)[
+                $userId => (object) [
                     'total_count' => Account::where('user_id', $userId)->count(),
                     'live_count' => $myLive,
                     'banned_count' => $myBanned,
@@ -238,7 +254,7 @@ class AccountOverview extends BaseWidget
 
                 // Chi tiết cá nhân
                 $personalPltDataMap = collect([
-                    $userId => (object)[
+                    $userId => (object) [
                         'total_count' => Account::where('platform', $platform)->where('user_id', $userId)->count(),
                         'live_count' => $myLive,
                         'banned_count' => $myBanned,
