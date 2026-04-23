@@ -116,6 +116,10 @@ class AdminPanelProvider extends PanelProvider
 
             // 🎨 THEME CSS — Inject professional stylesheet
             ->renderHook(
+                'panels::head.start',
+                fn(): string => '<meta name="robots" content="noindex, nofollow">'
+            )
+            ->renderHook(
                 'panels::styles.after',
                 fn(): string => Blade::render('
                     <link rel="preconnect" href="https://fonts.googleapis.com">
