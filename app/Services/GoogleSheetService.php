@@ -45,7 +45,7 @@ class GoogleSheetService
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-            throw new \Exception('Google Sheets service initialization failed');
+            throw new \Exception('Google Sheets service initialization failed', 0, $e);
         }
     }
 

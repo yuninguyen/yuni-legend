@@ -131,7 +131,7 @@ class GoogleSyncService
             $record->device_linked_paypal ?? 'N/A',
             $this->formatDate($record->paypal_linked_at),
             $record->paypal_info ?? 'N/A',
-            now()->format('d/m/Y H:i:s'),
+            now('Asia/Ho_Chi_Minh')->format('d/m/Y H:i:s'),
         ];
     }
 
@@ -182,7 +182,7 @@ class GoogleSyncService
         'Note'
     ];
 
-    public function formatEmail(Email $record): array
+    public function formatEmail(Email $record, array $platforms_map = []): array
     {
         // 1. Capitalize Provider (gmail -> Gmail)
         $provider = $record->provider ? ucfirst($record->provider) : 'Other';
@@ -191,7 +191,6 @@ class GoogleSyncService
         $usage = $record->accounts->count() > 0 ? (string) $record->accounts->count() : 'N/A';
 
         // 3. Map Platform slugs to full names for Platforms column
-        $platforms_map = Platform::pluck('name', 'slug')->toArray();
         $platforms = $record->accounts->pluck('platform')
             ->map(fn($s) => $platforms_map[$s] ?? $s)
             ->unique()->implode(', ') ?: 'N/A';
@@ -224,7 +223,9 @@ class GoogleSyncService
         }
 
         $targetTab = 'Emails';
-        $rows = collect($records)->map(fn($r) => $this->formatEmail($r))->values()->toArray();
+        // Hoist Platform lookup outside the loop to avoid N+1 queries
+        $platforms_map = Platform::pluck('name', 'slug')->toArray();
+        $rows = collect($records)->map(fn($r) => $this->formatEmail($r, $platforms_map))->values()->toArray();
 
         $this->sheetService->createSheetIfNotExist($targetTab);
         $result = $this->sheetService->upsertRows($rows, $targetTab, self::$emailHeaders);
@@ -310,7 +311,7 @@ class GoogleSyncService
             (string) ucwords((string) $record->status ?: 'N/A'),
             (string) ($record->note ?? ''),
             (string) ($record->is_active ? 'On' : 'Off'),
-            now()->format('d/m/Y H:i'),
+            now('Asia/Ho_Chi_Minh')->format('d/m/Y H:i'),
         ];
     }
 

@@ -76,6 +76,6 @@ class SyncGoogleSheetJob implements ShouldQueue
             $query->with(['account.email', 'payoutMethod']);
         }
 
-        return $query->withTrashed()->find($this->recordId);
+        return $query->find($this->recordId);
     }
 }

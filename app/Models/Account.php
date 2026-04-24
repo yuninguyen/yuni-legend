@@ -5,8 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Spatie\Activitylog\Traits\LogsActivity; // Bật tính năng Log
-use Spatie\Activitylog\LogOptions;          // Tùy chọn Log
+use Illuminate\Support\Facades\DB;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Account extends Model
@@ -52,9 +53,10 @@ class Account extends Model
 
         // Tự động xử lý khi trạng thái tài khoản thay đổi
         static::updated(function ($account) {
-            if (in_array('banned', (array)($account->status ?? []))) {
-                // Nếu tài khoản bị banned, ép toàn bộ rebate_amount về 0
-                $account->rebateTrackers()->update(['rebate_amount' => 0]);
+            if ($account->wasChanged('status') && in_array('banned', (array) ($account->status ?? []))) {
+                DB::transaction(function () use ($account) {
+                    $account->rebateTrackers()->lockForUpdate()->update(['rebate_amount' => 0]);
+                });
             }
         });
     }

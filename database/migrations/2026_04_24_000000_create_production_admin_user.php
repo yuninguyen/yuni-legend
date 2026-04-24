@@ -5,27 +5,32 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\Hash;
 
 return new class extends Migration {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
+        $email    = env('ADMIN_EMAIL');
+        $username = env('ADMIN_USERNAME');
+        $password = env('ADMIN_PASSWORD');
+
+        if (!$email || !$password) {
+            return;
+        }
+
         User::updateOrCreate(
-            ['email' => 'yuninguyen.it@gmail.com'],
+            ['email' => $email],
             [
-                'name' => 'Admin',
-                'username' => 'yuninguyen',
-                'password' => Hash::make('@Yuni2026'),
-                'role' => 'admin',
+                'name'     => 'Admin',
+                'username' => $username ?? 'admin',
+                'password' => Hash::make($password),
+                'role'     => 'admin',
             ]
         );
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        User::where('email', 'yuninguyen.it@gmail.com')->delete();
+        $email = env('ADMIN_EMAIL');
+        if ($email) {
+            User::where('email', $email)->delete();
+        }
     }
 };
