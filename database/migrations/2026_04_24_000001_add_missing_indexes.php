@@ -7,15 +7,37 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::table('payout_logs', function (Blueprint $table) {
-            $table->index('asset_type');
-            $table->index('transaction_type');
-            $table->index('status');
-        });
+        $this->addIndexIfNotExists('payout_logs', ['asset_type', 'transaction_type', 'status']);
+        $this->addIndexIfNotExists('rebate_trackers', ['status']);
+    }
 
-        Schema::table('rebate_trackers', function (Blueprint $table) {
-            $table->index('status');
-        });
+    protected function addIndexIfNotExists(string $tableName, array $columns): void
+    {
+        $connection = Schema::getConnection();
+        $drv = $connection->getDriverName();
+
+        foreach ($columns as $column) {
+            $indexName = "{$tableName}_{$column}_index";
+
+            if ($drv === 'sqlite') {
+                $exists = collect($connection->select("PRAGMA index_list('{$tableName}')"))
+                    ->contains('name', $indexName);
+
+                if ($exists)
+                    continue;
+            }
+
+            try {
+                Schema::table($tableName, function (Blueprint $table) use ($column) {
+                    $table->index($column);
+                });
+            } catch (\Exception $e) {
+                // Fallback for other drivers or if check failed
+                if (!str_contains($e->getMessage(), 'already exists')) {
+                    throw $e;
+                }
+            }
+        }
     }
 
     public function down(): void
