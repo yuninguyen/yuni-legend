@@ -12,8 +12,8 @@ fi
 # Ensure storage is linked
 php artisan storage:link --force 2>/dev/null || true
 
-# Run migrations on every deploy
-php artisan migrate --force
+# Run migrations and seeders on every deploy
+php artisan migrate --force --seed
 
 # Start web server
 exec php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"
