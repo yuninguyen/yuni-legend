@@ -13,7 +13,8 @@ fi
 php artisan storage:link --force 2>/dev/null || true
 
 # Run migrations and seeders on every deploy
-php artisan migrate --force --seed
+php artisan migrate --force
+php artisan db:seed --class=AdminSeeder --force
 
 # Start web server
 exec php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"

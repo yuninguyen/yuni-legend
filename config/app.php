@@ -123,4 +123,13 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Initial Admin Creation
+    |--------------------------------------------------------------------------
+    */
+    'initial_admin_name' => env('INITIAL_ADMIN_NAME', 'Admin'),
+    'initial_admin_email' => env('INITIAL_ADMIN_EMAIL'),
+    'initial_admin_password' => env('INITIAL_ADMIN_PASSWORD'),
+
 ];

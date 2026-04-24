@@ -13,9 +13,9 @@ class AdminSeeder extends Seeder
      */
     public function run(): void
     {
-        $name = env('INITIAL_ADMIN_NAME', 'Admin');
-        $email = env('INITIAL_ADMIN_EMAIL');
-        $password = env('INITIAL_ADMIN_PASSWORD');
+        $name = config('app.initial_admin_name', 'Admin');
+        $email = config('app.initial_admin_email');
+        $password = config('app.initial_admin_password');
 
         if (!$email || !$password) {
             $this->command->warn('Missing INITIAL_ADMIN_EMAIL or INITIAL_ADMIN_PASSWORD environment variables. Skipping admin creation.');
