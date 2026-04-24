@@ -62,7 +62,6 @@ trait HasTrackerSchema
                                 // 2. SELECT PLATFORM (Làm nhỏ lại cho Staff)
                                 Forms\Components\Select::make('platform')
                                     ->label(__('system.labels.platform'))
-                                    ->options(self::getPlatforms())
                                     ->options(function (Forms\Get $get, $record) {
                                         $userId = $get('user_id') ?? $record?->user_id;
                                         $allPlatforms = self::getPlatforms();

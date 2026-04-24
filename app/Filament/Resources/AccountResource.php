@@ -35,7 +35,6 @@ use Filament\Navigation\NavigationItem;
 use App\Filament\Resources\Traits\HasAccountSchema; // <-- Nhúng Trait
 use App\Filament\Resources\AccountResource\RelationManagers\ActivitiesRelationManager;
 
-use function Livewire\wrap;
 
 class AccountResource extends Resource
 {

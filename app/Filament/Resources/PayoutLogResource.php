@@ -56,7 +56,10 @@ class PayoutLogResource extends Resource
     {
         $query = parent::getEloquentQuery()
             ->select('payout_logs.*')
-            ->selectRaw("CONCAT(account_id, '_', COALESCE(gc_brand, 'none'), '_', COALESCE(parent_id, id)) as group_key")
+            ->selectRaw(match (DB::getDriverName()) {
+                'sqlite' => "account_id || '_' || COALESCE(gc_brand, 'none') || '_' || COALESCE(parent_id, id) as group_key",
+                default  => "CONCAT(account_id, '_', COALESCE(gc_brand, 'none'), '_', COALESCE(parent_id, id)) as group_key",
+            })
             ->withCount('children')
             ->withSum(['children as children_sum' => fn($q) => $q->whereNull('deleted_at')], 'amount_usd')
             ->withSum(['children as settled_children_sum' => fn($q) => $q->whereNotNull('user_payment_id')], 'amount_usd')
@@ -136,12 +139,18 @@ class PayoutLogResource extends Resource
                     // 🟢 FIX: Dùng find() để kích hoạt Observer cập nhật Balance ví
                     $log = PayoutLog::find($row[0]);
                     if ($log) {
+                        $allowedStatuses = ['pending', 'completed', 'hold', 'rejected'];
+                        $newStatus = strtolower(trim($row[$statusIdx] ?? ''));
+                        if (!in_array($newStatus, $allowedStatuses)) {
+                            continue;
+                        }
+
                         // 🟢 GẮN CỜ ẢO TRƯỚC KHI UPDATE ĐỂ BÁO CHO OBSERVER BIẾT
                         $log->is_syncing_from_sheet = true;
 
                         $log->update([
-                            'status' => strtolower(trim($row[$statusIdx] ?? 'pending')),         // Index 16 là Status
-                            'note' => trim($row[$noteIdx] ?? ''),                            // Index 17 là Note
+                            'status' => $newStatus,
+                            'note'   => trim($row[$noteIdx] ?? ''),
                         ]);
                         $count++;
                     }
@@ -749,12 +758,14 @@ class PayoutLogResource extends Resource
 
                         $userName = $record->user?->name ?? __('system.n/a');
 
+                        $safeEmail    = e($email);
+                        $safeUserName = e($userName);
                         return "
                             <div style='line-height: 1.6; padding: 4px 0;'>
-                                <div style='font-weight: 600; color: #111827; margin-bottom: 4px;'>$email</div>
+                                <div style='font-weight: 600; color: #111827; margin-bottom: 4px;'>$safeEmail</div>
                                 <div style='font-size: 12px; color: #6b7280; display: flex; align-items: center; gap: 4px;'>
-                                    <span style='color: #9ca3af;'>" . __('system.labels.user') . ":</span> 
-                                    <span style='font-weight: 500; color: #4b5563;'>$userName</span>
+                                    <span style='color: #9ca3af;'>" . __('system.labels.user') . ":</span>
+                                    <span style='font-weight: 500; color: #4b5563;'>$safeUserName</span>
                                 </div>
                             </div>
                         ";
