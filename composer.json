@@ -17,7 +17,7 @@
         "laravel/tinker": "^2.10.1",
         "openspout/openspout": "^4.32",
         "spatie/laravel-activitylog": "^4.12",
-        "z3d0x/filament-logger": "*",
+        "riodwanto/filament-logger": "^3.0",
         "ext-intl": "*",
         "ext-zip": "*"
     },
@@ -47,7 +47,7 @@
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",
-            "@php artisan migrate --force",
+            "@php artisan migrate --force --seed",
             "npm install",
             "npm run build"
         ],
@@ -73,7 +73,7 @@
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi",
             "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan migrate --graceful --ansi"
+            "@php artisan migrate --graceful --ansi --seed"
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
