@@ -47,7 +47,7 @@ class AdminUserEarningsTable extends BaseWidget
             ->whereIn('users.role', ['admin', 'staff', 'operator'])
             ->select('user_payments.user_id as user_id', 'users.role as user_role', 'users.name as user_name', 'user_payments.asset_group as asset_group')
             ->selectRaw('SUM(total_usd) as amount_usd')
-            ->selectRaw('SUM(CASE WHEN status = "paid" THEN total_vnd ELSE 0 END) as amount_paid')
+            ->selectRaw("SUM(CASE WHEN status = 'paid' THEN total_vnd ELSE 0 END) as amount_paid")
             ->groupBy('user_id', 'asset_group', 'user_role')
             // Scope cho Operator: Chỉ thấy của chính mình
             ->when(!auth()->user()?->isAdmin() && !auth()->user()?->isFinance(), fn($query) => $query->where('user_payments.user_id', auth()->id()))
@@ -60,28 +60,28 @@ class AdminUserEarningsTable extends BaseWidget
             ->where('role', 'finance')
             ->select('users.id as user_id', 'users.role as user_role', 'users.name as user_name')
             ->selectRaw("'system_profit' as asset_group")
-            ->selectRaw('
+            ->selectRaw("
                 (SELECT SUM(total_usd) 
                  FROM user_payments 
-                 WHERE status = "paid"
+                 WHERE status = 'paid'
                  AND deleted_at IS NULL
                  AND (? IS NULL OR created_at >= ?)
                  AND (? IS NULL OR created_at <= ?)
                 ) as amount_usd
-            ', [
+            ", [
                 $data['from_date'] ?? null,
                 $data['from_date'] ?? null,
                 $data['to_date'] ?? null,
                 $data['to_date'] ?? null
             ])
-            ->selectRaw('
+            ->selectRaw("
                 (SELECT SUM((exchange_rate - payout_rate) * total_usd * (payout_percentage / 100)) 
-                 FROM user_payments                  WHERE status = "paid"
+                 FROM user_payments                  WHERE status = 'paid'
                   AND deleted_at IS NULL
                   AND (? IS NULL OR created_at >= ?)
                   AND (? IS NULL OR created_at <= ?)
                 ) as amount_paid
-            ', [
+            ", [
                 $data['from_date'] ?? null,
                 $data['from_date'] ?? null,
                 $data['to_date'] ?? null,
@@ -124,7 +124,7 @@ class AdminUserEarningsTable extends BaseWidget
                         default => 'gray',
                     })
                     ->visibleFrom('md'),
-                
+
                 Tables\Columns\TextColumn::make('amount_usd')
                     ->label(__('system.payout_logs.fields.net_amount_usd'))
                     ->money('USD')
@@ -135,7 +135,7 @@ class AdminUserEarningsTable extends BaseWidget
                             ->label('')
                             ->money('USD')
                     ),
-                
+
                 Tables\Columns\TextColumn::make('amount_paid')
                     ->label(__('system.status.completed') . ' (VND)')
                     ->money('VND', locale: 'vi_VN')
