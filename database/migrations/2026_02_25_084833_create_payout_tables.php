@@ -25,8 +25,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
             // Liên kết với bảng accounts (Platform) và bảng payout_methods (Ví nhận)
-            $table->foreignId('account_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('payout_method_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('account_id')->constrained()->restrictOnDelete();
+            $table->foreignId('payout_method_id')->constrained()->restrictOnDelete();
 
             $table->string('asset_type'); // paypal, gift_card
             $table->string('gc_brand')->nullable();

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('user_payments', function (Blueprint $table) {
             $table->id();
             // Liên kết với bảng users
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->restrictOnDelete();
 
             $table->string('platform'); // Ví dụ: Rakuten, Join Honey...
             $table->string('transaction_type'); // Ví dụ: Gift Card, PayPal US...

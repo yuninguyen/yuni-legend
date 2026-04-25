@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
 
             // Liên kết với Account (Phải có bảng accounts trước)
-            $table->foreignId('account_id')->constrained('accounts')->onDelete('cascade');
+            $table->foreignId('account_id')->constrained('accounts')->restrictOnDelete();
 
             
             $table->date('transaction_date')->nullable();        // Transaction date

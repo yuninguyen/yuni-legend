@@ -1,32 +1,34 @@
 <?php
 
-namespace Tests\Unit; // 🟢 1. BẮT BUỘC PHẢI CÓ DÒNG NÀY ĐỂ LARAVEL TÌM THẤY FILE
+namespace Tests\Unit;
 
-use Tests\TestCase; // 🟢 2. DÙNG TESTCASE CỦA LARAVEL (Xóa dòng PHPUnit đi)
+use App\Models\PayoutMethod;
 use App\Services\GoogleSheetService;
-use Illuminate\Support\Facades\Cache;
-use Mockery;
+use App\Services\GoogleSyncService;
+use Tests\TestCase;
 
 class GoogleSheetServiceTest extends TestCase
 {
-    /**
-     * Test: Đảm bảo hàm tạo Sheet mới không gọi API Google nếu Sheet đã tồn tại trong Cache
-     */
-    public function test_create_sheet_skips_api_call_when_sheet_already_exists(): void
+    public function test_format_payout_method_normalizes_balance_without_calling_google_api(): void
     {
-        // Mock cache trả về sheet đã tồn tại
-        Cache::shouldReceive('remember')
-            ->once()
-            ->andReturn(['Emails' => 12345]);
+        $sheetService = $this->getMockBuilder(GoogleSheetService::class)
+            ->disableOriginalConstructor()
+            ->getMock();
 
-        // Verify không gọi API thực (GoogleSheetService được inject mock)
-        $mockSheetService = $this->createMock(\App\Services\GoogleSheetService::class);
-        $mockSheetService->expects($this->never())
-            ->method('createSheet'); // Không tạo sheet mới
+        $syncService = new GoogleSyncService($sheetService);
 
-        $syncService = new \App\Services\GoogleSyncService($mockSheetService);
-        // ... gọi method cần test
+        $method = new PayoutMethod([
+            'name' => 'Main PayPal',
+            'type' => 'paypal_us',
+            'current_balance' => 123.456,
+            'is_active' => true,
+        ]);
+        $method->id = 10;
 
-        $this->addToAssertionCount(1); // Rõ ràng hơn assertTrue(true)
+        $row = $syncService->formatPayoutMethod($method);
+
+        $this->assertSame('10', $row[0]);
+        $this->assertSame('PAYPAL US', $row[2]);
+        $this->assertSame('123.46', $row[3]);
     }
 }

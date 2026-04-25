@@ -7,11 +7,19 @@ use App\Models\PayoutLog;
 use App\Models\User;
 use App\Models\UserPayment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class PayoutLogExchangeTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Queue::fake();
+    }
 
     private function createWithdrawal(?User $user = null): PayoutLog
     {
