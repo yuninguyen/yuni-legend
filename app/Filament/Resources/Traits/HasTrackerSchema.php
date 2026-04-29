@@ -624,8 +624,8 @@ trait HasTrackerSchema
                         Tables\Actions\Action::make('quick_set_status')
                             ->label(__('system.labels.quick_set_status'))
                             ->modalHeading(__('system.labels.quick_set_status'))
-                            ->modalSubmitActionLabel('Gửi')
-                            ->modalCancelActionLabel('Hủy bỏ')
+                            ->modalSubmitActionLabel(__('system.actions.submit'))
+                            ->modalCancelActionLabel(__('system.actions.cancel'))
                             ->form([
                                 Forms\Components\Select::make('status')
                                     ->label(__('system.labels.status'))
@@ -648,7 +648,7 @@ trait HasTrackerSchema
                                     static::syncTrackerWithService($record);
                                 } catch (\Exception $e) {
                                     \Filament\Notifications\Notification::make()
-                                        ->title('Đã lưu, nhưng sync Google Sheet thất bại')
+                                        ->title(__('system.notifications.sync_sheet_failed'))
                                         ->body($e->getMessage())
                                         ->warning()
                                         ->send();
@@ -702,8 +702,8 @@ trait HasTrackerSchema
                         Tables\Actions\Action::make('quick_set_date')
                             ->label(__('system.labels.quick_set_date'))
                             ->modalHeading(__('system.labels.quick_set_date'))
-                            ->modalSubmitActionLabel('Gửi')
-                            ->modalCancelActionLabel('Hủy bỏ')
+                            ->modalSubmitActionLabel(__('system.actions.submit'))
+                            ->modalCancelActionLabel(__('system.actions.cancel'))
                             ->form([
                                 Forms\Components\DatePicker::make('payout_date')
                                     ->label(__('system.labels.select_payout_date'))
@@ -717,7 +717,7 @@ trait HasTrackerSchema
                                     static::syncTrackerWithService($record);
                                 } catch (\Exception $e) {
                                     \Filament\Notifications\Notification::make()
-                                        ->title('Đã lưu, nhưng sync Google Sheet thất bại')
+                                        ->title(__('system.notifications.sync_sheet_failed'))
                                         ->body($e->getMessage())
                                         ->warning()
                                         ->send();

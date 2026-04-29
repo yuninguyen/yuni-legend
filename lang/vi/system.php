@@ -187,6 +187,8 @@ return [
         'mark_as_confirmed' => 'Đánh dấu Xác nhận',
         'submit' => 'Gửi',
         'cancel' => 'Hủy bỏ',
+        'close' => 'Đóng',
+        'get_account' => 'Nhận tài khoản',
     ],
 
     'placeholders' => [
@@ -234,6 +236,8 @@ return [
         'sync_error_msg' => 'Đã xảy ra lỗi khi đồng bộ.',
         'cannot_claim_banned' => 'Không thể nhận tài khoản đã bị Khóa!',
         'cannot_claim_unlinked' => 'Không thể nhận! Tài khoản này chưa liên kết PayPal.',
+        'cannot_claim_not_linked' => 'Không thể nhận! Tài khoản này chưa được liên kết với PayPal.',
+        'sync_sheet_failed' => 'Đã lưu, nhưng đồng bộ Google Sheet thất bại.',
     ],
 
     // GMAIL WARNING SECTION

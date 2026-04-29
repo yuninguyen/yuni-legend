@@ -186,6 +186,8 @@ return [
         'mark_as_confirmed' => 'Mark as Confirmed',
         'submit' => 'Submit',
         'cancel' => 'Cancel',
+        'close' => 'Close',
+        'get_account' => 'Get Account',
     ],
 
     'placeholders' => [
@@ -233,6 +235,8 @@ return [
         'sync_error_msg' => 'An error occurred during synchronization.',
         'cannot_claim_banned' => 'Cannot claim a banned account!',
         'cannot_claim_unlinked' => 'Cannot claim! This account is not unlinked from PayPal.',
+        'cannot_claim_not_linked' => 'Cannot claim! This account is not linked to PayPal yet.',
+        'sync_sheet_failed' => 'Saved, but Google Sheet sync failed.',
     ],
 
     // GMAIL WARNING SECTION

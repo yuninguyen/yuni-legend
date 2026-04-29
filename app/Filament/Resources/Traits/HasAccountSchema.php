@@ -663,13 +663,13 @@ trait HasAccountSchema
                 // Option B: Source Information as compact modal
                 Tables\Actions\Action::make('view_source_info')
                     ->label('')
-                    ->tooltip(__('system.labels.source_information') ?: 'Source Info')
+                    ->tooltip(__('system.labels.source_information'))
                     ->icon('heroicon-o-map-pin')
                     ->color('info')
-                    ->modalHeading(__('system.labels.source_information') ?: 'Source Information')
+                    ->modalHeading(__('system.labels.source_information'))
                     ->modalWidth('md')
                     ->modalSubmitAction(false)
-                    ->modalCancelActionLabel('Đóng')
+                    ->modalCancelActionLabel(__('system.actions.close'))
                     ->form(function (Account $record): array {
                         $stateCode = $record->state ?? null;
                         $stateName = self::$usStates[$stateCode] ?? '';
