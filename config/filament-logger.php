@@ -5,7 +5,7 @@ return [
 
     'activity_resource' => \Riodwanto\FilamentLogger\Resources\ActivityResource::class,
 	'scoped_to_tenant' => true,
-	'navigation_sort' => null,
+	'navigation_sort' => 4,
 
     'resources' => [
         'enabled' => false,

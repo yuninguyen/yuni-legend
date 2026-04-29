@@ -17,7 +17,6 @@ class PlatformResource extends Resource
 {
     protected static ?string $model = Platform::class;
     protected static ?string $navigationIcon = 'heroicon-o-puzzle-piece';
-    protected static ?int $navigationSort = 6;
 
     public static function getNavigationGroup(): ?string
     {
@@ -38,6 +37,8 @@ class PlatformResource extends Resource
     {
         return __('system.platforms.plural_label');
     }
+
+    protected static ?int $navigationSort = 2;
 
     public static function canViewAny(): bool
     {

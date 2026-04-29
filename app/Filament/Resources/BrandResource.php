@@ -19,7 +19,7 @@ class BrandResource extends Resource
     protected static ?string $model = Brand::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    protected static ?int $navigationSort = 7;
+
 
     public static function getNavigationGroup(): ?string
     {
@@ -40,6 +40,8 @@ class BrandResource extends Resource
     {
         return __('system.brands.plural_label');
     }
+
+    protected static ?int $navigationSort = 3;
 
     // 🟢 CHỈ ADMIN MỚI THẤY VÀ TRUY CẬP ĐƯỢC MENU NÀY
     public static function canViewAny(): bool
@@ -110,7 +112,7 @@ class BrandResource extends Resource
                     ->alignment(Alignment::Center)
                     ->money('USD')
                     ->searchable()
-                    ->placeholder(__('system.brands.columns.no_limit')) 
+                    ->placeholder(__('system.brands.columns.no_limit'))
                     ->color('danger'),
                 Tables\Columns\TextColumn::make('gc_rate')
                     ->label(__('system.brands.columns.rate'))
