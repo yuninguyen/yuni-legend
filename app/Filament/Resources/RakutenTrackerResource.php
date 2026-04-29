@@ -65,7 +65,7 @@ class RakutenTrackerResource extends Resource
     {
         // 1. Lớp lọc mặc định: LUÔN LUÔN chỉ lấy dữ liệu của Rakuten
         $query = parent::getEloquentQuery()->whereHas('account', function ($query) {
-            $query->where('platform', 'Rakuten');
+            $query->whereIn('platform', ['Rakuten', 'rakuten']);
         });
 
         $user = auth()->user();

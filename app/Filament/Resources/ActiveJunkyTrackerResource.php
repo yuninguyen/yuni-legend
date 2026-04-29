@@ -65,7 +65,7 @@ class ActiveJunkyTrackerResource extends Resource
     {
         // 1. Lớp lọc mặc định: LUÔN LUÔN chỉ lấy dữ liệu của Active Junky
         $query = parent::getEloquentQuery()->whereHas('account', function ($query) {
-            $query->where('platform', 'Active Junky');
+            $query->whereIn('platform', ['ActiveJunky', 'activejunky', 'Active Junky']);
         });
 
         $user = auth()->user();

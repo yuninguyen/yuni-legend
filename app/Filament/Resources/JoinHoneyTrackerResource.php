@@ -65,7 +65,7 @@ class JoinHoneyTrackerResource extends Resource
     {
         // 1. Lớp lọc mặc định: LUÔN LUÔN chỉ lấy dữ liệu của JoinHoney
         $query = parent::getEloquentQuery()->whereHas('account', function ($query) {
-            $query->where('platform', 'Join Honey');
+            $query->whereIn('platform', ['JoinHoney', 'joinhoney', 'Join Honey']);
         });
 
         $user = auth()->user();

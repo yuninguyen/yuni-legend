@@ -66,7 +66,7 @@ class TopCashbackTrackerResource extends Resource
     {
         // 1. Lớp lọc mặc định: LUÔN LUÔN chỉ lấy dữ liệu của TopCashback
         $query = parent::getEloquentQuery()->whereHas('account', function ($query) {
-            $query->where('platform', 'TopCashback');
+            $query->whereIn('platform', ['TopCashback', 'topcashback']);
         });
 
         $user = auth()->user();

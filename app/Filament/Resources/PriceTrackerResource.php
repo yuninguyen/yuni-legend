@@ -65,7 +65,7 @@ class PriceTrackerResource extends Resource
     {
         // 1. Lớp lọc mặc định: LUÔN LUÔN chỉ lấy dữ liệu của Price
         $query = parent::getEloquentQuery()->whereHas('account', function ($query) {
-            $query->where('platform', 'TopCasPricehback');
+            $query->whereIn('platform', ['Price', 'price', 'Price.com']);
         });
 
         $user = auth()->user();

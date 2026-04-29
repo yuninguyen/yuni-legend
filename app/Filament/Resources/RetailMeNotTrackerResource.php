@@ -65,7 +65,7 @@ class RetailMeNotTrackerResource extends Resource
     {
         // 1. Lớp lọc mặc định: LUÔN LUÔN chỉ lấy dữ liệu của RetailMeNot
         $query = parent::getEloquentQuery()->whereHas('account', function ($query) {
-            $query->where('platform', 'RetailMeNot');
+            $query->whereIn('platform', ['RetailMeNot', 'retailmenot']);
         });
 
         $user = auth()->user();
