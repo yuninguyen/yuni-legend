@@ -557,24 +557,32 @@ trait HasTrackerSchema
                     ->weight('medium')
                     ->icon('heroicon-m-shopping-bag')
                     ->iconColor('gray')
-                    ->alignment(Alignment::Center)
+                    ->alignment(Alignment::Left)
                     ->extraAttributes(['class' => 'pl-10'])
                     ->wrap()
-                    ->width('20%')
+                    ->width('18%')
+                    ->searchable(),
+
+                // 1b. ORDER ID
+                Tables\Columns\TextColumn::make('order_id')
+                    ->label(__('system.labels.order_id'))
+                    ->alignment(Alignment::Left)
+                    ->placeholder(__('system.n/a'))
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->searchable(),
 
                 // 2. ORDER VALUE
                 Tables\Columns\TextColumn::make('order_value')
                     ->label(__('system.labels.order_value'))
                     ->money('USD')
-                    ->alignment(Alignment::Center),
+                    ->alignment(Alignment::Right),
 
                 // 3. CASHBACK PERCENT
                 Tables\Columns\TextColumn::make('cashback_percent')
                     ->label(__('system.labels.cashback_percent'))
                     ->numeric(2)
                     ->suffix('%')
-                    ->alignment(Alignment::Center),
+                    ->alignment(Alignment::Right),
 
                 // 4. CASHBACK ($) - ĐÂY LÀ CHÌA KHÓA
                 Tables\Columns\TextColumn::make('rebate_amount')
@@ -582,7 +590,7 @@ trait HasTrackerSchema
                     ->money('USD')
                     ->color('success')
                     ->weight('bold')
-                    ->alignment(Alignment::Center),
+                    ->alignment(Alignment::Right),
 
                 // 5. STATUS
                 Tables\Columns\TextColumn::make('status')
@@ -616,7 +624,6 @@ trait HasTrackerSchema
                         Tables\Actions\Action::make('quick_set_status')
                             ->label(__('system.labels.quick_set_status'))
                             ->modalHeading(__('system.labels.quick_set_status'))
-                            ->modalSubmitActionLabel(__('system.actions.get_account')) // Dùng 'Nhận tài khoản' cho Gửi nếu thích, hoặc tạo key mới 'submit'.
                             ->modalSubmitActionLabel('Gửi')
                             ->modalCancelActionLabel('Hủy bỏ')
                             ->form([
@@ -636,8 +643,17 @@ trait HasTrackerSchema
                                 // 1. Lưu vào Database
                                 $record->update($data);
 
-                                // 2. Gọi Cỗ máy để đẩy lên Google Sheet
-                                static::syncTrackerWithService($record);
+                                // 2. Gọi Cỗ máy để đẩy lên Google Sheet (bọc try-catch để tránh 500)
+                                try {
+                                    static::syncTrackerWithService($record);
+                                } catch (\Exception $e) {
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Đã lưu, nhưng sync Google Sheet thất bại')
+                                        ->body($e->getMessage())
+                                        ->warning()
+                                        ->send();
+                                    return;
+                                }
 
                                 \Filament\Notifications\Notification::make()
                                     ->title(__('system.notifications.status_updated_sync'))
@@ -653,6 +669,15 @@ trait HasTrackerSchema
                     ->placeholder(__('system.n/a'))
                     ->date('d/m/Y')
                     ->alignment(Alignment::Center),
+
+                // 7. TRANSACTION DETAILS
+                Tables\Columns\TextColumn::make('detail_transaction')
+                    ->label(__('system.labels.transaction_details'))
+                    ->alignment(Alignment::Left)
+                    ->placeholder(__('system.n/a'))
+                    ->limit(40)
+                    ->tooltip(fn($state) => $state)
+                    ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('payout_date')
                     ->label(__('system.labels.payout_date'))
                     ->alignment(Alignment::Center)
@@ -687,7 +712,17 @@ trait HasTrackerSchema
                             ])
                             ->action(function ($record, array $data) {
                                 $record->update($data);
-                                static::syncTrackerWithService($record);
+
+                                try {
+                                    static::syncTrackerWithService($record);
+                                } catch (\Exception $e) {
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Đã lưu, nhưng sync Google Sheet thất bại')
+                                        ->body($e->getMessage())
+                                        ->warning()
+                                        ->send();
+                                    return;
+                                }
 
                                 \Filament\Notifications\Notification::make()
                                     ->title(__('system.notifications.date_updated_sync'))
@@ -846,8 +881,7 @@ trait HasTrackerSchema
                     }),
                 Tables\Filters\TrashedFilter::make(), // 🟢 BẬT TÍNH NĂNG THÙNG RÁC
             ])
-            // 1. ÉP BỘ LỌC HIỂN THỊ LỘ THIÊN LÊN TRÊN CÙNG
-            ->filtersLayout(\Filament\Tables\Enums\FiltersLayout::AboveContent)
+            ->filtersLayout(\Filament\Tables\Enums\FiltersLayout::AboveContentCollapsible)
 
             // 2. CHÌA KHÓA Ở ĐÂY: TỰ ĐỘNG CHIA 5 CỘT HOẶC 4 CỘT TÙY VÀO TRANG ĐANG XEM
             ->filtersFormColumns(static::class === \App\Filament\Resources\RebateTrackerResource::class ? 5 : 4)

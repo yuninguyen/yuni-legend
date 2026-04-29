@@ -338,7 +338,7 @@ trait HasAccountSchema
 
                 TextColumn::make('email.email')
                     ->label(__('system.labels.email_address'))
-                    ->alignment(Alignment::Center)
+                    ->alignment(Alignment::Left)
                     ->extraHeaderAttributes(['style' => 'width: 250px; min-width: 250px'])
                     ->extraAttributes(['style' => 'width: 250px; min-width: 250px'])
                     ->wrap()
@@ -429,60 +429,7 @@ trait HasAccountSchema
                         ";
                     }),
 
-                TextColumn::make('state')
-                    ->label(__('system.labels.source_information'))
-                    ->alignment(Alignment::Center)
-                    ->toggleable()
-                    ->width('250px')
-                    ->extraHeaderAttributes(['style' => 'width: 200px; min-width: 200px'])
-                    ->extraAttributes(['style' => 'width: 200px; min-width: 200px'])
-                    ->wrap()
-                    ->html()
-                    ->formatStateUsing(function (Account $record): string {
-                        $stateCode = $record->state ?? 'N/A';
-                        $stateName = self::$usStates[$stateCode] ?? '';
-                        $stateDisplay = $stateName ? "{$stateCode} - {$stateName}" : $stateCode;
-
-                        $device = $record->device ?? 'N/A';
-                        $paypal = $record->paypal_info ?? 'N/A';
-                        $devicePaypal = $record->device_linked_paypal ?? 'N/A';
-                        $created = $record->account_created_at ? \Carbon\Carbon::parse($record->account_created_at)->format('d/m/Y') : 'N/A';
-                        $linked = $record->paypal_linked_at ? \Carbon\Carbon::parse($record->paypal_linked_at)->format('d/m/Y') : 'N/A';
-
-                        return "
-                            <div style='justify-content: flex-start !important; text-align: left; line-height: 1.6; max-width: 250px; padding-left: 0;'>
-                                <div style='margin-bottom: 2px;'>
-                                    <span style='color: #64748b;'>" . __('system.labels.state_us') . ":</span> 
-                                    <span style='color: #1e293b; font-weight: 500;'>{$stateDisplay}</span>
-                                </div>
-                
-                            <div style='margin-bottom: 2px;'>
-                                    <span style='color: #64748b;'>" . __('system.labels.device') . ":</span> 
-                                    <span style='color: #1e293b;'>{$device}</span>
-                            </div>
-
-                            <div style='margin-bottom: 2px;'>
-                                    <span style='color: #64748b;'>" . __('system.labels.date_create') . ":</span> 
-                                    <span style='color: #1e293b;'>{$created}</span>
-                            </div>
-                
-                            <div style='margin-top: 10px; overflow: hidden; text-overflow: ellipsis; white-space: wrap;'>
-                                    <span style='color: #64748b;'>" . __('system.labels.address') . ":</span> 
-                                    <span style='color: #3b82f6; font-weight: 500;'>{$paypal}</span>
-                            </div>
-                
-                            <div style='margin-top: 2px;'>
-                                    <span style='color: #64748b;'>" . __('system.labels.device') . ":</span> 
-                                    <span style='color: #1e293b;'>{$devicePaypal}</span>
-                            </div>
-
-                            <div style='margin-bottom: 2px;'>
-                                    <span style='color: #64748b;'>" . __('system.labels.linked_paypal_date') . ":</span> 
-                                    <span style='color: #1e293b;'>{$linked}</span>
-                            </div>
-                        </div>
-                    ";
-                    }),
+                // SOURCE INFORMATION: removed wide column, now shown via 'View Detail' action button below
 
                 TextColumn::make('status')
                     ->label(__('system.labels.status'))
@@ -529,7 +476,7 @@ trait HasAccountSchema
 
                 TextColumn::make('user.name')
                     ->label(__('system.labels.holder'))
-                    ->alignment(Alignment::Center)
+                    ->alignment(Alignment::Left)
                     ->default(__('system.unassigned'))
                     ->color(fn(Account $record) => $record->user_id === null ? 'gray' : 'default')
                     ->html()
@@ -645,7 +592,7 @@ trait HasAccountSchema
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->filtersFormColumns(fn() => auth()->user()?->isAdmin() ? 6 : 4)
-            ->filtersLayout(FiltersLayout::AboveContent)
+            ->filtersLayout(FiltersLayout::AboveContentCollapsible)
             ->actions([
                 Tables\Actions\Action::make('get_account')
                     ->label(__('system.get_account'))
@@ -711,6 +658,60 @@ trait HasAccountSchema
                             ->title(__('system.account_claim.success'))
                             ->success()
                             ->send();
+                    }),
+
+                // Option B: Source Information as compact modal
+                Tables\Actions\Action::make('view_source_info')
+                    ->label('')
+                    ->tooltip(__('system.labels.source_information') ?: 'Source Info')
+                    ->icon('heroicon-o-map-pin')
+                    ->color('info')
+                    ->modalHeading(__('system.labels.source_information') ?: 'Source Information')
+                    ->modalWidth('md')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Đóng')
+                    ->form(function (Account $record): array {
+                        $stateCode = $record->state ?? null;
+                        $stateName = self::$usStates[$stateCode] ?? '';
+                        $stateDisplay = $stateCode
+                            ? ($stateName ? "{$stateCode} – {$stateName}" : $stateCode)
+                            : 'N/A';
+
+                        $created = $record->account_created_at
+                            ? $record->account_created_at->format('d/m/Y')
+                            : 'N/A';
+                        $linked = $record->paypal_linked_at
+                            ? $record->paypal_linked_at->format('d/m/Y')
+                            : 'N/A';
+
+                        return [
+                            Forms\Components\Section::make(__('system.labels.source_information') ?: 'Account Source')
+                                ->schema([
+                                    Forms\Components\Placeholder::make('state_display')
+                                        ->label(__('system.labels.state_us') ?: 'State')
+                                        ->content($stateDisplay),
+                                    Forms\Components\Placeholder::make('device_display')
+                                        ->label(__('system.labels.device') ?: 'Device')
+                                        ->content($record->device ?? 'N/A'),
+                                    Forms\Components\Placeholder::make('created_display')
+                                        ->label(__('system.labels.date_create') ?: 'Date Created')
+                                        ->content($created),
+                                ])->columns(3),
+
+                            Forms\Components\Section::make(__('system.heading_infolist.paypal_information') ?: 'PayPal Information')
+                                ->schema([
+                                    Forms\Components\Placeholder::make('paypal_info_display')
+                                        ->label(__('system.labels.address') ?: 'PayPal Info')
+                                        ->content($record->paypal_info ?? 'N/A')
+                                        ->columnSpanFull(),
+                                    Forms\Components\Placeholder::make('device_linked_display')
+                                        ->label(__('system.labels.device') ?: 'Device Linked')
+                                        ->content($record->device_linked_paypal ?? 'N/A'),
+                                    Forms\Components\Placeholder::make('linked_date_display')
+                                        ->label(__('system.labels.linked_paypal_date') ?: 'Date Linked')
+                                        ->content($linked),
+                                ])->columns(2),
+                        ];
                     }),
 
                 Tables\Actions\ViewAction::make()
