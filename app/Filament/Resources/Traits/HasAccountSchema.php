@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Traits;
 
 use App\Models\Account;
+use App\Models\Platform;
 use App\Models\RebateTracker;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -191,7 +192,7 @@ trait HasAccountSchema
             ]);
     }
 
-    public static function infolist(\Filament\Infolists\Infolist $infolist): \Filament\Infolists\Infolist
+    public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist
             ->schema([
@@ -532,10 +533,10 @@ trait HasAccountSchema
                     ->default(__('system.unassigned'))
                     ->color(fn(Account $record) => $record->user_id === null ? 'gray' : 'default')
                     ->html()
-                    ->description(function (Account $record): ?\Illuminate\Support\HtmlString {
+                    ->description(function (Account $record): ?HtmlString {
                         $user = auth()->user();
                         if ($record->user_id === null && !$user?->isFinance()) {
-                            return new \Illuminate\Support\HtmlString(
+                            return new HtmlString(
                                 '<span class = "get-account-btn">' . __('system.get_account') . '</span>'
                             );
                         }
@@ -571,13 +572,13 @@ trait HasAccountSchema
                     ->label(__('system.labels.platform'))
                     ->multiple()
                     ->options(function () {
-                        $platforms = \App\Models\Account::query()
+                        $platforms = Account::query()
                             ->distinct()
                             ->whereNotNull('platform')
                             ->pluck('platform', 'platform')
                             ->map(fn($label) => (string) $label)
                             ->toArray();
-                        $platforms_map = \App\Models\Platform::pluck('name', 'slug')->toArray();
+                        $platforms_map = Platform::pluck('name', 'slug')->toArray();
                         $formattedOptions = [];
                         foreach ($platforms as $p) {
                             $formattedOptions[$p] = $platforms_map[$p] ?? $p;
@@ -588,12 +589,12 @@ trait HasAccountSchema
 
                 Filter::make('year_created')
                     ->form([
-                        \Filament\Forms\Components\Select::make('year')
+                        Select::make('year')
                             ->label(__('system.labels.year_created'))
                             ->multiple()
                             ->options(function () {
-                                return \App\Models\Account::query()
-                                    ->selectRaw(match (\Illuminate\Support\Facades\DB::getDriverName()) {
+                                return Account::query()
+                                    ->selectRaw(match (DB::getDriverName()) {
                                         'sqlite' => "strftime('%Y', account_created_at) as year",
                                         default => "YEAR(account_created_at) as year",
                                     })
@@ -662,7 +663,7 @@ trait HasAccountSchema
                             return [
                                 Forms\Components\Placeholder::make('warning')
                                     ->label('')
-                                    ->content(new \Illuminate\Support\HtmlString('
+                                    ->content(new HtmlString('
                                         <div style="color: #dc2626; font-weight: bold; padding: 12px; background-color: #fef2f2; border-radius: 8px; border: 1px solid #fecaca; font-size: 14px; line-height: 1.5;">
                                             ⚠️ ' . __('system.gmail_warning.title') . '<br>
                                             <span style="font-weight: 500; color: #991b1b; font-size: 13px;">' . __('system.gmail_warning.desc') . '</span>
@@ -681,7 +682,7 @@ trait HasAccountSchema
                         return [
                             Forms\Components\Placeholder::make('msg')
                                 ->label('')
-                                ->content(new \Illuminate\Support\HtmlString(__('system.account_claim.desc'))),
+                                ->content(new HtmlString(__('system.account_claim.desc'))),
                         ];
                     })
                     ->modalSubmitActionLabel(__('system.account_claim.submit'))
@@ -862,7 +863,7 @@ trait HasAccountSchema
                         ->color('success')
                         ->visible(fn() => !auth()->user()?->isFinance())
                         ->requiresConfirmation()
-                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                        ->action(function (Collection $records) {
                             $currentUserId = auth()->id();
                             foreach ($records as $record) {
                                 if (empty($record->user_id)) {
@@ -884,7 +885,7 @@ trait HasAccountSchema
                         ->color('danger')
                         ->visible(fn() => auth()->user()?->isAdmin())
                         ->requiresConfirmation()
-                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                        ->action(function (Collection $records) {
                             foreach ($records as $record) {
                                 $record->update(['account_created_at' => null]);
                             }
@@ -899,7 +900,7 @@ trait HasAccountSchema
                         ->label(__('system.actions.copy_selected'))
                         ->icon('heroicon-m-clipboard-document-list')
                         ->color('warning')
-                        ->action(function (\Illuminate\Database\Eloquent\Collection $records, $livewire) {
+                        ->action(function (Collection $records, $livewire) {
                             $header = " | ID | Email Status | Year Created | Email Address | Email Password | Recovery Email | 2FA Code | Email Note | Platform | Platform Password | State | Device Create | Date Create | Platform Status | Platform Note | Holder | Personal Information | Device Linked | Date Linked PayPal | ";
                             $output = $header . "\n";
                             foreach ($records as $record) {
