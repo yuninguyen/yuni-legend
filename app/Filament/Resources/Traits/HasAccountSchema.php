@@ -384,7 +384,7 @@ trait HasAccountSchema
                                     </span>
                                 </div>
                                 
-                                <div style=\"margin-bottom: 2px;\">
+                                <!-- <div style=\"margin-bottom: 2px;\">
                                     <span style=\"color: #64748b;\">" . __('system.labels.password_email') . ": </span> 
                                     <span style=\"color: #1e293b; cursor: pointer; position: relative;\" 
                                           x-on:click.stop.prevent=\"window.navigator.clipboard.writeText(" . e(Js::from($pass)) . "); copied = 'pass'; setTimeout(() => copied = null, 5000)\"
@@ -424,7 +424,7 @@ trait HasAccountSchema
                                         <span style=\"color: #64748b;\">" . __('system.labels.note') . ": </span> 
                                         <span style=\"color: #1e293b;\">{$emailNote}</span>
                                     </div>
-                                </div>
+                                </div> -->
                             </div>
                         ";
                     }),

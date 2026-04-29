@@ -649,9 +649,9 @@ class PayoutMethodResource extends Resource
                                         <span style='color: #6b7280; display: inline-block;'>{$labels['paypal']}:</span> 
                                         <strong style='color: #111827;'>{$payPalAccount}</strong>
                                         <span style='color: #6b7280; display: inline-block;'> | </span> 
-                                        <!-- <strong style='color: #111827;'>{$paypalPassword}</strong>
+                                        <strong style='color: #111827;'>{$paypalPassword}</strong>
                                     </div>
-                                    <div style='margin-bottom: 4px;'>
+                                    <!-- <div style='margin-bottom: 4px;'>
                                         <span style='color: #6b7280; display: inline-block;'>{$labels['auth']}:</span> 
                                         <span style='color: #111827;'>{$authcode}</span>
                                     </div>
