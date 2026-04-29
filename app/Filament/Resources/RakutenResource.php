@@ -47,7 +47,7 @@ class RakutenResource extends Resource
     // HÀM LỌC DỮ LIỆU: Chỉ lấy tài khoản của Rakuten
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->where('platform', 'Rakuten');
+        $query = parent::getEloquentQuery()->whereIn('platform', ['Rakuten', 'rakuten']);
 
         if (auth()->user()?->isAdmin()) {
             return $query;

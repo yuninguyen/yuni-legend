@@ -48,7 +48,7 @@ class PriceResource extends Resource
     // HÀM LỌC DỮ LIỆU: Chỉ lấy tài khoản của Active Junky
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->where('platform', 'Price.com');
+        $query = parent::getEloquentQuery()->whereIn('platform', ['Price', 'price', 'Price.com']);
 
         if (auth()->user()?->isAdmin()) {
             return $query;

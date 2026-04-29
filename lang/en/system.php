@@ -40,7 +40,7 @@ return [
     'status' => [
         'live' => 'Live',
         'active' => 'Active',
-        'used' => 'Used',
+        'used' => 'In Use',
         'disabled' => 'Disabled',
         'locked' => 'Locked',
         'banned' => 'Banned',

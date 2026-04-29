@@ -49,7 +49,7 @@ class ActiveJunkyResource extends Resource
     // HÀM LỌC DỮ LIỆU: Chỉ lấy tài khoản của Active Junky
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->where('platform', 'Active Junky');
+        $query = parent::getEloquentQuery()->whereIn('platform', ['ActiveJunky', 'activejunky', 'Active Junky']);
 
         if (auth()->user()?->isAdmin()) {
             return $query;

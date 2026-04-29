@@ -49,7 +49,7 @@ class RetailMeNotResource extends Resource
     // HÀM LỌC DỮ LIỆU: Chỉ lấy tài khoản của RetailMeNot
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->where('platform', 'RetailMeNot');
+        $query = parent::getEloquentQuery()->whereIn('platform', ['RetailMeNot', 'retailmenot']);
 
         if (auth()->user()?->isAdmin()) {
             return $query;

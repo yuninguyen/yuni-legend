@@ -49,7 +49,7 @@ class JoinHoneyResource extends Resource
     // HÀM LỌC DỮ LIỆU: Chỉ lấy tài khoản của Join Honey
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->where('platform', 'Join Honey');
+        $query = parent::getEloquentQuery()->whereIn('platform', ['JoinHoney', 'joinhoney', 'Join Honey']);
 
         if (auth()->user()?->isAdmin()) {
             return $query;
