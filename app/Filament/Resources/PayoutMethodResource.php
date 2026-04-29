@@ -346,7 +346,8 @@ class PayoutMethodResource extends Resource
                                         Infolists\Components\TextEntry::make('auth_code')->label(__('system.payout_methods.fields.auth_code'))
                                             ->copyable()
                                             ->weight(FontWeight::Bold)
-                                            ->color('success'),
+                                            ->color('success')
+                                            ->placeholder(__('system.n/a')),
                                     ])->columnSpan(1),
                                 ]),
                             ]),
@@ -365,14 +366,32 @@ class PayoutMethodResource extends Resource
                                         ->label(__('system.payout_methods.fields.ssn_tax_id'))
                                         ->copyable()
                                         ->placeholder(__('system.n/a')),
-                                    Infolists\Components\TextEntry::make('phone')->label(__('system.payout_methods.fields.phone_number'))->copyable(),
-                                    Infolists\Components\TextEntry::make('address')->label(__('system.payout_methods.fields.full_address'))->columnSpan(2),
+                                    Infolists\Components\TextEntry::make('phone')
+                                        ->label(__('system.payout_methods.fields.phone_number'))
+                                        ->copyable()
+                                        ->placeholder(__('system.n/a')),
+                                    Infolists\Components\TextEntry::make('address')
+                                        ->label(__('system.payout_methods.fields.full_address'))
+                                        ->placeholder(__('system.n/a'))
+                                        ->columnSpan(2),
                                 ]),
                                 Infolists\Components\Grid::make(2)->schema([
-                                    Infolists\Components\TextEntry::make('question_1')->label(__('system.payout_methods.fields.question_security_1'))->color('gray'),
-                                    Infolists\Components\TextEntry::make('answer_1')->label(__('system.payout_methods.fields.answer_1'))->weight(FontWeight::Bold),
-                                    Infolists\Components\TextEntry::make('question_2')->label(__('system.payout_methods.fields.question_security_2'))->color('gray'),
-                                    Infolists\Components\TextEntry::make('answer_2')->label(__('system.payout_methods.fields.answer_2'))->weight(FontWeight::Bold),
+                                    Infolists\Components\TextEntry::make('question_1')
+                                        ->label(__('system.payout_methods.fields.question_security_1'))
+                                        ->color('gray')
+                                        ->placeholder(__('system.n/a')),
+                                    Infolists\Components\TextEntry::make('answer_1')
+                                        ->label(__('system.payout_methods.fields.answer_1'))
+                                        ->weight(FontWeight::Bold)
+                                        ->placeholder(__('system.n/a')),
+                                    Infolists\Components\TextEntry::make('question_2')
+                                        ->label(__('system.payout_methods.fields.question_security_2'))
+                                        ->color('gray')
+                                        ->placeholder(__('system.n/a')),
+                                    Infolists\Components\TextEntry::make('answer_2')
+                                        ->label(__('system.payout_methods.fields.answer_2'))
+                                        ->weight(FontWeight::Bold)
+                                        ->placeholder(__('system.n/a')),
                                 ])->extraAttributes(['class' => 'bg-gray-50 p-4 rounded-xl mt-4']),
                             ]),
 
@@ -381,12 +400,25 @@ class PayoutMethodResource extends Resource
                             ->icon('heroicon-m-globe-alt')
                             ->schema([
                                 Infolists\Components\Grid::make(3)->schema([
-                                    Infolists\Components\TextEntry::make('proxy_type')->label(__('system.payout_methods.fields.proxy_type')),
-                                    Infolists\Components\TextEntry::make('ip_address')->label(__('system.payout_methods.fields.ip_address'))->copyable(),
-                                    Infolists\Components\TextEntry::make('location')->label(__('system.payout_methods.fields.location')),
-                                    Infolists\Components\TextEntry::make('isp')->label(__('system.payout_methods.fields.isp')),
-                                    Infolists\Components\TextEntry::make('browser')->label(__('system.payout_methods.fields.browser')),
-                                    Infolists\Components\TextEntry::make('device')->label(__('system.payout_methods.fields.device')),
+                                    Infolists\Components\TextEntry::make('proxy_type')
+                                        ->label(__('system.payout_methods.fields.proxy_type'))
+                                        ->placeholder(__('system.n/a')),
+                                    Infolists\Components\TextEntry::make('ip_address')
+                                        ->label(__('system.payout_methods.fields.ip_address'))
+                                        ->placeholder(__('system.n/a'))
+                                        ->copyable(),
+                                    Infolists\Components\TextEntry::make('location')
+                                        ->label(__('system.payout_methods.fields.location'))
+                                        ->placeholder(__('system.n/a')),
+                                    Infolists\Components\TextEntry::make('isp')
+                                        ->label(__('system.payout_methods.fields.isp'))
+                                        ->placeholder(__('system.n/a')),
+                                    Infolists\Components\TextEntry::make('browser')
+                                        ->label(__('system.payout_methods.fields.browser'))
+                                        ->placeholder(__('system.n/a')),
+                                    Infolists\Components\TextEntry::make('device')
+                                        ->label(__('system.payout_methods.fields.device'))
+                                        ->placeholder(__('system.n/a')),
                                 ]),
                                 Infolists\Components\TextEntry::make('note')
                                     ->label(__('system.labels.note'))

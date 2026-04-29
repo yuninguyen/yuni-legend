@@ -58,7 +58,7 @@ class PayoutLogResource extends Resource
             ->select('payout_logs.*')
             ->selectRaw(match (DB::getDriverName()) {
                 'sqlite' => "account_id || '_' || COALESCE(gc_brand, 'none') || '_' || COALESCE(parent_id, id) as group_key",
-                default  => "CONCAT(account_id, '_', COALESCE(gc_brand, 'none'), '_', COALESCE(parent_id, id)) as group_key",
+                default => "CONCAT(account_id, '_', COALESCE(gc_brand, 'none'), '_', COALESCE(parent_id, id)) as group_key",
             })
             ->withCount('children')
             ->withSum(['children as children_sum' => fn($q) => $q->whereNull('deleted_at')], 'amount_usd')
@@ -150,7 +150,7 @@ class PayoutLogResource extends Resource
 
                         $log->update([
                             'status' => $newStatus,
-                            'note'   => trim($row[$noteIdx] ?? ''),
+                            'note' => trim($row[$noteIdx] ?? ''),
                         ]);
                         $count++;
                     }
@@ -758,7 +758,7 @@ class PayoutLogResource extends Resource
 
                         $userName = $record->user?->name ?? __('system.n/a');
 
-                        $safeEmail    = e($email);
+                        $safeEmail = e($email);
                         $safeUserName = e($userName);
                         return "
                             <div style='line-height: 1.6; padding: 4px 0;'>
@@ -774,8 +774,8 @@ class PayoutLogResource extends Resource
                     ->searchable(query: function ($query, string $search) {
                         $query->whereHas('account', function ($q) use ($search) {
                             $q->where('platform', 'like', "%{$search}%")
-                            ->orWhereHas('email', function ($q2) use ($search) {
-                                $q2->where('email', 'like', "%{$search}%");
+                                ->orWhereHas('email', function ($q2) use ($search) {
+                                    $q2->where('email', 'like', "%{$search}%");
                                 });
                         });
                     }),
@@ -1287,87 +1287,87 @@ class PayoutLogResource extends Resource
                         $exchangeCreated = false;
 
                         DB::transaction(function () use ($record, $data, &$exchangeCreated) {
-                        $record = PayoutLog::query()
-                            ->lockForUpdate()
-                            ->find($record->id);
+                            $record = PayoutLog::query()
+                                ->lockForUpdate()
+                                ->find($record->id);
 
-                        if (!$record) {
-                            return;
-                        }
-
-                        $existingLiquidation = PayoutLog::query()
-                            ->where('parent_id', $record->id)
-                            ->where('transaction_type', 'liquidation')
-                            ->where('status', 'completed')
-                            ->lockForUpdate()
-                            ->first();
-
-                        if ($record->user_payment_id !== null || $existingLiquidation !== null) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Exchange failed!')
-                                ->body('This payout log has already been liquidated or settled.')
-                                ->danger()
-                                ->send();
-                            return;
-                        }
-
-                        // 🟢 LÀM SẠCH DỮ LIỆU TRƯỚC KHI LƯU
-                        $cleanRate = (float) str_replace(['.', ','], '', $data['exchange_rate']);
-                        $cleanVnd = (float) str_replace(['.', ','], '', $data['total_vnd']);
-                        $usdAmount = (float) $data['net_amount_usd'];
-
-                        // 🚀 NEW: Tiền tố ghi chú theo loại giao dịch
-                        $categoryPrefix = '';
-                        $category = $data['transaction_category'] ?? null;
-                        if (!empty($category)) {
-                            $categoryPrefix = match ($category) {
-                                'send' => '[SEND] ',
-                                'payment_service' => '[PAYMENT_SERVICE] ',
-                                'withdraw_to_bank' => '[WITHDRAW] ',
-                                default => '',
-                            };
-                        }
-
-                        // 🚀 Phụ bản ghi chú chi tiết phí
-                        $feeNote = '';
-                        if ($category === 'withdraw_to_bank') {
-                            if ($record->payoutMethod?->type === 'paypal_vn') {
-                                $fVnd = number_format((float) ($data['withdrawal_fee_vn'] ?? 0), 0, ',', '.');
-                                $feeNote = "Fee: {$fVnd}đ - ";
-                            } else if ($record->payoutMethod?->type === 'paypal_us') {
-                                $fRate = (float) ($data['withdrawal_fee_us_rate'] ?? 0);
-                                $feeNote = "Fee: {$fRate}% - ";
+                            if (!$record) {
+                                return;
                             }
-                        }
 
-                        PayoutLog::create([
-                            'parent_id' => $record->id,
-                            'user_id' => $record->user_id,
-                            'account_id' => $record->account_id,
-                            'payout_method_id' => $record->payout_method_id,
-                            'transaction_type' => 'liquidation',
-                            'asset_type' => $record->asset_type,
+                            $existingLiquidation = PayoutLog::query()
+                                ->where('parent_id', $record->id)
+                                ->where('transaction_type', 'liquidation')
+                                ->where('status', 'completed')
+                                ->lockForUpdate()
+                                ->first();
 
-                            // 🟢 THÊM: Copy thông tin Gift Card sang dòng con
-                            'gc_brand' => $record->gc_brand,
-                            'gc_code' => $record->gc_code,
-                            'gc_pin' => $record->gc_pin,
+                            if ($record->user_payment_id !== null || $existingLiquidation !== null) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Exchange failed!')
+                                    ->body('This payout log has already been liquidated or settled.')
+                                    ->danger()
+                                    ->send();
+                                return;
+                            }
 
-                            // 🟢 ĐIỀN CẢ 2 ĐỂ TRÁNH LỖI SQL (Mặc định Gross = Net khi bán)
-                            'amount_usd' => $usdAmount,
-                            'net_amount_usd' => $usdAmount,
+                            // 🟢 LÀM SẠCH DỮ LIỆU TRƯỚC KHI LƯU
+                            $cleanRate = (float) str_replace(['.', ','], '', $data['exchange_rate']);
+                            $cleanVnd = (float) str_replace(['.', ','], '', $data['total_vnd']);
+                            $usdAmount = (float) $data['net_amount_usd'];
 
-                            'exchange_rate' => $cleanRate,
-                            'total_vnd' => $cleanVnd,
-                            'status' => 'completed',
-                            'note' => $categoryPrefix .
-                                $feeNote .
-                                ($category === 'send' ? (($data['recipient_email'] ?? '') . ' - ') : '') .
-                                ($category === 'payment_service' ? (($data['payment_description'] ?? '') . ' - ') : '') .
-                                __('system.labels.liquidity_from_id') . $record->id,
-                        ]);
+                            // 🚀 NEW: Tiền tố ghi chú theo loại giao dịch
+                            $categoryPrefix = '';
+                            $category = $data['transaction_category'] ?? null;
+                            if (!empty($category)) {
+                                $categoryPrefix = match ($category) {
+                                    'send' => '[SEND] ',
+                                    'payment_service' => '[PAYMENT_SERVICE] ',
+                                    'withdraw_to_bank' => '[WITHDRAW] ',
+                                    default => '',
+                                };
+                            }
 
-                        $exchangeCreated = true;
+                            // 🚀 Phụ bản ghi chú chi tiết phí
+                            $feeNote = '';
+                            if ($category === 'withdraw_to_bank') {
+                                if ($record->payoutMethod?->type === 'paypal_vn') {
+                                    $fVnd = number_format((float) ($data['withdrawal_fee_vn'] ?? 0), 0, ',', '.');
+                                    $feeNote = "Fee: {$fVnd}đ - ";
+                                } else if ($record->payoutMethod?->type === 'paypal_us') {
+                                    $fRate = (float) ($data['withdrawal_fee_us_rate'] ?? 0);
+                                    $feeNote = "Fee: {$fRate}% - ";
+                                }
+                            }
+
+                            PayoutLog::create([
+                                'parent_id' => $record->id,
+                                'user_id' => $record->user_id,
+                                'account_id' => $record->account_id,
+                                'payout_method_id' => $record->payout_method_id,
+                                'transaction_type' => 'liquidation',
+                                'asset_type' => $record->asset_type,
+
+                                // 🟢 THÊM: Copy thông tin Gift Card sang dòng con
+                                'gc_brand' => $record->gc_brand,
+                                'gc_code' => $record->gc_code,
+                                'gc_pin' => $record->gc_pin,
+
+                                // 🟢 ĐIỀN CẢ 2 ĐỂ TRÁNH LỖI SQL (Mặc định Gross = Net khi bán)
+                                'amount_usd' => $usdAmount,
+                                'net_amount_usd' => $usdAmount,
+
+                                'exchange_rate' => $cleanRate,
+                                'total_vnd' => $cleanVnd,
+                                'status' => 'completed',
+                                'note' => $categoryPrefix .
+                                    $feeNote .
+                                    ($category === 'send' ? (($data['recipient_email'] ?? '') . ' - ') : '') .
+                                    ($category === 'payment_service' ? (($data['payment_description'] ?? '') . ' - ') : '') .
+                                    __('system.labels.liquidity_from_id') . $record->id,
+                            ]);
+
+                            $exchangeCreated = true;
 
                         });
 
@@ -1477,141 +1477,141 @@ class PayoutLogResource extends Resource
 
                             DB::transaction(function () use ($records, $data, &$paymentGenerated) {
 
-                            // 1. Chỉ lọc đơn hợp lệ: Đã Completed và Chưa bị chốt sổ
-                            // 🚀 SECURITY FIX: Dùng lockForUpdate() để tránh tranh chấp khi có 2 admin cùng bấm nút
-                            $validSelected = PayoutLog::whereIn('id', $records->pluck('id'))
-                                ->where('status', 'completed')
-                                ->whereNull('user_payment_id')
-                                ->lockForUpdate()
-                                ->get();
+                                // 1. Chỉ lọc đơn hợp lệ: Đã Completed và Chưa bị chốt sổ
+                                // 🚀 SECURITY FIX: Dùng lockForUpdate() để tránh tranh chấp khi có 2 admin cùng bấm nút
+                                $validSelected = PayoutLog::whereIn('id', $records->pluck('id'))
+                                    ->where('status', 'completed')
+                                    ->whereNull('user_payment_id')
+                                    ->lockForUpdate()
+                                    ->get();
 
-                            if ($validSelected->isEmpty()) {
-                                \Filament\Notifications\Notification::make()
-                                    ->title('Settlement Failed!')
-                                    ->body('No valid records found (Requires "Completed" status and not yet settled).')
-                                    ->danger()
-                                    ->send();
-                                return;
-                            }
-
-                            // 🟢 FIX LỖI NHÂN ĐÔI (DOUBLE COUNTING)
-                            $parentIds = $validSelected->map(fn($log) => $log->parent_id ?? $log->id)->unique();
-
-                            // Lấy lại danh sách các đơn Gốc (Parent) sạch sẽ từ Database
-                            // 🟢 FIX: Cho phép lấy Parent kể cả khi Parent ĐÃ bị settled, để giải quyết các Child tới sau
-                            $parentLogs = PayoutLog::whereIn('id', $parentIds)
-                                ->with(['account', 'payoutMethod'])
-                                ->lockForUpdate()
-                                ->get();
-
-                            // 2. GOM NHÓM THÔNG MINH (Chỉ gom các đơn Gốc)
-                            $groupedLogs = $parentLogs->groupBy(function ($log) {
-                                $platform = $log->account?->platform ?? 'unknown';
-                                return $log->user_id . '_' .
-                                    $platform . '_' .
-                                    $log->asset_type . '_' .
-                                    ($log->gc_brand ?? 'null') . '_' .
-                                    ($log->payout_method_id ?? 'null');
-                            });
-
-                            // 3. XỬ LÝ TỪNG NHÓM 
-                            foreach ($groupedLogs as $groupKey => $logs) {
-                                $firstLog = $logs->first();
-                                $sourceName = '';
-                                $platformRaw = $firstLog->account?->platform ?? 'unknown';
-                                $platformName = static::getPlatformName($platformRaw);
-
-                                if ($firstLog->asset_type === 'gift_card') {
-                                    $brandRecord = \App\Models\Brand::where('slug', $firstLog->gc_brand)->first();
-                                    $sourceName = $brandRecord ? $brandRecord->name : ucwords(str_replace(['_', '-'], ' ', $firstLog->gc_brand));
-                                } else {
-                                    $sourceName = $firstLog->payoutMethod?->name ?? 'Unknown Wallet';
+                                if ($validSelected->isEmpty()) {
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Settlement Failed!')
+                                        ->body('No valid records found (Requires "Completed" status and not yet settled).')
+                                        ->danger()
+                                        ->send();
+                                    return;
                                 }
 
-                                $totalUsd = 0;
-                                $totalVndMarket = 0;
+                                // 🟢 FIX LỖI NHÂN ĐÔI (DOUBLE COUNTING)
+                                $parentIds = $validSelected->map(fn($log) => $log->parent_id ?? $log->id)->unique();
 
-                                $parentIdsToUpdate = [];
-                                $childIdsToUpdate = [];
+                                // Lấy lại danh sách các đơn Gốc (Parent) sạch sẽ từ Database
+                                // 🟢 FIX: Cho phép lấy Parent kể cả khi Parent ĐÃ bị settled, để giải quyết các Child tới sau
+                                $parentLogs = PayoutLog::whereIn('id', $parentIds)
+                                    ->with(['account', 'payoutMethod'])
+                                    ->lockForUpdate()
+                                    ->get();
 
-                                // 🟢 QUÉT TỪNG ĐƠN GỐC ĐỂ TÍNH TIỀN
-                                foreach ($logs as $log) {
-                                    /** @var \App\Models\PayoutLog $log */
-                                    // 🟢 CHỈ LẤY CÁC CON THANH KHOẢN CHƯA BỊ CHỐT SỔ (user_payment_id IS NULL)
-                                    $liquidationChildren = $log->children()
-                                        ->where('transaction_type', 'liquidation')
-                                        ->where('status', 'completed')
-                                        ->whereNull('user_payment_id')
-                                        ->lockForUpdate()
-                                        ->get();
+                                // 2. GOM NHÓM THÔNG MINH (Chỉ gom các đơn Gốc)
+                                $groupedLogs = $parentLogs->groupBy(function ($log) {
+                                    $platform = $log->account?->platform ?? 'unknown';
+                                    return $log->user_id . '_' .
+                                        $platform . '_' .
+                                        $log->asset_type . '_' .
+                                        ($log->gc_brand ?? 'null') . '_' .
+                                        ($log->payout_method_id ?? 'null');
+                                });
 
-                                    $usd = 0;
-                                    $vndMarket = 0;
+                                // 3. XỬ LÝ TỪNG NHÓM 
+                                foreach ($groupedLogs as $groupKey => $logs) {
+                                    $firstLog = $logs->first();
+                                    $sourceName = '';
+                                    $platformRaw = $firstLog->account?->platform ?? 'unknown';
+                                    $platformName = static::getPlatformName($platformRaw);
 
-                                    if ($liquidationChildren->isNotEmpty()) {
-                                        $usd = (float) $liquidationChildren->sum('net_amount_usd');
-                                        $vndMarket = (float) $liquidationChildren->sum('total_vnd');
-
-                                        // Lưu lại hết IDs con để chốt sổ (không cho thanh khoản nữa)
-                                        foreach ($liquidationChildren as $child) {
-                                            $childIdsToUpdate[] = $child->id;
-                                        }
+                                    if ($firstLog->asset_type === 'gift_card') {
+                                        $brandRecord = \App\Models\Brand::where('slug', $firstLog->gc_brand)->first();
+                                        $sourceName = $brandRecord ? $brandRecord->name : ucwords(str_replace(['_', '-'], ' ', $firstLog->gc_brand));
                                     } else {
-                                        // 🟢 CHỈ THANH TOÁN PARENT NẾU PARENT CHƯA BỊ CHỐT SỔ
-                                        if (is_null($log->user_payment_id)) {
-                                            $usd = (float) $log->net_amount_usd;
-                                            $vndMarket = (float) $log->total_vnd;
-                                            $parentIdsToUpdate[] = $log->id;
-                                        }
+                                        $sourceName = $firstLog->payoutMethod?->name ?? 'Unknown Wallet';
                                     }
 
-                                    $totalUsd += $usd;
-                                    $totalVndMarket += $vndMarket;
+                                    $totalUsd = 0;
+                                    $totalVndMarket = 0;
+
+                                    $parentIdsToUpdate = [];
+                                    $childIdsToUpdate = [];
+
+                                    // 🟢 QUÉT TỪNG ĐƠN GỐC ĐỂ TÍNH TIỀN
+                                    foreach ($logs as $log) {
+                                        /** @var \App\Models\PayoutLog $log */
+                                        // 🟢 CHỈ LẤY CÁC CON THANH KHOẢN CHƯA BỊ CHỐT SỔ (user_payment_id IS NULL)
+                                        $liquidationChildren = $log->children()
+                                            ->where('transaction_type', 'liquidation')
+                                            ->where('status', 'completed')
+                                            ->whereNull('user_payment_id')
+                                            ->lockForUpdate()
+                                            ->get();
+
+                                        $usd = 0;
+                                        $vndMarket = 0;
+
+                                        if ($liquidationChildren->isNotEmpty()) {
+                                            $usd = (float) $liquidationChildren->sum('net_amount_usd');
+                                            $vndMarket = (float) $liquidationChildren->sum('total_vnd');
+
+                                            // Lưu lại hết IDs con để chốt sổ (không cho thanh khoản nữa)
+                                            foreach ($liquidationChildren as $child) {
+                                                $childIdsToUpdate[] = $child->id;
+                                            }
+                                        } else {
+                                            // 🟢 CHỈ THANH TOÁN PARENT NẾU PARENT CHƯA BỊ CHỐT SỔ
+                                            if (is_null($log->user_payment_id)) {
+                                                $usd = (float) $log->net_amount_usd;
+                                                $vndMarket = (float) $log->total_vnd;
+                                                $parentIdsToUpdate[] = $log->id;
+                                            }
+                                        }
+
+                                        $totalUsd += $usd;
+                                        $totalVndMarket += $vndMarket;
+                                    }
+
+                                    // 🟢 Nếu cả Parent và Children đều đã chốt sổ hết => Skip nhóm này
+                                    if ($totalUsd <= 0) {
+                                        continue;
+                                    }
+
+                                    // Tính tỷ giá thị trường trung bình
+                                    $averageMarketRate = $totalUsd > 0 ? round($totalVndMarket / $totalUsd, 2) : 0;
+
+                                    // Lấy tỷ giá trả user từ form (nếu không nhập thì lấy bằng tỷ giá thị trường)
+                                    $payoutRate = (float) ($data['manual_payout_rate'] ?? $averageMarketRate);
+                                    $payoutPercentage = (float) ($data['payout_percentage'] ?? 100);
+
+                                    // Tiền thực trả = (Số lượng USD * Tỷ giá chi trả) * (% chi trả / 100)
+                                    $totalVndPayout = floor(($totalUsd * $payoutRate) * ($payoutPercentage / 100));
+
+                                    // Profit của Gin = (Tỷ giá thanh khoản - Tỷ giá trả user) * (Số lượng USD * % chi trả)
+                                    // Công thức: (MarketRate - PayoutRate) * TotalUSD * (PayoutPercentage / 100)
+                                    $profitVnd = floor(($averageMarketRate - $payoutRate) * $totalUsd * ($payoutPercentage / 100));
+
+                                    // 4. TẠO PHIẾU LƯƠNG
+                                    $payment = \App\Models\UserPayment::create([
+                                        'user_id' => $firstLog->user_id,
+                                        'platform' => $platformName,
+                                        'asset_group' => $firstLog->asset_type === 'gift_card' ? 'gift_card' : 'paypal',
+                                        'transaction_type' => ($firstLog->asset_type === 'gift_card' ? 'Gift Card' : 'PayPal') . " ({$sourceName})",
+                                        'total_usd' => $totalUsd,
+                                        'exchange_rate' => $averageMarketRate, // Lưu Market Rate để đối soát
+                                        'payout_rate' => $payoutRate,        // Lưu Payout Rate
+                                        'payout_percentage' => $payoutPercentage, // Lưu tỷ lệ chi trả
+                                        'total_vnd' => $totalVndPayout,      // Số tiền thực trả User
+                                        'profit_vnd' => $profitVnd,          // Số tiền lãi
+                                        'status' => 'pending',
+                                    ]);
+
+                                    $paymentGenerated = true;
+
+                                    // 5. CẬP NHẬT ID PHIẾU LƯƠNG ĐỂ KHÓA ĐƠN
+                                    PayoutLog::whereIn('id', $parentIdsToUpdate)->update(['user_payment_id' => $payment->id]);
+
+                                    if (!empty($childIdsToUpdate)) {
+                                        PayoutLog::whereIn('id', $childIdsToUpdate)->update(['user_payment_id' => $payment->id]);
+                                    }
                                 }
-
-                                // 🟢 Nếu cả Parent và Children đều đã chốt sổ hết => Skip nhóm này
-                                if ($totalUsd <= 0) {
-                                    continue;
-                                }
-
-                                // Tính tỷ giá thị trường trung bình
-                                $averageMarketRate = $totalUsd > 0 ? round($totalVndMarket / $totalUsd, 2) : 0;
-
-                                // Lấy tỷ giá trả user từ form (nếu không nhập thì lấy bằng tỷ giá thị trường)
-                                $payoutRate = (float) ($data['manual_payout_rate'] ?? $averageMarketRate);
-                                $payoutPercentage = (float) ($data['payout_percentage'] ?? 100);
-
-                                // Tiền thực trả = (Số lượng USD * Tỷ giá chi trả) * (% chi trả / 100)
-                                $totalVndPayout = floor(($totalUsd * $payoutRate) * ($payoutPercentage / 100));
-
-                                // Profit của Gin = (Tỷ giá thanh khoản - Tỷ giá trả user) * (Số lượng USD * % chi trả)
-                                // Công thức: (MarketRate - PayoutRate) * TotalUSD * (PayoutPercentage / 100)
-                                $profitVnd = floor(($averageMarketRate - $payoutRate) * $totalUsd * ($payoutPercentage / 100));
-
-                                // 4. TẠO PHIẾU LƯƠNG
-                                $payment = \App\Models\UserPayment::create([
-                                    'user_id' => $firstLog->user_id,
-                                    'platform' => $platformName,
-                                    'asset_group' => $firstLog->asset_type === 'gift_card' ? 'gift_card' : 'paypal',
-                                    'transaction_type' => ($firstLog->asset_type === 'gift_card' ? 'Gift Card' : 'PayPal') . " ({$sourceName})",
-                                    'total_usd' => $totalUsd,
-                                    'exchange_rate' => $averageMarketRate, // Lưu Market Rate để đối soát
-                                    'payout_rate' => $payoutRate,        // Lưu Payout Rate
-                                    'payout_percentage' => $payoutPercentage, // Lưu tỷ lệ chi trả
-                                    'total_vnd' => $totalVndPayout,      // Số tiền thực trả User
-                                    'profit_vnd' => $profitVnd,          // Số tiền lãi
-                                    'status' => 'pending',
-                                ]);
-
-                                $paymentGenerated = true;
-
-                                // 5. CẬP NHẬT ID PHIẾU LƯƠNG ĐỂ KHÓA ĐƠN
-                                PayoutLog::whereIn('id', $parentIdsToUpdate)->update(['user_payment_id' => $payment->id]);
-
-                                if (!empty($childIdsToUpdate)) {
-                                    PayoutLog::whereIn('id', $childIdsToUpdate)->update(['user_payment_id' => $payment->id]);
-                                }
-                            }
 
                             });
 
@@ -1672,7 +1672,7 @@ class PayoutLogResource extends Resource
                     ->getTitleFromRecordUsing(function ($record) {
                         $email = $record->account?->email?->email ?? __('system.n/a');
                         $platform = static::getPlatformName($record->account?->platform);
-                        
+
                         // 🟢 TÍNH TỔNG CHO HEADER (Do phiên bản Filament này chưa hỗ trợ ->summary() trên Group)
                         $parts = explode('_', $record->group_key);
                         $accountId = $parts[0] ?? null;
