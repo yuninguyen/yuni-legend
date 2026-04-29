@@ -85,7 +85,7 @@ class PayoutMethodResource extends Resource
     public static function syncFromGoogleSheet(): void
     {
         try {
-            $service = app(\App\Services\GoogleSheetService::class);
+            $service = app(GoogleSheetService::class);
             $targetTab = 'Payout_Methods';
             $rows = $service->readSheet('A2:AB', $targetTab); // Đọc từ dòng 2
 
@@ -99,7 +99,7 @@ class PayoutMethodResource extends Resource
             $count = 0;
             foreach ($rows as $row) {
                 if (isset($row[0]) && is_numeric($row[0])) {
-                    $method = \App\Models\PayoutMethod::find($row[0]);
+                    $method = PayoutMethod::find($row[0]);
                     if ($method) {
                         $method->update([
                             // Cập nhật Trạng thái và Ghi chú từ Sheet về Web
@@ -111,12 +111,12 @@ class PayoutMethodResource extends Resource
                 }
             }
 
-            \Filament\Notifications\Notification::make()
+            Notification::make()
                 ->title(__('system.payout_methods.notifications.synced_wallets', ['count' => $count]))
                 ->success()
                 ->send();
         } catch (\Exception $e) {
-            \Filament\Notifications\Notification::make()
+            Notification::make()
                 ->title(__('system.notifications.sync_error'))
                 ->body($e->getMessage())
                 ->danger()
@@ -553,7 +553,7 @@ class PayoutMethodResource extends Resource
                     }),
 
                 Tables\Columns\TextColumn::make('identifier')
-                    ->label(__('system.labels.transaction_details'))
+                    ->label(__('system.labels.paypal_information'))
                     ->copyable()
                     ->searchable()
                     ->html()
@@ -649,7 +649,7 @@ class PayoutMethodResource extends Resource
                                         <span style='color: #6b7280; display: inline-block;'>{$labels['paypal']}:</span> 
                                         <strong style='color: #111827;'>{$payPalAccount}</strong>
                                         <span style='color: #6b7280; display: inline-block;'> | </span> 
-                                        <strong style='color: #111827;'>{$paypalPassword}</strong>
+                                        <!-- <strong style='color: #111827;'>{$paypalPassword}</strong>
                                     </div>
                                     <div style='margin-bottom: 4px;'>
                                         <span style='color: #6b7280; display: inline-block;'>{$labels['auth']}:</span> 
@@ -674,7 +674,7 @@ class PayoutMethodResource extends Resource
                                         <div style='margin-bottom: 4px;'>
                                         <span style='color: #6b7280; display: inline-block;'>{$labels['address']}:</span> 
                                         <span style='color: #111827;'>{$address}</span>
-                                    </div>
+                                    </div> -->
                                     <div style='margin-bottom: 4px; white-space: nowrap;'>
                                         <span style='color: #6b7280; display: inline-block;'>{$labels['status']}:</span> 
                                         <code style='background: #f3f4f6; color: {$statusColor}; padding: 2px 6px; border-radius: 4px; font-weight: bold;'>{$statusLabel}</code>
@@ -738,13 +738,13 @@ class PayoutMethodResource extends Resource
                             try {
                                 $syncService->syncPayoutMethods($records);
 
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title(__('system.notifications.synced_successfully'))
                                     ->description(__('system.notifications.sync_success_msg', ['count' => count($records)]))
                                     ->success()
                                     ->send();
                             } catch (\Exception $e) {
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title(__('system.notifications.sync_error'))
                                     ->body($e->getMessage())
                                     ->danger()

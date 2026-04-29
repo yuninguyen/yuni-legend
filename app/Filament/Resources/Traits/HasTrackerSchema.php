@@ -44,7 +44,7 @@ trait HasTrackerSchema
                                 // 1. USER (Chỉ Admin thấy)
                                 Forms\Components\Select::make('user_id')
                                     ->label(__('system.labels.user'))
-                                    ->relationship('user', 'name', fn (Builder $query) => $query->whereHas('accounts'))
+                                    ->relationship('user', 'name', fn(Builder $query) => $query->whereHas('accounts'))
                                     ->default(fn() => auth()->id())
                                     ->hidden(fn() => !auth()->user()?->isAdmin())
                                     ->dehydrated(true)
@@ -527,7 +527,7 @@ trait HasTrackerSchema
                     ->getTitleFromRecordUsing(function ($record) {
                         $email = $record->account?->email?->email ?? 'N/A';
                         $platform = static::getPlatformName($record->account?->platform);
-                        
+
                         // 🟢 TÍNH TỔNG CHO HEADER (Do phiên bản này chưa hỗ trợ ->summary() trên Group)
                         $totalRebate = \App\Models\RebateTracker::query()
                             ->where('account_id', $record->account_id)
@@ -670,14 +670,6 @@ trait HasTrackerSchema
                     ->date('d/m/Y')
                     ->alignment(Alignment::Center),
 
-                // 7. TRANSACTION DETAILS
-                Tables\Columns\TextColumn::make('detail_transaction')
-                    ->label(__('system.labels.transaction_details'))
-                    ->alignment(Alignment::Left)
-                    ->placeholder(__('system.n/a'))
-                    ->limit(40)
-                    ->tooltip(fn($state) => $state)
-                    ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('payout_date')
                     ->label(__('system.labels.payout_date'))
                     ->alignment(Alignment::Center)

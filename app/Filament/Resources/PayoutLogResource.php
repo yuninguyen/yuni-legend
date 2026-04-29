@@ -381,7 +381,7 @@ class PayoutLogResource extends Resource
                                 if (!$userId)
                                     return [];
 
-                                $query = \App\Models\Account::query()->where('user_id', $userId);
+                                $query = Account::query()->where('user_id', $userId);
 
                                 return $query->with('email')
                                     ->get()
@@ -480,7 +480,7 @@ class PayoutLogResource extends Resource
                                 if (!$accId)
                                     return [];
 
-                                $account = \App\Models\Account::find($accId);
+                                $account = Account::find($accId);
                                 if (!$account)
                                     return [];
 
@@ -538,7 +538,7 @@ class PayoutLogResource extends Resource
                                     ]),
                             ])
                             ->createOptionUsing(function (array $data, Forms\Get $get) {
-                                $account = \App\Models\Account::find($get('account_id'));
+                                $account = Account::find($get('account_id'));
                                 if (!$account)
                                     throw new \Exception("Please select an account first.");
 
@@ -938,7 +938,7 @@ class PayoutLogResource extends Resource
                     ->numeric(2, '.', ',')
                     ->prefix('$')
                     ->color('warning')
-                    ->weight(\Filament\Support\Enums\FontWeight::Bold)
+                    ->weight(FontWeight::Bold)
                     ->alignment(Alignment::Center),
                 Tables\Columns\TextColumn::make('total_vnd')
                     ->label(__('system.labels.total_vnd'))
@@ -973,8 +973,8 @@ class PayoutLogResource extends Resource
                 Tables\Filters\SelectFilter::make('platform')
                     ->label(__('system.labels.platform'))
                     ->options(function () {
-                        $platforms = \App\Models\Account::query()
-                            ->whereIn('id', \App\Models\PayoutLog::distinct()->pluck('account_id'))
+                        $platforms = Account::query()
+                            ->whereIn('id', PayoutLog::distinct()->pluck('account_id'))
                             ->pluck('platform', 'platform')
                             ->mapWithKeys(fn($state) => [
                                 $state => self::$platform[$state] ?? ucwords(
@@ -1009,7 +1009,7 @@ class PayoutLogResource extends Resource
                     ->visible(fn() => auth()->user()?->isAdmin() || auth()->user()?->isFinance()) // 🟢 HIỆN CHO ADMIN & FINANCE
                     ->options(
                         fn() => \App\Models\User::query()
-                            ->whereIn('id', \App\Models\PayoutLog::distinct()->pluck('user_id'))
+                            ->whereIn('id', PayoutLog::distinct()->pluck('user_id'))
                             ->pluck('name', 'id')
                             ->toArray()
                     )
@@ -1287,7 +1287,7 @@ class PayoutLogResource extends Resource
                         $exchangeCreated = false;
 
                         DB::transaction(function () use ($record, $data, &$exchangeCreated) {
-                        $record = \App\Models\PayoutLog::query()
+                        $record = PayoutLog::query()
                             ->lockForUpdate()
                             ->find($record->id);
 
@@ -1295,7 +1295,7 @@ class PayoutLogResource extends Resource
                             return;
                         }
 
-                        $existingLiquidation = \App\Models\PayoutLog::query()
+                        $existingLiquidation = PayoutLog::query()
                             ->where('parent_id', $record->id)
                             ->where('transaction_type', 'liquidation')
                             ->where('status', 'completed')
@@ -1340,7 +1340,7 @@ class PayoutLogResource extends Resource
                             }
                         }
 
-                        \App\Models\PayoutLog::create([
+                        PayoutLog::create([
                             'parent_id' => $record->id,
                             'user_id' => $record->user_id,
                             'account_id' => $record->account_id,
@@ -1479,7 +1479,7 @@ class PayoutLogResource extends Resource
 
                             // 1. Chỉ lọc đơn hợp lệ: Đã Completed và Chưa bị chốt sổ
                             // 🚀 SECURITY FIX: Dùng lockForUpdate() để tránh tranh chấp khi có 2 admin cùng bấm nút
-                            $validSelected = \App\Models\PayoutLog::whereIn('id', $records->pluck('id'))
+                            $validSelected = PayoutLog::whereIn('id', $records->pluck('id'))
                                 ->where('status', 'completed')
                                 ->whereNull('user_payment_id')
                                 ->lockForUpdate()
@@ -1499,7 +1499,7 @@ class PayoutLogResource extends Resource
 
                             // Lấy lại danh sách các đơn Gốc (Parent) sạch sẽ từ Database
                             // 🟢 FIX: Cho phép lấy Parent kể cả khi Parent ĐÃ bị settled, để giải quyết các Child tới sau
-                            $parentLogs = \App\Models\PayoutLog::whereIn('id', $parentIds)
+                            $parentLogs = PayoutLog::whereIn('id', $parentIds)
                                 ->with(['account', 'payoutMethod'])
                                 ->lockForUpdate()
                                 ->get();
@@ -1536,6 +1536,7 @@ class PayoutLogResource extends Resource
 
                                 // 🟢 QUÉT TỪNG ĐƠN GỐC ĐỂ TÍNH TIỀN
                                 foreach ($logs as $log) {
+                                    /** @var \App\Models\PayoutLog $log */
                                     // 🟢 CHỈ LẤY CÁC CON THANH KHOẢN CHƯA BỊ CHỐT SỔ (user_payment_id IS NULL)
                                     $liquidationChildren = $log->children()
                                         ->where('transaction_type', 'liquidation')
@@ -1605,10 +1606,10 @@ class PayoutLogResource extends Resource
                                 $paymentGenerated = true;
 
                                 // 5. CẬP NHẬT ID PHIẾU LƯƠNG ĐỂ KHÓA ĐƠN
-                                \App\Models\PayoutLog::whereIn('id', $parentIdsToUpdate)->update(['user_payment_id' => $payment->id]);
+                                PayoutLog::whereIn('id', $parentIdsToUpdate)->update(['user_payment_id' => $payment->id]);
 
                                 if (!empty($childIdsToUpdate)) {
-                                    \App\Models\PayoutLog::whereIn('id', $childIdsToUpdate)->update(['user_payment_id' => $payment->id]);
+                                    PayoutLog::whereIn('id', $childIdsToUpdate)->update(['user_payment_id' => $payment->id]);
                                 }
                             }
 
@@ -1678,7 +1679,7 @@ class PayoutLogResource extends Resource
                         $brand = $parts[1] ?? 'none';
                         $parentOrId = $parts[2] ?? null;
 
-                        $baseQuery = \App\Models\PayoutLog::query()
+                        $baseQuery = PayoutLog::query()
                             ->where('account_id', $accountId)
                             ->where(function ($q) use ($parentOrId) {
                                 $q->where('id', $parentOrId)->orWhere('parent_id', $parentOrId);
@@ -1734,7 +1735,7 @@ class PayoutLogResource extends Resource
             ->whereIn('status', ['confirmed'])
             ->sum('rebate_amount') ?? 0;
 
-        $paid = \App\Models\PayoutLog::where('account_id', $accountId)
+        $paid = PayoutLog::where('account_id', $accountId)
             ->whereIn('transaction_type', ['withdrawal', 'hold'])
             ->where('status', 'completed')
             ->sum('amount_usd') ?? 0;
