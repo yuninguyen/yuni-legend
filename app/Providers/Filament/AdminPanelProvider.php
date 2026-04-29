@@ -70,6 +70,9 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 \App\Filament\Pages\Dashboard::class,
             ])
+            ->resources([
+                config('filament-logger.activity_resource')
+            ])
             // 📊 WIDGETS
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
