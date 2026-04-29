@@ -195,7 +195,7 @@ trait HasTrackerSchema
                                 $emailState = $get('account_email');
                                 $account = \App\Models\Account::whereHas('email', fn($q) => $q->where('email', $emailState))->first();
                                 if (!$account)
-                                    return new \Illuminate\Support\HtmlString("<div class='text-danger'>⚠️ " . __('system.notifications.no_records_found') . "</div>");
+                                    return new HtmlString("<div class='text-danger'>⚠️ " . __('system.notifications.no_records_found') . "</div>");
                                 $statuses = (array) $account->status;
                                 if (empty($statuses))
                                     return __('system.n/a');
@@ -223,7 +223,7 @@ trait HasTrackerSchema
                                     $arrow = ($index < count($statuses) - 1) ? " <span style='color: #d1d5db; margin: 0 4px;'>→</span> " : "";
                                     return "<span style='color: {$color}; font-weight: 800; font-size: 0.85rem;'>{$label}</span>{$arrow}";
                                 })->implode('');
-                                return new \Illuminate\Support\HtmlString("<div style='padding:12px; background:#f0f9ff; border-radius:8px;'>{$htmlResult}</div>");
+                                return new HtmlString("<div style='padding:12px; background:#f0f9ff; border-radius:8px;'>{$htmlResult}</div>");
                             })
                             ->columnSpanFull(),
 
@@ -335,7 +335,7 @@ trait HasTrackerSchema
             ]);
     }
 
-    public static function infolist(\Filament\Infolists\Infolist $infolist): \Filament\Infolists\Infolist
+    public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist
             ->schema([
@@ -607,7 +607,7 @@ trait HasTrackerSchema
                         default => 'heroicon-m-question-mark-circle',
                     })
                     // 2. Dùng formatStateUsing để "vẽ" thêm icon bút chì vào phía sau (phải)
-                    ->formatStateUsing(fn(string $state) => new \Illuminate\Support\HtmlString('
+                    ->formatStateUsing(fn(string $state) => new HtmlString('
                         <div class="flex items-center gap-1.5 justify-center">
                             <span>' . __('system.status.' . $state) . '</span>
                                 ' . \Illuminate\Support\Facades\Blade::render('<x-heroicon-m-pencil-square class="w-4 h-4 text-gray-400" />') . '
@@ -781,7 +781,7 @@ trait HasTrackerSchema
 
                         return $formattedOptions;
                     })
-                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data) {
+                    ->query(function (Builder $query, array $data) {
                         if (!empty($data['value'])) {
                             $query->whereHas('account', fn($q) => $q->where('platform', $data['value']));
                         }
@@ -860,7 +860,7 @@ trait HasTrackerSchema
                     ])
                     ->columns(2)     // 👈 Ép 2 ô Date nằm ngang nhau
                     ->columnSpan(2)  // 👈 Chiếm 2 phần lưới
-                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
+                    ->query(function (Builder $query, array $data): Builder {
                         return $query
                             ->when($data['transaction_from'], fn($q, $date) => $q->whereDate('transaction_date', '>=', $date))
                             ->when($data['transaction_to'], fn($q, $date) => $q->whereDate('transaction_date', '<=', $date));
@@ -874,7 +874,7 @@ trait HasTrackerSchema
                     ])
                     ->columns(2)     // 👈 Ép 2 ô Date nằm ngang nhau
                     ->columnSpan(2)  // 👈 Chiếm 2 phần lưới
-                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
+                    ->query(function (Builder $query, array $data): Builder {
                         return $query
                             ->when($data['payout_from'], fn($q, $date) => $q->whereDate('payout_date', '>=', $date))
                             ->when($data['payout_to'], fn($q, $date) => $q->whereDate('payout_date', '<=', $date));
