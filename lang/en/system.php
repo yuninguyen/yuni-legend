@@ -207,6 +207,14 @@ return [
         'details' => 'View details',
     ],
 
+    // HEADING INFOLIST
+    'heading_infolist' => [
+        'email_information' => 'Email Information',
+        'account_information' => 'Account Information',
+        'paypal_information' => 'PayPal Information',
+        'source_information' => 'Detailed Information',
+    ],
+
     // NOTIFICATIONS & MODALS
     'notifications' => [
         'sync_to_google_sheet' => 'Sync to Google Sheet',
