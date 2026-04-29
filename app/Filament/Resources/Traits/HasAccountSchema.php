@@ -678,10 +678,10 @@ trait HasAccountSchema
                             : 'N/A';
 
                         $created = $record->account_created_at
-                            ? $record->account_created_at->format('d/m/Y')
+                            ? \Carbon\Carbon::parse($record->account_created_at)->format('d/m/Y')
                             : 'N/A';
                         $linked = $record->paypal_linked_at
-                            ? $record->paypal_linked_at->format('d/m/Y')
+                            ? \Carbon\Carbon::parse($record->paypal_linked_at)->format('d/m/Y')
                             : 'N/A';
 
                         return [
