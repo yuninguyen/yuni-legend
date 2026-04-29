@@ -376,7 +376,7 @@ class PayoutLogResource extends Resource
                         // CHỌN ACCOUNT (Phụ thuộc vào User ở trên)
                         Forms\Components\Select::make('account_id')
                             ->label(__('system.payout_logs.fields.source_account'))
-                            ->options(function (Forms\Get $get, ?\App\Models\PayoutLog $record) {
+                            ->options(function (Forms\Get $get, ?PayoutLog $record) {
                                 $userId = $get('user_id');
                                 if (!$userId)
                                     return [];
