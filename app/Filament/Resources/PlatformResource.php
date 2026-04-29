@@ -21,7 +21,7 @@ class PlatformResource extends Resource
 
     public static function getNavigationGroup(): ?string
     {
-        return 'settings';
+        return 'Settings';
     }
 
     public static function getNavigationLabel(): string

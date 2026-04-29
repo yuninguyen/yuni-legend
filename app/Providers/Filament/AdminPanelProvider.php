@@ -70,10 +70,6 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 \App\Filament\Pages\Dashboard::class,
             ])
-            ->resources([
-                config('filament-logger.activity_resource')
-            ])
-
             // 📊 WIDGETS
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
@@ -92,7 +88,7 @@ class AdminPanelProvider extends PanelProvider
                     ->label(__('system.nav.working_space')),
                 'wallet_payout' => NavigationGroup::make()
                     ->label(__('system.nav.wallet_payouts')),
-                'settings' => NavigationGroup::make()
+                'Settings' => NavigationGroup::make()
                     ->label(__('system.nav.settings')),
                 'logs' => NavigationGroup::make()
                     ->label(__('system.nav.logs')),

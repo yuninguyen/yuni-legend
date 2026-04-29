@@ -21,7 +21,7 @@ class UserResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
     public static function getNavigationGroup(): ?string
     {
-        return 'settings';
+        return 'Settings';
     }
 
     public static function getNavigationLabel(): string
