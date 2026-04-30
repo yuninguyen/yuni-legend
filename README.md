@@ -62,25 +62,25 @@ RebateOps is designed for team collaboration with strictly scoped access.
 ---
 
 ## 💰 Financial Operations & Workflows
-
-### 1. Withdrawal (Rút tiền về hệ thống)
-- **Kịch bản**: Khi nhân viên thực hiện rút tiền từ Platform (như Rakuten, TopCashback) về ví trung gian hoặc nhận Gift Card.
-- **Trạng thái khởi tạo**: Mặc định là `Pending`.
-- **Hỗ trợ**: Tự động nhận diện loại tài sản (PayPal balance hoặc Gift Card) để áp dụng quy trình thanh khoản tương ứng.
-
+ 
+### 1. Withdrawal (Inbound Funds)
+- **Scenario**: Triggered when staff pull funds from platforms (e.g., Rakuten, TopCashback) to intermediary wallets or receive Gift Cards.
+- **Initial Status**: Defaults to `Pending`.
+- **Logic**: Automatically identifies the asset type (PayPal balance or Gift Card) to apply the appropriate liquidation workflow.
+ 
 ### 2. Hold (Keep Code)
-- **Mục đích**: Dành cho các đơn hàng chưa muốn bán ngay (đặc biệt là Gift Card) hoặc cần giữ lại để xử lý sau.
-- **Vận hành**: Chuyển trạng thái sang `Hold`. Hệ thống vẫn ghi nhận tồn kho nhưng sẽ không đưa vào danh sách tính lương cho đến khi được thanh khoản (Exchange).
-
-### 3. Exchange to VND (Thanh khoản)
-- **Quy trình**: Chuyển đổi số dư USD trong ví/thẻ thành tiền Việt (VND) dựa trên tỷ giá thị trường.
-- **Partial Liquidation (Thanh khoản lẻ)**: 
-    - Cho phép thực hiện **nhiều lần thanh khoản** trên cùng một đơn gốc (Parent).
-    - Hữu ích khi sếp chỉ muốn bán một phần số dư ví PayPal hoặc bán lẻ mệnh giá thẻ.
-- **Kiểm soát rủi ro**:
-    - **Gift Card**: Tổng số tiền các lần thanh khoản không được vượt quá mệnh giá gốc của thẻ.
-    - **PayPal**: Cho phép linh hoạt rút theo số dư thực tế của ví.
-    - **Khóa thanh khoản**: Chức năng "Exchange to VND" sẽ tự động ẩn khi số tiền đã thanh khoản đủ 100% hoặc đơn đã được đưa vào phiếu lương (Settled).
+- **Purpose**: Designed for records that should not be sold immediately (especially Gift Cards) or need to be kept for later processing.
+- **Operation**: Switch status to `Hold`. The system still tracks inventory, but the amount won't be included in payroll calculations until it is liquidated (Exchanged).
+ 
+### 3. Exchange to VND (Liquidation)
+- **Process**: Converting USD balances from wallets/cards into Vietnamese Dong (VND) based on market exchange rates.
+- **Partial Liquidation**: 
+    - Allows for **multiple partial liquidations** on the same original record (Parent).
+    - Useful when liquidating only a portion of a PayPal wallet balance or selling small amounts of a large Gift Card.
+- **Risk Control**:
+    - **Gift Card**: The total sum of all liquidations cannot exceed the original face value of the card.
+    - **PayPal**: Allows flexible withdrawals based on the actual wallet balance.
+    - **Liquidation Locking**: The "Exchange to VND" action automatically disappears once the record is 100% liquidated or has been settled in a payment (`Settled`).
 
 ---
 
