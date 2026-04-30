@@ -1298,17 +1298,30 @@ class PayoutLogResource extends Resource
                                 return;
                             }
 
-                            $existingLiquidation = PayoutLog::query()
+                            // 🟢 TÍNH TỔNG ĐÃ THANH KHOẢN (LIQUIDATED)
+                            $totalLiquidated = PayoutLog::query()
                                 ->where('parent_id', $record->id)
                                 ->where('transaction_type', 'liquidation')
                                 ->where('status', 'completed')
-                                ->lockForUpdate()
-                                ->first();
+                                ->sum('amount_usd');
 
-                            if ($record->user_payment_id !== null || $existingLiquidation !== null) {
+                            $newAmount = (float) $data['net_amount_usd'];
+                            $limitAmount = (float) $record->net_amount_usd;
+
+                            // Nếu là PayPal, số dư ví có thể cao hơn Net của đơn này, nhưng với Gift Card thì không được vượt quá đơn gốc.
+                            if ($record->asset_type === 'gift_card' && ($totalLiquidated + $newAmount) > ($limitAmount + 0.01)) {
                                 \Filament\Notifications\Notification::make()
                                     ->title('Exchange failed!')
-                                    ->body('This payout log has already been liquidated or settled.')
+                                    ->body('Total liquidated amount exceeds the original record amount.')
+                                    ->danger()
+                                    ->send();
+                                return;
+                            }
+
+                            if ($record->user_payment_id !== null) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Exchange failed!')
+                                    ->body('This record has already been settled in a payment.')
                                     ->danger()
                                     ->send();
                                 return;

@@ -900,6 +900,8 @@ trait HasTrackerSchema
                                 ->placeholder(__('system.placeholders.store_name_example'))
                                 ->required()
                                 ->maxLength(255),
+                            Forms\Components\TextInput::make('order_id')
+                                ->label(__('system.labels.order_id')),
                             Forms\Components\TextInput::make('order_value')
                                 ->label(__('system.labels.order_value'))
                                 ->placeholder(__('system.placeholders.order_value_example'))
@@ -911,6 +913,9 @@ trait HasTrackerSchema
                                 ->suffix('%')
                                 ->reactive()
                                 ->default(10),
+                            Forms\Components\Textarea::make('detail_transaction')
+                                ->label(__('system.labels.transaction_details'))
+                                ->rows(5),
                         ])
                         ->beforeReplicaSaved(function ($replica, $data) {
                             // Ghi đè dữ liệu mới vào bản sao
