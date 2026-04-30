@@ -235,26 +235,28 @@ class PayoutMethodResource extends Resource
                                             ->label(__('system.payout_methods.fields.question_security_1'))
                                             ->placeholder(__('system.payout_methods.placeholders.select_question'))
                                             ->options([
-                                                'What\'s the nickname of your oldest child?' => 'What\'s the nickname of your oldest child?',
-                                                'What was the name of your first pet?' => 'What was the name of your first pet?',
-                                                'What\'s the name of your favorite childhood cuddly toy?' => 'What\'s the name of your favorite childhood cuddly toy?',
-                                                'What is the maiden name of grandmother?' => 'What is the maiden name of grandmother?',
-                                                'Who was your first roommate?' => 'Who was your first roommate?',
-                                                'What\'s the name of the hospital in which you were born?' => 'What\'s the name of the hospital in which you were born?',
                                                 'What was the name of your first school?' => 'What was the name of your first school?',
+                                                'What was the name of your first pet?' => 'What was the name of your first pet?',
+                                                'What\'s the name of the hospital in which you were born?' => 'What\'s the name of the hospital in which you were born?',
+                                                'What\'s the nickname of your oldest child?' => 'What\'s the nickname of your oldest child?',
+                                                'What is the middle name of your father?' => 'What is the middle name of your father?',
+                                                'What\'s the name of your favorite childhood cuddly toy?' => 'What\'s the name of your favorite childhood cuddly toy?',
+                                                'Who was your first roommate?' => 'Who was your first roommate?',
+                                                'What is the maiden name of grandmother?' => 'What is the maiden name of grandmother?',
                                             ]),
                                         Forms\Components\TextInput::make('answer_1')->label(__('system.payout_methods.fields.answer_1')),
                                         Forms\Components\Select::make('question_2')
                                             ->label(__('system.payout_methods.fields.question_security_2'))
                                             ->placeholder(__('system.payout_methods.placeholders.select_question'))
                                             ->options([
-                                                'What\'s the nickname of your oldest child?' => 'What\'s the nickname of your oldest child?',
-                                                'What was the name of your first pet?' => 'What was the name of your first pet?',
-                                                'What\'s the name of your favorite childhood cuddly toy?' => 'What\'s the name of your favorite childhood cuddly toy?',
-                                                'What is the maiden name of grandmother?' => 'What is the maiden name of grandmother?',
-                                                'Who was your first roommate?' => 'Who was your first roommate?',
-                                                'What\'s the name of the hospital in which you were born?' => 'What\'s the name of the hospital in which you were born?',
                                                 'What was the name of your first school?' => 'What was the name of your first school?',
+                                                'What was the name of your first pet?' => 'What was the name of your first pet?',
+                                                'What\'s the name of the hospital in which you were born?' => 'What\'s the name of the hospital in which you were born?',
+                                                'What\'s the nickname of your oldest child?' => 'What\'s the nickname of your oldest child?',
+                                                'What is the middle name of your father?' => 'What is the middle name of your father?',
+                                                'What\'s the name of your favorite childhood cuddly toy?' => 'What\'s the name of your favorite childhood cuddly toy?',
+                                                'Who was your first roommate?' => 'Who was your first roommate?',
+                                                'What is the maiden name of grandmother?' => 'What is the maiden name of grandmother?',
                                             ]),
                                         Forms\Components\TextInput::make('answer_2')->label(__('system.payout_methods.fields.answer_2')),
                                     ])->columns(2),
