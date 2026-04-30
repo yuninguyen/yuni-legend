@@ -29,7 +29,7 @@ RebateOps is a professional, high-performance internal tool built with **Laravel
 
 ### 🔄 Automation & UX
 - **Dynamic Bidirectional Sync**: Advanced Google Sheets integration supporting independent Spreadsheet IDs for Import and Export operations.
-- **Intelligent Email Import**: Seamless bulk onboarding via Google Sheets with automated ID generation, smart status mapping, and duplicate prevention using Email Address as a unique identifier.
+- **Intelligent Onboarding**: Bulk import for both **Emails** (7-column spec) and **Accounts** from platform-specific tabs with automated record linking and duplicate prevention.
 - **Contextual Tooltips**: Real-time platform discovery—hovering over Usage metrics instantly reveals linked platforms for every email record.
 - **Composite Grouping**: Advanced table grouping in Payout Logs by **Account + Brand**, providing a clear separated view for multi-brand accounts.
 - **Contextual UI**: "Exchange to VND" link intelligently disappears once a record is fully liquidated, preventing duplicate transactions.
@@ -152,6 +152,7 @@ REBATEOPS
 - [x] v5.4.2: Concurrency Hardening — `lockForUpdate()` on Exchange & Settlement group scope; soft-delete cascade unlinks PayoutLogs
 - [x] v5.4.3: Railway Production Stability — SQLite compatibility refactor (CONCAT/YEAR), forced HTTPS, anti-SEO hardening, and disbursement slug update.
 - [x] v5.5: Dynamic Google Sheets Integration — Independent Import/Export IDs, Intelligent Email Onboarding (7-column spec), and Contextual Hover Tooltips.
+- [x] v5.5.1: Bidirectional Account Sync — Cross-platform import, and unified UI-driven sync actions.
 ---
 
 ## 🔐 Security & Access Control

@@ -24,17 +24,36 @@ class ListAccounts extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            // Nút Import
-            \Filament\Actions\ImportAction::make()
-                ->importer(\App\Filament\Imports\AccountImporter::class)
-                ->label('Import All Data')
-                ->color('success')
-                ->icon('heroicon-o-arrow-up-tray')
-                // 🟢 THÊM DÒNG NÀY: Chỉ hiển thị nếu là Admin
-                ->visible(fn() => auth()->user()?->isAdmin()),
-
-
             $this->getSyncToSheetAction('syncAccounts', 'Accounts'),
+
+            // Nút Import từ Google Sheet
+            \Filament\Actions\Action::make('syncFromSheet')
+                ->label(__('system.notifications.sync_from_google_sheet'))
+                ->color('warning')
+                ->icon('heroicon-o-cloud-arrow-down')
+                ->requiresConfirmation()
+                ->action(function (\App\Services\GoogleSyncService $syncService) {
+                    try {
+                        $result = $syncService->importAccounts();
+                        
+                        \Filament\Notifications\Notification::make()
+                            ->title(__('system.notifications.sync_success'))
+                            ->success()
+                            ->body(__('system.notifications.sync_from_success_msg', [
+                                'updated' => $result['updated'],
+                                'created' => $result['created'],
+                                'failed' => $result['failed']
+                            ]))
+                            ->send();
+                    } catch (\Exception $e) {
+                        \Filament\Notifications\Notification::make()
+                            ->title('Synchronization Failed')
+                            ->danger()
+                            ->body($e->getMessage())
+                            ->send();
+                    }
+                })
+                ->visible(fn() => auth()->user()?->isAdmin()),
 
             // Nút Create
             \Filament\Actions\CreateAction::make(),

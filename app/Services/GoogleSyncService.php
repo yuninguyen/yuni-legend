@@ -283,8 +283,8 @@ class GoogleSyncService
     public function importEmails(?string $sheetName = null, ?string $spreadsheetId = null): array
     {
         $sheetName = $sheetName ?: 'Emails';
-        // Đọc toàn bộ dữ liệu (bao gồm cả Header để kiểm tra)
-        $rows = $this->sheetService->readSheet('A1:K', $sheetName, $spreadsheetId);
+        // Đọc toàn bộ dữ liệu (bao gồm cả Header)
+        $rows = $this->sheetService->readSheet('A:K', $sheetName, $spreadsheetId);
         
         $updated = 0;
         $created = 0;
@@ -295,12 +295,13 @@ class GoogleSyncService
             return ['updated' => 0, 'created' => 0, 'failed' => 0];
         }
 
+        // Bỏ qua hàng tiêu đề
+        array_shift($rows);
+
         foreach ($rows as $index => $row) {
-            // 1. Kiểm tra định dạng: Bỏ qua hàng tiêu đề nếu có
-            $emailRaw = trim($row[1] ?? '');
-            if ($index === 0 && (str_contains(strtolower($emailRaw), 'email') || str_contains(strtolower($emailRaw), 'địa chỉ'))) {
-                continue;
-            }
+            // Mapping dữ liệu theo cấu trúc Tab Emails:
+            // 0: ID, 1: Status, 2: Email, 3: Password, 4: Recovery Email, 5: 2FA Code, ...
+            $emailRaw = trim($row[2] ?? '');
 
             // Nếu cột Email trống thì bỏ qua
             if (empty($emailRaw) || !str_contains($emailRaw, '@')) {
@@ -309,7 +310,7 @@ class GoogleSyncService
             }
 
             try {
-                // 2. Tìm hoặc Tạo mới dựa trên Email (không dùng ID nữa)
+                // 2. Tìm hoặc Tạo mới dựa trên Email
                 $emailRecord = Email::where('email', $emailRaw)->first();
                 $isNew = false;
 
@@ -319,32 +320,30 @@ class GoogleSyncService
                     $isNew = true;
                 }
 
-                // 3. Mapping dữ liệu theo cấu trúc người dùng cung cấp:
-                // 0: Status, 1: Email, 2: Password, 3: Recovery Email, 4: 2FA Code, 5: Date Create, 6: Note
-
+                // 3. Mapping dữ liệu:
                 // Status mapping
-                $statusRaw = strtolower(trim($row[0] ?? 'active'));
+                $statusRaw = strtolower(trim($row[1] ?? 'active'));
                 $status = ($statusRaw === 'live' || $statusRaw === 'active') ? 'active' : $statusRaw;
                 if (in_array($status, ['active', 'disabled', 'locked'])) {
                     $emailRecord->status = $status;
                 }
 
                 // Password
-                if (!empty($row[2])) $emailRecord->email_password = trim($row[2]);
+                if (!empty($row[3])) $emailRecord->email_password = trim($row[3]);
 
                 // Recovery Email
-                if (isset($row[3])) $emailRecord->recovery_email = trim($row[3]) ?: null;
+                if (isset($row[4])) $emailRecord->recovery_email = trim($row[4]) ?: null;
 
                 // 2FA Code
-                if (isset($row[4])) $emailRecord->two_factor_code = trim($row[4]) ?: null;
+                if (isset($row[5])) $emailRecord->two_factor_code = trim($row[5]) ?: null;
 
                 // Date Create
-                if (!empty($row[5])) {
-                    $emailRecord->email_created_at = $this->parseDate($row[5]);
+                if (!empty($row[6])) {
+                    $emailRecord->email_created_at = $this->parseDate($row[6]);
                 }
 
-                // Note
-                if (isset($row[6])) $emailRecord->note = trim($row[6]);
+                // Note (giả sử cột 10 là Note)
+                if (isset($row[10])) $emailRecord->note = trim($row[10]);
 
                 $emailRecord->save();
 
@@ -719,8 +718,115 @@ class GoogleSyncService
     }
 
     // =========================================================================
-    // FORMATTING HELPERS
+    // ✅ CHIỀU 2: SHEET -> WEB (ACCOUNTS)
     // =========================================================================
+
+    public function importAccounts(?string $spreadsheetId = null): array
+    {
+        $id = $spreadsheetId ?? $this->sheetService->getSpreadsheetId();
+
+        $sheetMappings = [
+            'RKT_account_import' => 'Rakuten',
+            'RMN_account_import' => 'RetailMeNot',
+            'JH_account_import' => 'JoinHoney',
+            'AJ_account_import' => 'ActiveJunky',
+            'TCB_account_import' => 'TopCashback',
+            'Price_account_import' => 'Price',
+        ];
+
+        $totalUpdated = 0;
+        $totalCreated = 0;
+        $totalFailed = 0;
+        $totalSkipped = 0;
+
+        foreach ($sheetMappings as $sheetName => $platform) {
+            try {
+                $rows = $this->sheetService->readSheet('A:O', $sheetName, $id);
+                if (empty($rows)) continue;
+
+                // Bỏ qua hàng tiêu đề
+                array_shift($rows);
+
+                foreach ($rows as $index => $row) {
+                    $emailRaw = trim($row[0] ?? '');
+                    if (empty($emailRaw) || !str_contains($emailRaw, '@')) {
+                        $totalSkipped++;
+                        continue;
+                    }
+
+                    try {
+                        \Illuminate\Support\Facades\DB::transaction(function () use ($row, $platform, &$totalCreated, &$totalUpdated) {
+                            // 1. Sync Email
+                            $email = Email::firstOrNew(['email' => trim($row[0])]);
+                            $email->email_password = trim($row[1] ?? $email->email_password);
+                            $email->recovery_email = trim($row[2] ?? $email->recovery_email) ?: null;
+                            $email->two_factor_code = trim($row[3] ?? $email->two_factor_code) ?: null;
+                            $email->note = trim($row[4] ?? $email->note) ?: null;
+
+                            $statusEmailRaw = strtolower(trim($row[5] ?? 'active'));
+                            $email->status = ($statusEmailRaw === 'live' || $statusEmailRaw === 'active') ? 'active' : $statusEmailRaw;
+                            $email->save();
+
+                            // 2. Sync Account
+                            $account = Account::firstOrNew([
+                                'email_id' => $email->id,
+                                'platform' => $platform
+                            ]);
+
+                            $isNew = !$account->exists;
+
+                            $account->password = trim($row[6] ?? $account->password);
+                            $account->state = trim($row[7] ?? $account->state);
+                            $account->device = trim($row[8] ?? $account->device);
+
+                            if (!empty($row[9])) {
+                                $account->account_created_at = $this->parseDate($row[9]);
+                            }
+
+                            // Status Account (Array) - Luôn lưu lowercase
+                            if (!empty($row[10])) {
+                                $account->status = [strtolower(trim($row[10]))];
+                            }
+
+                            $account->note = trim($row[11] ?? $account->note);
+
+                            // Extra columns for Rakuten or others if present
+                            if ($platform === 'Rakuten') {
+                                if (isset($row[12])) $account->device_linked_paypal = trim($row[12]) ?: null;
+                                if (!empty($row[13])) $account->paypal_linked_at = $this->parseDate($row[13]);
+                                if (isset($row[14])) $account->paypal_info = trim($row[14]) ?: null;
+                            }
+
+                            $account->save();
+
+                            if ($isNew) {
+                                $totalCreated++;
+                            } else {
+                                $totalUpdated++;
+                            }
+                        });
+                    } catch (\Exception $e) {
+                        Log::error("Import Account Row Error [{$platform}] at index {$index}: " . $e->getMessage());
+                        $totalFailed++;
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::error("Import Sheet Error [{$sheetName}]: " . $e->getMessage());
+                $totalFailed++;
+            }
+        }
+
+        return [
+            'updated' => $totalUpdated,
+            'created' => $totalCreated,
+            'failed' => $totalFailed,
+            'skipped' => $totalSkipped
+        ];
+    }
+
+    // ==========================================
+    // FORMATTING HELPERS
+    // ==========================================
 
     protected function applySpecificTabFormatting(string $tabName): void
     {
