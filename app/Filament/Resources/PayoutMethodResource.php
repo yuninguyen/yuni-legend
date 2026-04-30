@@ -590,8 +590,6 @@ class PayoutMethodResource extends Resource
                     ->searchable()
                     ->html()
                     ->alignment(Alignment::Center)
-                    ->wrap()
-                    ->width('502px')
                     ->copyableState(function ($record) {
                         $na = __('system.n/a');
                         $labels = [
@@ -680,8 +678,8 @@ class PayoutMethodResource extends Resource
                                     <div style='margin-bottom: 4px;'>
                                         <span style='color: #6b7280; display: inline-block;'>{$labels['paypal']}:</span> 
                                         <strong style='color: #111827;'>{$payPalAccount}</strong>
-                                        <span style='color: #6b7280; display: inline-block;'> | </span> 
-                                        <strong style='color: #111827;'>{$paypalPassword}</strong>
+                                        <!-- <span style='color: #6b7280; display: inline-block;'> | </span> 
+                                        <strong style='color: #111827;'>{$paypalPassword}</strong> -->
                                     </div>
                                     <!-- <div style='margin-bottom: 4px;'>
                                         <span style='color: #6b7280; display: inline-block;'>{$labels['auth']}:</span> 

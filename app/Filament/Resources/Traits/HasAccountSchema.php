@@ -255,31 +255,46 @@ trait HasAccountSchema
                             ->placeholder(__('system.n/a')),
                         \Filament\Infolists\Components\TextEntry::make('status')
                             ->label(__('system.labels.status'))
-                            ->badge()
+                            ->html()
                             ->placeholder(__('system.n/a'))
                             ->columnSpanFull()
-                            ->color(fn(string $state): string => match ($state) {
-                                'active' => 'gray',
-                                'used' => 'info',
-                                'no_paypal_needed' => 'warning',
-                                'not_linked' => 'warning',
-                                'linked' => 'success',
-                                'limited' => 'danger',
-                                'unlinked' => 'warning',
-                                'banned' => 'danger',
-                                default => 'gray',
-                            })
-                            ->separator(',')
-                            ->formatStateUsing(fn(string $state): string => match ($state) {
-                                'active' => __('system.status.active'),
-                                'used' => __('system.status.used'),
-                                'limited' => __('system.status.paypal_limited'),
-                                'linked' => __('system.status.linked_paypal'),
-                                'unlinked' => __('system.status.unlinked_paypal'),
-                                'not_linked' => __('system.status.not_linked_paypal'),
-                                'no_paypal_needed' => __('system.status.no_paypal_required'),
-                                'banned' => __('system.status.banned'),
-                                default => __('system.status.' . $state),
+                            ->formatStateUsing(function ($state): ?string {
+                                if (blank($state)) return null;
+
+                                // Nếu là chuỗi (có thể có dấu phẩy), tách ra thành mảng. Nếu đã là mảng thì giữ nguyên.
+                                $statuses = is_array($state) 
+                                    ? $state 
+                                    : array_map('trim', explode(',', (string) $state));
+                                
+                                $html = collect($statuses)->filter()->map(function($s) {
+                                    $label = match ($s) {
+                                        'used' => __('system.status.used'),
+                                        'limited' => __('system.status.paypal_limited'),
+                                        'linked' => __('system.status.linked_paypal'),
+                                        'unlinked' => __('system.status.unlinked_paypal'),
+                                        'not_linked' => __('system.status.not_linked_paypal'),
+                                        'no_paypal_needed' => __('system.status.no_paypal_required'),
+                                        'banned' => __('system.status.banned'),
+                                        'active' => __('system.status.active'),
+                                        default => __('system.status.' . $s),
+                                    };
+
+                                    $color = match ($s) {
+                                        'active' => '#6b7280',
+                                        'used' => '#3b82f6',
+                                        'no_paypal_needed' => '#f59e0b',
+                                        'not_linked' => '#f59e0b',
+                                        'linked' => '#22c55e',
+                                        'limited' => '#ef4444',
+                                        'unlinked' => '#f59e0b',
+                                        'banned' => '#ef4444',
+                                        default => '#6b7280',
+                                    };
+
+                                    return "<span style='color: {$color}; font-weight: 600; padding: 2px 8px; border-radius: 4px);'>{$label}</span>";
+                                })->implode("<span style='margin: 0 6px; color: #94a3b8; font-weight: bold;'>→</span>");
+
+                                return $html;
                             }),
                         \Filament\Infolists\Components\TextEntry::make('note')
                             ->label(__('system.labels.note'))
@@ -433,29 +448,45 @@ trait HasAccountSchema
 
                 TextColumn::make('status')
                     ->label(__('system.labels.status'))
-                    ->badge()
                     ->alignment(Alignment::Center)
-                    ->color(fn(string $state): string => match ($state) {
-                        'active' => 'gray',
-                        'used' => 'info',
-                        'no_paypal_needed' => 'warning',
-                        'not_linked' => 'warning',
-                        'linked' => 'success',
-                        'limited' => 'danger',
-                        'unlinked' => 'warning',
-                        'banned' => 'danger',
-                        default => 'gray',
-                    })
-                    ->separator(',')
-                    ->formatStateUsing(fn(string $state): string => match ($state) {
-                        'used' => __('system.status.used'),
-                        'limited' => __('system.status.paypal_limited'),
-                        'linked' => __('system.status.linked_paypal'),
-                        'unlinked' => __('system.status.unlinked_paypal'),
-                        'not_linked' => __('system.status.not_linked_paypal'),
-                        'no_paypal_needed' => __('system.status.no_paypal_required'),
-                        'banned' => __('system.status.banned'),
-                        default => __('system.status.' . $state),
+                    ->html()
+                    ->formatStateUsing(function ($state): ?string {
+                        if (blank($state)) return null;
+
+                        // Tách chuỗi trạng thái nếu cần
+                        $statuses = is_array($state) 
+                            ? $state 
+                            : array_map('trim', explode(',', (string) $state));
+                        
+                        $html = collect($statuses)->filter()->map(function($s) {
+                            $label = match ($s) {
+                                'used' => __('system.status.used'),
+                                'limited' => __('system.status.paypal_limited'),
+                                'linked' => __('system.status.linked_paypal'),
+                                'unlinked' => __('system.status.unlinked_paypal'),
+                                'not_linked' => __('system.status.not_linked_paypal'),
+                                'no_paypal_needed' => __('system.status.no_paypal_required'),
+                                'banned' => __('system.status.banned'),
+                                'active' => __('system.status.active'),
+                                default => __('system.status.' . $s),
+                            };
+
+                            $color = match ($s) {
+                                'active' => '#6b7280', // Gray
+                                'used' => '#3b82f6',   // Info Blue
+                                'no_paypal_needed' => '#f59e0b', // Warning Orange
+                                'not_linked' => '#f59e0b',
+                                'linked' => '#22c55e',   // Success Green
+                                'limited' => '#ef4444',  // Danger Red
+                                'unlinked' => '#f59e0b',
+                                'banned' => '#ef4444',
+                                default => '#6b7280',
+                            };
+
+                            return "<span style='color: {$color}; font-weight: 600; padding: 2px 6px; border-radius: 4px;'>{$label}</span>";
+                        })->implode("<span style='margin: 0 4px; color: #94a3b8; font-weight: bold;'>→</span>");
+
+                        return $html;
                     })
                     ->tooltip(function (Tables\Columns\TextColumn $column, Account $record): string {
                         $statuses = is_array($record->status) ? $record->status : [$record->status];
