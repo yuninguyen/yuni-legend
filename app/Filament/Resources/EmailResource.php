@@ -18,6 +18,13 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Enums\FiltersLayout;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Wizard;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Placeholder;
+use Filament\Notifications\Notification;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Validator;
 
 class EmailResource extends Resource
 {
@@ -497,5 +504,215 @@ class EmailResource extends Resource
             'create' => Pages\CreateEmail::route('/create'),
             'edit' => Pages\EditEmail::route('/{record}/edit'),
         ];
+    }
+
+    // 🚀 EMAIL TXT IMPORT SPEC V1 LOGIC
+    public static function getImportAction(): Tables\Actions\Action
+    {
+        return Tables\Actions\Action::make('import_txt')
+            ->label('Import Email (TXT)')
+            ->icon('heroicon-o-arrow-up-tray')
+            ->color('info')
+            ->visible(fn() => auth()->user()?->isAdmin())
+            ->modalWidth('4xl')
+            ->form([
+                Wizard::make([
+                    Wizard\Step::make('Data Input')
+                        ->schema([
+                            Textarea::make('raw_data')
+                                ->label('Paste your TXT content here')
+                                ->placeholder("email|password|recovery|2fa|date|note|status\nabc@gmail.com|pass123|recovery@gmail.com|ABCD EFGH|30-04-2026|gmail chính|live")
+                                ->rows(15)
+                                ->required()
+                                ->helperText('Format: email|email_password|recovery_email|two_factor_code|create_date|note|status'),
+                        ]),
+                    Wizard\Step::make('Preview Summary')
+                        ->schema([
+                            Placeholder::make('preview_summary')
+                                ->label('Summary')
+                                ->content(function (Forms\Get $get) {
+                                    $raw = $get('raw_data');
+                                    if (!$raw) return 'No data provided.';
+
+                                    $lines = explode("\n", str_replace("\r", "", trim($raw)));
+                                    $summary = [
+                                        'valid' => 0,
+                                        'duplicate' => 0,
+                                        'invalid_email' => 0,
+                                        'invalid_date' => 0,
+                                        'unknown_status' => 0,
+                                        'too_many_cols' => 0,
+                                        'no_pass' => 0,
+                                    ];
+                                    $errors = [];
+
+                                    foreach ($lines as $i => $line) {
+                                        $lineNo = $i + 1;
+                                        if (empty(trim($line))) continue;
+
+                                        $cols = explode('|', trim($line));
+                                        if (count($cols) > 7) {
+                                            $summary['too_many_cols']++;
+                                            $errors[] = "Line {$lineNo}: too many columns, note cannot contain \"|\"";
+                                            continue;
+                                        }
+
+                                        $email = strtolower(trim($cols[0] ?? ''));
+                                        $pass = trim($cols[1] ?? '');
+                                        $recovery = trim($cols[2] ?? '');
+                                        $twoFactor = trim($cols[3] ?? '');
+                                        $createDate = trim($cols[4] ?? '');
+                                        $note = trim($cols[5] ?? '');
+                                        $statusRaw = strtolower(trim($cols[6] ?? 'live'));
+
+                                        // Validation rules
+                                        if (empty($pass)) {
+                                            $summary['no_pass']++;
+                                            $errors[] = "Line {$lineNo}: email_password is required";
+                                            continue;
+                                        }
+
+                                        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                                            $summary['invalid_email']++;
+                                            $errors[] = "Line {$lineNo}: invalid email format";
+                                            continue;
+                                        }
+
+                                        if (!empty($recovery) && !filter_var($recovery, FILTER_VALIDATE_EMAIL)) {
+                                            $summary['invalid_email']++;
+                                            $errors[] = "Line {$lineNo}: invalid recovery email";
+                                            continue;
+                                        }
+
+                                        if (!empty($createDate)) {
+                                            try {
+                                                Carbon::createFromFormat('d-m-Y', $createDate);
+                                            } catch (\Exception $e) {
+                                                $summary['invalid_date']++;
+                                                $errors[] = "Line {$lineNo}: create_date must be dd-mm-yyyy";
+                                                continue;
+                                            }
+                                        }
+
+                                        if (!in_array($statusRaw, ['live', 'disabled', 'locked'])) {
+                                            $summary['unknown_status']++;
+                                            $errors[] = "Line {$lineNo}: status \"{$statusRaw}\" is unknown";
+                                            continue;
+                                        }
+
+                                        // Check duplicates
+                                        if (Email::where('email', $email)->exists()) {
+                                            $summary['duplicate']++;
+                                        }
+
+                                        $summary['valid']++;
+                                    }
+
+                                    $errorHtml = !empty($errors) ? "<div style='color: #ef4444; font-size: 13px; margin-top: 10px;'><strong>Errors:</strong><ul style='list-style: disc; margin-left: 20px;'>" . implode("", array_map(fn($e) => "<li>$e</li>", array_slice($errors, 0, 10))) . (count($errors) > 10 ? "<li>... and " . (count($errors) - 10) . " more errors</li>" : "") . "</ul></div>" : "";
+
+                                    return new \Illuminate\Support\HtmlString("
+                                        <div style='background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;'>
+                                            <div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;'>
+                                                <div style='color: #22c55e;'><strong>Valid:</strong> {$summary['valid']}</div>
+                                                <div style='color: #f59e0b;'><strong>Duplicate:</strong> {$summary['duplicate']}</div>
+                                                <div style='color: #ef4444;'><strong>Invalid Email:</strong> {$summary['invalid_email']}</div>
+                                                <div style='color: #ef4444;'><strong>Invalid Date:</strong> {$summary['invalid_date']}</div>
+                                                <div style='color: #ef4444;'><strong>Unknown Status:</strong> {$summary['unknown_status']}</div>
+                                                <div style='color: #ef4444;'><strong>Column/Pass Errors:</strong> " . ($summary['too_many_cols'] + $summary['no_pass']) . "</div>
+                                            </div>
+                                            {$errorHtml}
+                                        </div>
+                                    ");
+                                }),
+                        ]),
+                ])->submitAction(new \Illuminate\Support\HtmlString('<button type="submit" class="fi-btn fi-btn-size-md fi-btn-color-primary fi-ac-btn-action">Confirm Import</button>'))
+            ])
+            ->action(function (array $data) {
+                $raw = $data['raw_data'];
+                $lines = explode("\n", str_replace("\r", "", trim($raw)));
+
+                $stats = [
+                    'created' => 0,
+                    'updated' => 0,
+                    'skipped' => 0,
+                    'failed' => 0,
+                ];
+
+                foreach ($lines as $line) {
+                    if (empty(trim($line))) continue;
+
+                    $cols = explode('|', trim($line));
+                    if (count($cols) > 7) { $stats['failed']++; continue; }
+
+                    $email = strtolower(trim($cols[0] ?? ''));
+                    $pass = trim($cols[1] ?? '');
+                    $recovery = trim($cols[2] ?? '');
+                    $twoFactor = trim($cols[3] ?? '');
+                    $createDateRaw = trim($cols[4] ?? '');
+                    $note = trim($cols[5] ?? '');
+                    $statusRaw = strtolower(trim($cols[6] ?? 'live'));
+
+                    // Double validation
+                    if (empty($pass) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $stats['failed']++;
+                        continue;
+                    }
+
+                    // Mapping Status
+                    $status = [
+                        'live' => 'active',
+                        'disabled' => 'disabled',
+                        'locked' => 'locked',
+                    ][$statusRaw] ?? 'active';
+
+                    // Mapping Date
+                    $emailCreatedAt = null;
+                    if (!empty($createDateRaw)) {
+                        try {
+                            $emailCreatedAt = Carbon::createFromFormat('d-m-Y', $createDateRaw)->format('Y-m-d');
+                        } catch (\Exception $e) {}
+                    }
+
+                    $existing = Email::where('email', $email)->first();
+
+                    if ($existing) {
+                        // Fill missing only mode
+                        $updates = [];
+                        if (empty($existing->email_password)) $updates['email_password'] = $pass;
+                        if (empty($existing->recovery_email) && !empty($recovery)) $updates['recovery_email'] = $recovery;
+                        if (empty($existing->two_factor_code) && !empty($twoFactor)) $updates['two_factor_code'] = $twoFactor;
+                        if (empty($existing->email_created_at) && $emailCreatedAt) $updates['email_created_at'] = $emailCreatedAt;
+                        if (empty($existing->note) && !empty($note)) $updates['note'] = $note;
+                        // Status is rarely "empty" so we usually keep existing if it's already set to something else
+                        // But if spec says "Fill missing only", and status defaults to active, we usually don't overwrite.
+                        
+                        if (!empty($updates)) {
+                            $existing->update($updates);
+                            $stats['updated']++;
+                        } else {
+                            $stats['skipped']++;
+                        }
+                    } else {
+                        // Create new
+                        Email::create([
+                            'email' => $email,
+                            'email_password' => $pass,
+                            'recovery_email' => $recovery,
+                            'two_factor_code' => $twoFactor,
+                            'email_created_at' => $emailCreatedAt,
+                            'note' => $note,
+                            'status' => $status,
+                        ]);
+                        $stats['created']++;
+                    }
+                }
+
+                Notification::make()
+                    ->title('Import Completed')
+                    ->body("Created: {$stats['created']}\nUpdated missing fields: {$stats['updated']}\nSkipped: {$stats['skipped']}\nFailed: {$stats['failed']}")
+                    ->success()
+                    ->persistent()
+                    ->send();
+            });
     }
 }

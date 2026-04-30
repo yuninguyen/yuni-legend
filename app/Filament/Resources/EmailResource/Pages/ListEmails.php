@@ -26,30 +26,8 @@ class ListEmails extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            // Nút Import
-            \Filament\Actions\ImportAction::make()
-                ->importer(\App\Filament\Imports\EmailImporter::class)
-                ->label('Import All Data')
-                ->color('success')
-                ->icon('heroicon-o-arrow-up-tray')
-                ->modalHeading('Upload Email Database')
-                ->modalDescription(fn() => new HtmlString('
-                    <div class="text-sm space-y-2">
-                        <p class="font-medium text-gray-700">Supported formats: .csv, .xlsx, and .txt</p>
-                        <div>
-                            <a href="/templates/email_template.csv" class="text-primary-600 underline hover:text-primary-500">
-                                Download CSV Template
-                            </a>
-                        </div>
-                        <div>
-                            <a href="/templates/email_template.txt" class="text-primary-600 underline hover:text-primary-500">
-                                Download TXT Template
-                            </a>
-                        </div>
-                    </div>
-                '))
-                // 🟢 CHỈ HIỆN CHO ADMIN
-                ->visible(fn() => auth()->user()?->isAdmin()),
+            // 🚀 NEW: CUSTOM TXT IMPORT ACTION (Spec v1)
+            EmailResource::getImportAction(),
 
 
             //Nút Sync to Google Sheet
