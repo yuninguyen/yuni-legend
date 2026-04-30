@@ -1490,8 +1490,9 @@ class PayoutLogResource extends Resource
                         ])
                         ->action(function (Collection $records, array $data) {
                             $paymentGenerated = false;
+                            $allProcessedIds = [];
 
-                            DB::transaction(function () use ($records, $data, &$paymentGenerated) {
+                            DB::transaction(function () use ($records, $data, &$paymentGenerated, &$allProcessedIds) {
 
                                 // 1. Chỉ lọc đơn hợp lệ: Đã Completed và Chưa bị chốt sổ
                                 // 🚀 SECURITY FIX: Dùng lockForUpdate() để tránh tranh chấp khi có 2 admin cùng bấm nút
@@ -1502,11 +1503,6 @@ class PayoutLogResource extends Resource
                                     ->get();
 
                                 if ($validSelected->isEmpty()) {
-                                    Notification::make()
-                                        ->title('Settlement Failed!')
-                                        ->body('No valid records found (Requires "Completed" status and not yet settled).')
-                                        ->danger()
-                                        ->send();
                                     return;
                                 }
 
@@ -1514,13 +1510,12 @@ class PayoutLogResource extends Resource
                                 $parentIds = $validSelected->map(fn($log) => $log->parent_id ?? $log->id)->unique();
 
                                 // Lấy lại danh sách các đơn Gốc (Parent) sạch sẽ từ Database
-                                // 🟢 FIX: Cho phép lấy Parent kể cả khi Parent ĐÃ bị settled, để giải quyết các Child tới sau
                                 $parentLogs = PayoutLog::whereIn('id', $parentIds)
                                     ->with(['account', 'payoutMethod'])
                                     ->lockForUpdate()
                                     ->get();
 
-                                // 2. GOM NHÓM THÔNG MINH (Chỉ gom các đơn Gốc)
+                                // 2. GOM NHÓM THÔNG MINH
                                 $groupedLogs = $parentLogs->groupBy(function ($log) {
                                     $platform = $log->account?->platform ?? 'unknown';
                                     return $log->user_id . '_' .
@@ -1546,19 +1541,15 @@ class PayoutLogResource extends Resource
 
                                     $totalUsd = 0;
                                     $totalVndMarket = 0;
-
                                     $parentIdsToUpdate = [];
                                     $childIdsToUpdate = [];
 
-                                    // 🟢 QUÉT TỪNG ĐƠN GỐC ĐỂ TÍNH TIỀN
                                     foreach ($logs as $log) {
                                         /** @var \App\Models\PayoutLog $log */
-                                        // 🟢 CHỈ LẤY CÁC CON THANH KHOẢN CHƯA BỊ CHỐT SỔ (user_payment_id IS NULL)
                                         $liquidationChildren = $log->children()
                                             ->where('transaction_type', 'liquidation')
                                             ->where('status', 'completed')
                                             ->whereNull('user_payment_id')
-                                            ->lockForUpdate()
                                             ->get();
 
                                         $usd = 0;
@@ -1567,13 +1558,10 @@ class PayoutLogResource extends Resource
                                         if ($liquidationChildren->isNotEmpty()) {
                                             $usd = (float) $liquidationChildren->sum('net_amount_usd');
                                             $vndMarket = (float) $liquidationChildren->sum('total_vnd');
-
-                                            // Lưu lại hết IDs con để chốt sổ (không cho thanh khoản nữa)
                                             foreach ($liquidationChildren as $child) {
                                                 $childIdsToUpdate[] = $child->id;
                                             }
                                         } else {
-                                            // 🟢 CHỈ THANH TOÁN PARENT NẾU PARENT CHƯA BỊ CHỐT SỔ
                                             if (is_null($log->user_payment_id)) {
                                                 $usd = (float) $log->net_amount_usd;
                                                 $vndMarket = (float) $log->total_vnd;
@@ -1585,57 +1573,57 @@ class PayoutLogResource extends Resource
                                         $totalVndMarket += $vndMarket;
                                     }
 
-                                    // 🟢 Nếu cả Parent và Children đều đã chốt sổ hết => Skip nhóm này
-                                    if ($totalUsd <= 0) {
-                                        continue;
-                                    }
+                                    if ($totalUsd <= 0) continue;
 
-                                    // Tính tỷ giá thị trường trung bình
                                     $averageMarketRate = $totalUsd > 0 ? round($totalVndMarket / $totalUsd, 2) : 0;
-
-                                    // Lấy tỷ giá trả user từ form (nếu không nhập thì lấy bằng tỷ giá thị trường)
                                     $payoutRate = (float) ($data['manual_payout_rate'] ?? $averageMarketRate);
                                     $payoutPercentage = (float) ($data['payout_percentage'] ?? 100);
-
-                                    // Tiền thực trả = (Số lượng USD * Tỷ giá chi trả) * (% chi trả / 100)
                                     $totalVndPayout = floor(($totalUsd * $payoutRate) * ($payoutPercentage / 100));
-
-                                    // Profit của Gin = (Tỷ giá thanh khoản - Tỷ giá trả user) * (Số lượng USD * % chi trả)
-                                    // Công thức: (MarketRate - PayoutRate) * TotalUSD * (PayoutPercentage / 100)
                                     $profitVnd = floor(($averageMarketRate - $payoutRate) * $totalUsd * ($payoutPercentage / 100));
 
-                                    // 4. TẠO PHIẾU LƯƠNG
                                     $payment = \App\Models\UserPayment::create([
                                         'user_id' => $firstLog->user_id,
                                         'platform' => $platformName,
                                         'asset_group' => $firstLog->asset_type === 'gift_card' ? 'gift_card' : 'paypal',
                                         'transaction_type' => ($firstLog->asset_type === 'gift_card' ? 'Gift Card' : 'PayPal') . " ({$sourceName})",
                                         'total_usd' => $totalUsd,
-                                        'exchange_rate' => $averageMarketRate, // Lưu Market Rate để đối soát
-                                        'payout_rate' => $payoutRate,        // Lưu Payout Rate
-                                        'payout_percentage' => $payoutPercentage, // Lưu tỷ lệ chi trả
-                                        'total_vnd' => $totalVndPayout,      // Số tiền thực trả User
-                                        'profit_vnd' => $profitVnd,          // Số tiền lãi
+                                        'exchange_rate' => $averageMarketRate,
+                                        'payout_rate' => $payoutRate,
+                                        'payout_percentage' => $payoutPercentage,
+                                        'total_vnd' => $totalVndPayout,
+                                        'profit_vnd' => $profitVnd,
                                         'status' => 'pending',
                                     ]);
 
                                     $paymentGenerated = true;
 
-                                    // 5. CẬP NHẬT ID PHIẾU LƯƠNG ĐỂ KHÓA ĐƠN
-                                    PayoutLog::whereIn('id', $parentIdsToUpdate)->update(['user_payment_id' => $payment->id]);
-
+                                    if (!empty($parentIdsToUpdate)) {
+                                        PayoutLog::whereIn('id', $parentIdsToUpdate)->update(['user_payment_id' => $payment->id]);
+                                        $allProcessedIds = array_merge($allProcessedIds, $parentIdsToUpdate);
+                                    }
                                     if (!empty($childIdsToUpdate)) {
                                         PayoutLog::whereIn('id', $childIdsToUpdate)->update(['user_payment_id' => $payment->id]);
+                                        $allProcessedIds = array_merge($allProcessedIds, $childIdsToUpdate);
                                     }
                                 }
-
                             });
 
                             if ($paymentGenerated) {
+                                // 🚀 SYNC LÊN SHEETS (CHẠY NGẦM)
+                                foreach (array_unique($allProcessedIds) as $id) {
+                                    \App\Jobs\SyncGoogleSheetJob::dispatch($id, PayoutLog::class);
+                                }
+
                                 Notification::make()
                                     ->title('Settlement Successful!')
-                                    ->body('Payout rates and profits have been calculated correctly.')
+                                    ->body('Payout rates calculated and sync jobs dispatched.')
                                     ->success()
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('Settlement Failed!')
+                                    ->body('No valid records were processed.')
+                                    ->danger()
                                     ->send();
                             }
                         })
