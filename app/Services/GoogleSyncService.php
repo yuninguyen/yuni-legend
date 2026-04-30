@@ -11,6 +11,8 @@ use App\Models\Platform;
 use App\Filament\Resources\Traits\HasUsStates;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Log;
 
 class GoogleSyncService
 {
@@ -36,6 +38,29 @@ class GoogleSyncService
             return Carbon::parse($date)->format($format);
         } catch (\Exception $e) {
             return 'N/A';
+        }
+    }
+
+    /**
+     * Chuyển đổi ngày từ định dạng d/m/Y (Sheet) sang Y-m-d (Database)
+     */
+    protected function parseDate(?string $date): ?string
+    {
+        if (!$date || $date === 'N/A') return null;
+
+        try {
+            // Thử parse theo định dạng d/m/Y H:i:s hoặc d/m/Y
+            if (str_contains($date, ':')) {
+                return Carbon::createFromFormat('d/m/Y H:i:s', trim($date))->format('Y-m-d H:i:s');
+            }
+            return Carbon::createFromFormat('d/m/Y', trim($date))->format('Y-m-d');
+        } catch (\Exception $e) {
+            // Nếu lỗi format, thử parse tự động bằng Carbon
+            try {
+                return Carbon::parse($date)->format('Y-m-d');
+            } catch (\Exception $e2) {
+                return null;
+            }
         }
     }
 
@@ -135,9 +160,11 @@ class GoogleSyncService
         ];
     }
 
-    public function syncAccounts($records = null): array
+    public function syncAccounts($records = null, ?string $spreadsheetId = null): array
     {
-        if ($records === null) {
+        if ($records instanceof Builder) {
+            $records = $records->with(['email', 'user'])->get();
+        } elseif ($records === null) {
             $records = Account::with(['email', 'user'])->get();
         }
 
@@ -150,12 +177,12 @@ class GoogleSyncService
             $targetTab = ucfirst($platform) . '_Accounts';
             $rows = $items->map(fn($r) => $this->formatAccount($r))->values()->toArray();
 
-            $this->sheetService->createSheetIfNotExist($targetTab);
-            $result = $this->sheetService->upsertRows($rows, $targetTab, self::$accountHeaders);
+            $this->sheetService->createSheetIfNotExist($targetTab, $spreadsheetId);
+            $result = $this->sheetService->upsertRows($rows, $targetTab, self::$accountHeaders, $spreadsheetId);
 
-            $this->sheetService->formatColumnsAsClip($targetTab, 5, 6);   // Note (Email)
-            $this->sheetService->formatColumnsAsClip($targetTab, 14, 15); // Platform Note
-            $this->sheetService->formatColumnsAsClip($targetTab, 17, 18); // Personal Information
+            $this->sheetService->formatColumnsAsClip($targetTab, 5, 6, $spreadsheetId);   // Note (Email)
+            $this->sheetService->formatColumnsAsClip($targetTab, 14, 15, $spreadsheetId); // Platform Note
+            $this->sheetService->formatColumnsAsClip($targetTab, 17, 18, $spreadsheetId); // Personal Information
 
             $totalUpdated += $result['updated'];
             $totalAppended += $result['appended'];
@@ -215,20 +242,22 @@ class GoogleSyncService
         ];
     }
 
-    public function syncEmails($records = null): array
+    public function syncEmails($records = null, ?string $sheetName = null, ?string $spreadsheetId = null): array
     {
-        if ($records === null) {
+        if ($records instanceof Builder) {
+            $records = $records->with(['accounts'])->get();
+        } elseif ($records === null) {
             // Eager load accounts and their nested info to avoid N+1 and get platforms
             $records = Email::with(['accounts'])->get();
         }
 
-        $targetTab = 'Emails';
+        $targetTab = $sheetName ?: 'Emails';
         // Hoist Platform lookup outside the loop to avoid N+1 queries
         $platforms_map = Platform::pluck('name', 'slug')->toArray();
         $rows = collect($records)->map(fn($r) => $this->formatEmail($r, $platforms_map))->values()->toArray();
 
-        $this->sheetService->createSheetIfNotExist($targetTab);
-        $result = $this->sheetService->upsertRows($rows, $targetTab, self::$emailHeaders);
+        $this->sheetService->createSheetIfNotExist($targetTab, $spreadsheetId);
+        $result = $this->sheetService->upsertRows($rows, $targetTab, self::$emailHeaders, $spreadsheetId);
 
 
         // 🎨 Format Status colors (Live, Disabled, Locked)
@@ -237,13 +266,106 @@ class GoogleSyncService
             'Live' => ['red' => 0.85, 'green' => 0.95, 'blue' => 0.85], // Light Green
             'Disabled' => ['red' => 1.0, 'green' => 0.8, 'blue' => 0.8],  // Light Red
             'Locked' => ['red' => 0.9, 'green' => 0.4, 'blue' => 0.4],  // Deep Red
-        ]);
+        ], $spreadsheetId);
 
         // ✂️ Column clipping (Keep it neat)
-        $this->sheetService->formatColumnsAsClip($targetTab, 2, 4);   // Email Address, Password
-        $this->sheetService->formatColumnsAsClip($targetTab, 9, 11);  // Platforms, Note
+        $this->sheetService->formatColumnsAsClip($targetTab, 2, 4, $spreadsheetId);   // Email Address, Password
+        $this->sheetService->formatColumnsAsClip($targetTab, 9, 11, $spreadsheetId);  // Platforms, Note
 
         return $result;
+    }
+
+    /**
+     * ✅ CHIỀU 2: SHEET -> WEB
+     * Đồng bộ dữ liệu từ Google Sheet (Tab Emails) về Database.
+     * Dựa trên ID để tìm và cập nhật bản ghi hiện có.
+     */
+    public function importEmails(?string $sheetName = null, ?string $spreadsheetId = null): array
+    {
+        $sheetName = $sheetName ?: 'Emails';
+        // Đọc toàn bộ dữ liệu (bao gồm cả Header để kiểm tra)
+        $rows = $this->sheetService->readSheet('A1:K', $sheetName, $spreadsheetId);
+        
+        $updated = 0;
+        $created = 0;
+        $skipped = 0;
+        $failed = 0;
+
+        if (empty($rows)) {
+            return ['updated' => 0, 'created' => 0, 'failed' => 0];
+        }
+
+        foreach ($rows as $index => $row) {
+            // 1. Kiểm tra định dạng: Bỏ qua hàng tiêu đề nếu có
+            $emailRaw = trim($row[1] ?? '');
+            if ($index === 0 && (str_contains(strtolower($emailRaw), 'email') || str_contains(strtolower($emailRaw), 'địa chỉ'))) {
+                continue;
+            }
+
+            // Nếu cột Email trống thì bỏ qua
+            if (empty($emailRaw) || !str_contains($emailRaw, '@')) {
+                $skipped++;
+                continue;
+            }
+
+            try {
+                // 2. Tìm hoặc Tạo mới dựa trên Email (không dùng ID nữa)
+                $emailRecord = Email::where('email', $emailRaw)->first();
+                $isNew = false;
+
+                if (!$emailRecord) {
+                    $emailRecord = new Email();
+                    $emailRecord->email = $emailRaw;
+                    $isNew = true;
+                }
+
+                // 3. Mapping dữ liệu theo cấu trúc người dùng cung cấp:
+                // 0: Status, 1: Email, 2: Password, 3: Recovery Email, 4: 2FA Code, 5: Date Create, 6: Note
+
+                // Status mapping
+                $statusRaw = strtolower(trim($row[0] ?? 'active'));
+                $status = ($statusRaw === 'live' || $statusRaw === 'active') ? 'active' : $statusRaw;
+                if (in_array($status, ['active', 'disabled', 'locked'])) {
+                    $emailRecord->status = $status;
+                }
+
+                // Password
+                if (!empty($row[2])) $emailRecord->email_password = trim($row[2]);
+
+                // Recovery Email
+                if (isset($row[3])) $emailRecord->recovery_email = trim($row[3]) ?: null;
+
+                // 2FA Code
+                if (isset($row[4])) $emailRecord->two_factor_code = trim($row[4]) ?: null;
+
+                // Date Create
+                if (!empty($row[5])) {
+                    $emailRecord->email_created_at = $this->parseDate($row[5]);
+                }
+
+                // Note
+                if (isset($row[6])) $emailRecord->note = trim($row[6]);
+
+                $emailRecord->save();
+
+                if ($isNew) {
+                    $created++;
+                } else {
+                    $updated++;
+                }
+
+            } catch (\Exception $e) {
+                Log::error("Import Email Row Error at index {$index}: " . $e->getMessage());
+                $failed++;
+            }
+        }
+
+        return [
+            'updated' => $updated,
+            'created' => $created,
+            'failed' => $failed,
+            'skipped' => $skipped
+        ];
     }
 
     // =========================================================================
@@ -403,7 +525,7 @@ class GoogleSyncService
         if ($records === null) {
             $records = PayoutLog::with(['account.email', 'payoutMethod'])->orderBy('created_at', 'desc')->get();
         } elseif ($records instanceof \Illuminate\Support\Collection || is_array($records)) {
-            $records = \Illuminate\Database\Eloquent\Collection::make($records);
+            $records = Collection::make($records);
             $records->load(['account.email', 'payoutMethod']);
         }
 
@@ -497,7 +619,7 @@ class GoogleSyncService
         if ($records === null) {
             $records = RebateTracker::with(['account.email', 'user'])->get();
         } elseif ($records instanceof \Illuminate\Support\Collection || is_array($records)) {
-            $records = \Illuminate\Database\Eloquent\Collection::make($records);
+            $records = Collection::make($records);
             $records->load(['account.email', 'user']);
         }
 

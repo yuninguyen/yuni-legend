@@ -103,26 +103,27 @@ class GoogleSheetService
     /**
      * Hàm phụ trợ: Tự động lấy tên Tab đầu tiên trong file Google Sheet
      */
-    private function getFirstSheetName()
+    private function getFirstSheetName(?string $spreadsheetId = null)
     {
-        $sheets = $this->getCachedSheetInfo();
+        $sheets = $this->getCachedSheetInfo($spreadsheetId);
         return array_key_first($sheets);
     }
 
     // ==========================================
     //  CHIỀU 1: WEB -> SHEET (Thêm một dòng mới)
     // ==========================================
-    public function appendRow(array $data, ?string $sheetName = null)
+    public function appendRow(array $data, ?string $sheetName = null, ?string $spreadsheetId = null)
     {
         try {
-            $targetSheet = $sheetName ?? $this->getFirstSheetName();
+            $id = $spreadsheetId ?? $this->spreadsheetId;
+            $targetSheet = $sheetName ?? $this->getFirstSheetName($id);
 
             $values = [$data];
             $body = new ValueRange(['values' => $values]);
             $params = ['valueInputOption' => 'RAW'];
 
             $result = $this->service->spreadsheets_values->append(
-                $this->spreadsheetId,
+                $id,
                 "'{$targetSheet}'!A1",
                 $body,
                 $params
@@ -153,16 +154,17 @@ class GoogleSheetService
     // ==========================================
     // TÃNH NÄ‚NG Má»šI: ThÃªm NHIá»€U dÃ²ng cÃ¹ng lÃºc (DÃ¹ng cho Bulk Action Filament)
     // ==========================================
-    public function appendMultipleRows(array $dataRows, ?string $sheetName = null)
+    public function appendMultipleRows(array $dataRows, ?string $sheetName = null, ?string $spreadsheetId = null)
     {
         try {
-            $targetSheet = $sheetName ?? $this->getFirstSheetName();
+            $id = $spreadsheetId ?? $this->spreadsheetId;
+            $targetSheet = $sheetName ?? $this->getFirstSheetName($id);
 
             $body = new ValueRange(['values' => $dataRows]);
             $params = ['valueInputOption' => 'RAW'];
 
             $result = $this->service->spreadsheets_values->append(
-                $this->spreadsheetId,
+                $id,
                 "'{$targetSheet}'!A1",
                 $body,
                 $params
@@ -195,23 +197,24 @@ class GoogleSheetService
     // ==========================================
     // CẬP NHẬT SHEET (Ghi đè lại toàn bộ)
     // ==========================================
-    public function updateSheet(array $values, $range = 'A1:AC', ?string $sheetName = null)
+    public function updateSheet(array $values, $range = 'A1:AC', ?string $sheetName = null, ?string $spreadsheetId = null)
     {
         try {
-            $targetSheet = trim($sheetName ?? $this->getFirstSheetName());
+            $id = $spreadsheetId ?? $this->spreadsheetId;
+            $targetSheet = trim($sheetName ?? $this->getFirstSheetName($id));
             $safeSheetName = "'" . str_replace("'", "''", $targetSheet) . "'";
 
             $this->service->spreadsheets_values->clear(
-                $this->spreadsheetId,
+                $id,
                 "{$safeSheetName}!A1:AC",
-                new \Google\Service\Sheets\ClearValuesRequest()
+                new ClearValuesRequest()
             );
 
-            $body = new \Google\Service\Sheets\ValueRange(['values' => $values]);
+            $body = new ValueRange(['values' => $values]);
             $fullRange = "{$safeSheetName}!{$range}";
 
             return $this->service->spreadsheets_values->update(
-                $this->spreadsheetId,
+                $id,
                 $fullRange,
                 $body,
                 ['valueInputOption' => 'RAW']
@@ -235,13 +238,14 @@ class GoogleSheetService
     // ==========================================
     // TÃNH NÄ‚NG: UPSERT (Tá»± Ä‘á»™ng tÃ¬m ID Ä‘á»ƒ Update hoáº·c Append náº¿u má»›i)
     // ==========================================
-    public function upsertRows(array $dataRows, ?string $sheetName = null, ?array $headers = null)
+    public function upsertRows(array $dataRows, ?string $sheetName = null, ?array $headers = null, ?string $spreadsheetId = null)
     {
         try {
-            $targetSheet = $sheetName ?? $this->getFirstSheetName();
+            $id = $spreadsheetId ?? $this->spreadsheetId;
+            $targetSheet = $sheetName ?? $this->getFirstSheetName($id);
             $safeSheetName = "'" . str_replace("'", "''", $targetSheet) . "'";
 
-            $existingIds = $this->readSheet('A2:A', $targetSheet);
+            $existingIds = $this->readSheet('A2:A', $targetSheet, $id);
 
             $idMap = [];
             if (!empty($existingIds)) {
@@ -264,12 +268,12 @@ class GoogleSheetService
                     $row[] = ($val === null) ? '' : (string) $val;
                 }
 
-                $id = isset($row[0]) ? (string) $row[0] : '';
+                $recordId = isset($row[0]) ? (string) $row[0] : '';
 
-                if ($id !== '' && isset($idMap[$id])) {
-                    $rowNumber = $idMap[$id];
+                if ($recordId !== '' && isset($idMap[$recordId])) {
+                    $rowNumber = $idMap[$recordId];
 
-                    $vr = new \Google\Service\Sheets\ValueRange();
+                    $vr = new ValueRange();
                     $vr->setRange("{$safeSheetName}!A{$rowNumber}");
                     $vr->setValues([$row]);
                     $updateData[] = $vr;
@@ -283,7 +287,7 @@ class GoogleSheetService
                 $batchRequest->setValueInputOption('RAW');
                 $batchRequest->setData($updateData);
 
-                $this->service->spreadsheets_values->batchUpdate($this->spreadsheetId, $batchRequest);
+                $this->service->spreadsheets_values->batchUpdate($id, $batchRequest);
             }
 
 
@@ -295,9 +299,9 @@ class GoogleSheetService
             }
 
             if (!empty($appendData)) {
-                $body = new \Google\Service\Sheets\ValueRange(['values' => $appendData]);
+                $body = new ValueRange(['values' => $appendData]);
                 $this->service->spreadsheets_values->append(
-                    $this->spreadsheetId,
+                    $id,
                     "{$safeSheetName}!A1",
                     $body,
                     ['valueInputOption' => 'RAW']
@@ -310,15 +314,17 @@ class GoogleSheetService
             ];
         } catch (\Google\Service\Exception $e) {
             Log::error('Google Sheets API Error - Upsert Rows', [
+                'spreadsheet_id' => $id,
+                'sheet' => $targetSheet,
                 'error' => $e->getMessage(),
                 'row_count' => count($dataRows),
-                'sheet' => $sheetName
             ]);
-            throw new \Exception('Failed to upsert data to Google Sheets: ' . $e->getMessage());
+            throw new \Exception("Failed to upsert data to Google Sheets [ID: {$id}, Sheet: {$targetSheet}]: " . $e->getMessage());
         } catch (\Exception $e) {
             Log::error('Unexpected error in upsertRows', [
+                'spreadsheet_id' => $id,
+                'sheet' => $targetSheet,
                 'error' => $e->getMessage(),
-                'sheet' => $sheetName
             ]);
             throw $e;
         }
@@ -327,10 +333,11 @@ class GoogleSheetService
     // ==========================================
     // TÃNH NÄ‚NG Äá»ŠNH Dáº NG: Ã‰p kiá»ƒu hiá»ƒn thá»‹ chá»¯ thÃ nh "Clip" (Cáº¯t bá»›t)
     // ==========================================
-    public function formatColumnsAsClip(string $sheetName, int $startColIndex, int $endColIndex)
+    public function formatColumnsAsClip(string $sheetName, int $startColIndex, int $endColIndex, ?string $spreadsheetId = null)
     {
+        $id = $spreadsheetId ?? $this->spreadsheetId;
         // 🟢 FIX N+1: Lấy ID từ Cache cực nhanh
-        $sheetId = $this->getSheetIdByName($sheetName);
+        $sheetId = $this->getSheetIdByName($sheetName, $id);
         if ($sheetId === null)
             return;
 
@@ -358,26 +365,27 @@ class GoogleSheetService
             'requests' => $requests
         ]);
 
-        $this->service->spreadsheets->batchUpdate($this->spreadsheetId, $batchUpdateRequest);
+        $this->service->spreadsheets->batchUpdate($id, $batchUpdateRequest);
     }
 
     // ==========================================
     // TÃNH NÄ‚NG Äá»ŠNH Dáº NG: TÃ¬m Ä‘Ãºng dÃ²ng Ä‘Ã³ vÃ  XÃ³a bá» hoÃ n toÃ n
     // ==========================================
-    public function deleteRowsByIds(array $ids, ?string $sheetName = null)
+    public function deleteRowsByIds(array $ids, ?string $sheetName = null, ?string $spreadsheetId = null)
     {
         if (empty($ids))
             return;
 
         try {
-            $targetSheet = $sheetName ?? $this->getFirstSheetName();
+            $id = $spreadsheetId ?? $this->spreadsheetId;
+            $targetSheet = $sheetName ?? $this->getFirstSheetName($id);
 
             // 🟢 FIX N+1: Lấy ID từ Cache cực nhanh
-            $sheetId = $this->getSheetIdByName($targetSheet);
+            $sheetId = $this->getSheetIdByName($targetSheet, $id);
             if ($sheetId === null)
                 return;
 
-            $existingData = $this->readSheet('A1:A', $targetSheet);
+            $existingData = $this->readSheet('A1:A', $targetSheet, $id);
             $indicesToDelete = [];
 
             if (!empty($existingData)) {
@@ -412,7 +420,7 @@ class GoogleSheetService
                 'requests' => $requests
             ]);
 
-            $result = $this->service->spreadsheets->batchUpdate($this->spreadsheetId, $batchUpdateRequest);
+            $result = $this->service->spreadsheets->batchUpdate($id, $batchUpdateRequest);
 
             Log::info('Successfully deleted rows from Google Sheets', [
                 'sheet' => $targetSheet,
@@ -440,13 +448,14 @@ class GoogleSheetService
     // ==========================================
     // CHIá»€U 2: SHEET -> WEB (Äá»c dá»¯ liá»‡u)
     // ==========================================
-    public function readSheet($range = 'A2:AC', ?string $sheetName = null)
+    public function readSheet($range = 'A2:AC', ?string $sheetName = null, ?string $spreadsheetId = null)
     {
         try {
-            $targetSheet = $sheetName ?? $this->getFirstSheetName();
+            $id = $spreadsheetId ?? $this->spreadsheetId;
+            $targetSheet = $sheetName ?? $this->getFirstSheetName($id);
             $fullRange = "'{$targetSheet}'!{$range}";
 
-            $response = $this->service->spreadsheets_values->get($this->spreadsheetId, $fullRange);
+            $response = $this->service->spreadsheets_values->get($id, $fullRange);
             $values = $response->getValues();
 
             Log::info('Successfully read data from Google Sheets', [
@@ -489,10 +498,11 @@ class GoogleSheetService
     }
 
     // Hàm kiểm tra và tự tạo Tab nếu chưa có
-    public function createSheetIfNotExist(string $sheetName)
+    public function createSheetIfNotExist(string $sheetName, ?string $spreadsheetId = null)
     {
         // ðŸŸ¢ Äá»c tá»« Cache thay vÃ¬ gá»i API
-        $sheets = $this->getCachedSheetInfo();
+        $id = $spreadsheetId ?? $this->spreadsheetId;
+        $sheets = $this->getCachedSheetInfo($id);
 
         if (array_key_exists($sheetName, $sheets)) {
             return; // ÄÃ£ tá»“n táº¡i, thoÃ¡t ra
@@ -507,10 +517,10 @@ class GoogleSheetService
             ]
         ]);
 
-        $this->service->spreadsheets->batchUpdate($this->spreadsheetId, $body);
+        $this->service->spreadsheets->batchUpdate($id, $body);
 
         // ðŸŸ¢ QUAN TRá»ŒNG: Vá»«a táº¡o Tab má»›i xong thÃ¬ pháº£i Ä‘áº­p bá» Cache cÅ© Ä‘á»ƒ nÃ³ láº¥y láº¡i danh sÃ¡ch má»›i
-        \Illuminate\Support\Facades\Cache::forget('sheet_info_' . $this->spreadsheetId);
+        \Illuminate\Support\Facades\Cache::forget('sheet_info_' . $id);
     }
 
     /**
@@ -518,9 +528,10 @@ class GoogleSheetService
      * Tô màu theo quy tắc linh hoạt
      * $rules: Mảng chứa [ 'Tên trạng thái' => [màu RGB] ]
      */
-    public function applyFormattingWithRules(string $sheetName, int $statusColIndex, array $rules)
+    public function applyFormattingWithRules(string $sheetName, int $statusColIndex, array $rules, ?string $spreadsheetId = null)
     {
-        $sheetId = $this->getSheetIdByName($sheetName);
+        $id = $spreadsheetId ?? $this->spreadsheetId;
+        $sheetId = $this->getSheetIdByName($sheetName, $id);
         if ($sheetId === null) {
             return;
         }
@@ -528,7 +539,7 @@ class GoogleSheetService
         $colLetter = chr(65 + $statusColIndex);
 
         // 1. Lấy danh sách các lệnh XÓA Rule cũ (để tránh tích lũy vô hạn - BUG #2)
-        $requests = $this->getDeleteConditionalFormatRulesRequests($sheetId);
+        $requests = $this->getDeleteConditionalFormatRulesRequests($sheetId, $id);
 
         // 2. Thêm các lệnh THÊM Rule mới
         foreach ($rules as $status => $color) {
@@ -550,15 +561,16 @@ class GoogleSheetService
         }
 
         $batchUpdateRequest = new \Google\Service\Sheets\BatchUpdateSpreadsheetRequest(['requests' => $requests]);
-        return $this->service->spreadsheets->batchUpdate($this->spreadsheetId, $batchUpdateRequest);
+        return $this->service->spreadsheets->batchUpdate($id, $batchUpdateRequest);
     }
 
     /**
      * Lấy danh sách Request để xóa toàn bộ Conditional Format Rules hiện tại của một Sheet
      */
-    private function getDeleteConditionalFormatRulesRequests(int $sheetId): array
+    private function getDeleteConditionalFormatRulesRequests(int $sheetId, ?string $spreadsheetId = null): array
     {
-        $spreadsheet = $this->service->spreadsheets->get($this->spreadsheetId);
+        $id = $spreadsheetId ?? $this->spreadsheetId;
+        $spreadsheet = $this->service->spreadsheets->get($id);
         $requests = [];
 
         foreach ($spreadsheet->getSheets() as $sheet) {
@@ -588,12 +600,13 @@ class GoogleSheetService
     /**
      * 🟢 HÀM MỚI: Lấy danh sách Sheet lưu vào Cache 60 phút
      */
-    private function getCachedSheetInfo()
+    private function getCachedSheetInfo(?string $spreadsheetId = null)
     {
-        $cacheKey = 'sheet_info_' . $this->spreadsheetId;
+        $id = $spreadsheetId ?? $this->spreadsheetId;
+        $cacheKey = 'sheet_info_' . $id;
 
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () {
-            $spreadsheet = $this->service->spreadsheets->get($this->spreadsheetId);
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($id) {
+            $spreadsheet = $this->service->spreadsheets->get($id);
             $info = [];
             foreach ($spreadsheet->getSheets() as $sheet) {
                 // Lưu thành mảng: ['Tên Tab' => ID_Của_Tab]
@@ -606,9 +619,9 @@ class GoogleSheetService
     /**
      * ðŸŸ¢ Láº¥y ID tá»« Cache thay vÃ¬ gá»i API liÃªn tá»¥c
      */
-    private function getSheetIdByName(string $sheetName): ?int
+    private function getSheetIdByName(string $sheetName, ?string $spreadsheetId = null): ?int
     {
-        $sheets = $this->getCachedSheetInfo();
+        $sheets = $this->getCachedSheetInfo($spreadsheetId);
 
         return $sheets[$sheetName] ?? null;
     }

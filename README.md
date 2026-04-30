@@ -28,9 +28,12 @@ RebateOps is a professional, high-performance internal tool built with **Laravel
 - **At-Rest Encryption**: Sensitive data (Gift Card codes, passwords) are encrypted using Laravel's native encryption.
 
 ### 🔄 Automation & UX
+- **Dynamic Bidirectional Sync**: Advanced Google Sheets integration supporting independent Spreadsheet IDs for Import and Export operations.
+- **Intelligent Email Import**: Seamless bulk onboarding via Google Sheets with automated ID generation, smart status mapping, and duplicate prevention using Email Address as a unique identifier.
+- **Contextual Tooltips**: Real-time platform discovery—hovering over Usage metrics instantly reveals linked platforms for every email record.
 - **Composite Grouping**: Advanced table grouping in Payout Logs by **Account + Brand**, providing a clear separated view for multi-brand accounts.
 - **Contextual UI**: "Exchange to VND" link intelligently disappears once a record is fully liquidated, preventing duplicate transactions.
-- **Queue-Powered Sync**: Real-time bidirectional sync with Google Sheets (3x retry, 60s backoff).
+- **Queue-Powered Sync**: Real-time synchronization with Google Sheets (3x retry, 60s backoff).
 - **Smart Formatting**: Automatic sheet tab creation, frozen headers, and status-based conditional coloring.
 - **Language-Independent Nav**: Strict sidebar hierarchy (Dashboard → Resource → Work → Wallet → Settings → Logs) enforced regardless of active locale.
 - **Activity Logging**: Full audit trail for Admin oversight on every data mutation.
@@ -97,12 +100,11 @@ REBATEOPS
 │   ├── Payout Logs       # Withdrawals & Liquidations
 │   ├── Payout Methods    # Virtual Wallets
 │   └── Disbursement      # Disbursement (User Payments) Payroll
-├── LOGS                  # Audit Trail (Admin only)
-│   └── Activity Logs     # System audit
 └── SETTINGS              # System Core (Admin only)
     ├── Users             # User Management
     ├── Platforms         # Platform Configuration
-    └── Brands            # Brand Management
+    ├── Brands            # Brand Management
+    └── Activity Logs     # System audit
 ```
 
 ---
@@ -126,13 +128,17 @@ REBATEOPS
    cp .env.example .env
    php artisan key:generate
    ```
-3. **Database**:
+3. **Google Configuration**:
+   ```bash
+   GOOGLE_SPREADSHEET_ID=primary_export_id
+   GOOGLE_IMPORT_SPREADSHEET_ID=primary_import_id
+   GOOGLE_SERVICE_ACCOUNT_PATH=storage/app/google-auth.json
+   ```
+4. **Database**:
    ```bash
    touch database/database.sqlite
    php artisan migrate --force
    ```
-4. **Google Auth**:
-   Place your service account JSON at `storage/app/google-auth.json`.
 
 ---
 
@@ -145,6 +151,7 @@ REBATEOPS
 - [x] v5.4.1: Security Patch — Policy registration, operator precedence, cascade forceDelete, email validation
 - [x] v5.4.2: Concurrency Hardening — `lockForUpdate()` on Exchange & Settlement group scope; soft-delete cascade unlinks PayoutLogs
 - [x] v5.4.3: Railway Production Stability — SQLite compatibility refactor (CONCAT/YEAR), forced HTTPS, anti-SEO hardening, and disbursement slug update.
+- [x] v5.5: Dynamic Google Sheets Integration — Independent Import/Export IDs, Intelligent Email Onboarding (7-column spec), and Contextual Hover Tooltips.
 ---
 
 ## 🔐 Security & Access Control

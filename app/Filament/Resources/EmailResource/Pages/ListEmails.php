@@ -33,6 +33,9 @@ class ListEmails extends ListRecords
             //Nút Sync to Google Sheet
             $this->getSyncToSheetAction('syncEmails', 'Emails'),
 
+            //Nút Sync FROM Google Sheet
+            $this->getSyncFromSheetAction('importEmails', 'Emails'),
+
             // Nút Create
             \Filament\Actions\CreateAction::make()
             ->visible(fn() => auth()->user()?->isAdmin()),

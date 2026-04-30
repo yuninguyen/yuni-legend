@@ -37,6 +37,7 @@ return [
 
     'google' => [
         'spreadsheet_id' => env('GOOGLE_SPREADSHEET_ID'),
+        'import_spreadsheet_id' => env('GOOGLE_IMPORT_SPREADSHEET_ID'),
         'service_account_path' => env('GOOGLE_SERVICE_ACCOUNT_PATH', storage_path('app/google-auth.json')),
     ],
 

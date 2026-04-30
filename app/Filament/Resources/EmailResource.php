@@ -211,9 +211,9 @@ class EmailResource extends Resource
                         $email = e($record->email);
                         $twoFA = e($record->two_factor_code ?? __('system.n/a'));
                         $note = e($record->note ?? __('system.n/a'));
-                        $dateCreate = $record->email_created_at instanceof \Carbon\Carbon
+                        $dateCreate = $record->email_created_at instanceof Carbon
                             ? $record->email_created_at->format('d/m/Y')
-                            : ($record->email_created_at ? \Carbon\Carbon::parse($record->email_created_at)->format('d/m/Y') : __('system.n/a'));
+                            : ($record->email_created_at ? Carbon::parse($record->email_created_at)->format('d/m/Y') : __('system.n/a'));
 
                         return "
                             <div style='text-align: left; font-size: 13px; line-height: 1.6; min-width: 250px; white-space: normal; word-break: break-all;'>
@@ -259,6 +259,7 @@ class EmailResource extends Resource
                 Tables\Columns\TextColumn::make('provider')
                     ->label(__('system.labels.provider'))
                     ->alignment(Alignment::Center)
+                    ->copyable()
                     ->toggleable()
                     // Tự động viết hoa chữ cái đầu (outlook -> Outlook)
                     ->formatStateUsing(fn(string $state): string => ucfirst($state)),
@@ -271,24 +272,20 @@ class EmailResource extends Resource
                     ->alignment(Alignment::Center)
                     ->formatStateUsing(fn($state) => $state > 0 ? "{$state}" : __('system.n/a'))
                     ->color(fn($state) => $state > 0 ? 'success' : 'secondary')
+                    ->tooltip(function (Email $record): ?string {
+                        $count = $record->accounts()->count();
+                        if ($count === 0) return null;
+                        
+                        $platforms_map = \App\Models\Platform::pluck('name', 'slug')->toArray();
+                        $platforms = $record->accounts->pluck('platform')
+                            ->unique()
+                            ->map(fn($s) => $platforms_map[$s] ?? $s)
+                            ->implode(', ');
+                            
+                        return $platforms ?: null;
+                    })
                     ->wrap()
                     ->toggleable(), // Cho phép ẩn/hiện cột này
-
-                // Hiển thị các tài khoản đang dùng email này, nếu có
-                Tables\Columns\TextColumn::make('accounts.platform')
-                    ->label(__('system.labels.platform'))
-                    ->placeholder(__('system.n/a')) // Nếu không có tài khoản nào đang dùng email này
-                    ->alignment(Alignment::Center)
-                    ->extraHeaderAttributes(['style' => 'width: 110px; min-width: 110px'])
-                    ->extraAttributes(['style' => 'width: 110px; min-width: 110px'])
-                    ->formatStateUsing(function ($state) {
-                        if (!$state)
-                            return 'N/A';
-                        $platforms_map = \App\Models\Platform::pluck('name', 'slug')->toArray();
-                        $items = is_array($state) ? $state : explode(', ', (string) $state);
-                        return collect($items)->map(fn($s) => $platforms_map[$s] ?? $s)->implode(', ');
-                    }) // Nếu có nhiều platform sẽ nối bằng dấu phẩy
-                    ->toggleable(), // Cho phép ẩn/hiện cột này 
             ])
 
             ->persistFiltersInSession() // Ghi nhớ bộ lọc trong phiên làm việc
@@ -383,7 +380,7 @@ class EmailResource extends Resource
 
                             $livewire->dispatch('copy-to-clipboard', text: $info);
 
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->title(__('system.actions.copied'))
                                 ->success()
                                 ->send();
@@ -406,13 +403,13 @@ class EmailResource extends Resource
                             try {
                                 $result = $syncService->syncEmails($records);
 
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title(__('system.notifications.sync_success'))
                                     ->body(__('system.notifications.sync_success_msg', ['count' => count($records)]))
                                     ->success()
                                     ->send();
                             } catch (\Exception $e) {
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title('Sync Error!')
                                     ->body($e->getMessage())
                                     ->danger()
@@ -471,7 +468,7 @@ class EmailResource extends Resource
                             $livewire->dispatch('copy-to-clipboard', text: $output);
 
                             // Thông báo thành công
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->title(__('system.actions.copied'))
                                 ->success()
                                 ->send();
@@ -507,9 +504,9 @@ class EmailResource extends Resource
     }
 
     // 🚀 EMAIL TXT IMPORT SPEC V1 LOGIC
-    public static function getImportAction(): Tables\Actions\Action
+    public static function getImportAction(): Action
     {
-        return Tables\Actions\Action::make('import_txt')
+        return Action::make('import_txt')
             ->label('Import Email (TXT)')
             ->icon('heroicon-o-arrow-up-tray')
             ->color('info')
