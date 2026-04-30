@@ -133,8 +133,8 @@ class PayoutLogResource extends Resource
                 return;
 
             // 🟢 TỰ ĐỘNG TÌM VỊ TRÍ CỘT ĐỂ TRÁNH LỆCH KHI THÊM CỘT SAU NÀY
-            $statusIdx = array_search('Status', \App\Services\GoogleSyncService::$payoutLogHeaders);
-            $noteIdx = array_search('Note', \App\Services\GoogleSyncService::$payoutLogHeaders);
+            $statusIdx = array_search('Status', GoogleSyncService::$payoutLogHeaders);
+            $noteIdx = array_search('Note', GoogleSyncService::$payoutLogHeaders);
 
             $count = 0;
             foreach ($rows as $row) {
@@ -1310,7 +1310,7 @@ class PayoutLogResource extends Resource
 
                             // Nếu là PayPal, số dư ví có thể cao hơn Net của đơn này, nhưng với Gift Card thì không được vượt quá đơn gốc.
                             if ($record->asset_type === 'gift_card' && ($totalLiquidated + $newAmount) > ($limitAmount + 0.01)) {
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title('Exchange failed!')
                                     ->body('Total liquidated amount exceeds the original record amount.')
                                     ->danger()
@@ -1319,7 +1319,7 @@ class PayoutLogResource extends Resource
                             }
 
                             if ($record->user_payment_id !== null) {
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title('Exchange failed!')
                                     ->body('This record has already been settled in a payment.')
                                     ->danger()
@@ -1438,13 +1438,13 @@ class PayoutLogResource extends Resource
                             try {
                                 $syncService->syncPayoutLogs($records);
 
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title('Sync Logs Success!')
                                     ->body('Synced ' . count($records) . ' transaction(s) to Google Sheets.')
                                     ->success()
                                     ->send();
                             } catch (\Exception $e) {
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title('Sync Error!')
                                     ->body($e->getMessage())
                                     ->danger()
@@ -1458,7 +1458,7 @@ class PayoutLogResource extends Resource
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->requiresConfirmation()
-                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                        ->action(function (Collection $records) {
                             $records->filter(fn($r) => $r->user_payment_id === null)->each->update(['status' => 'completed']);
 
                             // Gợi ý: Gọi Job để sync tất cả lên Sheet sau khi update xong
@@ -1488,7 +1488,7 @@ class PayoutLogResource extends Resource
                                 ->default(100)
                                 ->helperText('💡 Percentage of the total value to pay the user (e.g. 35% of USD * Rate).'),
                         ])
-                        ->action(function (\Illuminate\Database\Eloquent\Collection $records, array $data) {
+                        ->action(function (Collection $records, array $data) {
                             $paymentGenerated = false;
 
                             DB::transaction(function () use ($records, $data, &$paymentGenerated) {
@@ -1502,7 +1502,7 @@ class PayoutLogResource extends Resource
                                     ->get();
 
                                 if ($validSelected->isEmpty()) {
-                                    \Filament\Notifications\Notification::make()
+                                    Notification::make()
                                         ->title('Settlement Failed!')
                                         ->body('No valid records found (Requires "Completed" status and not yet settled).')
                                         ->danger()
@@ -1632,7 +1632,7 @@ class PayoutLogResource extends Resource
                             });
 
                             if ($paymentGenerated) {
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title('Settlement Successful!')
                                     ->body('Payout rates and profits have been calculated correctly.')
                                     ->success()
@@ -1644,7 +1644,7 @@ class PayoutLogResource extends Resource
                     Tables\Actions\RestoreBulkAction::make(),     // 🟢 Khôi phục nhiều dòng
                     Tables\Actions\ForceDeleteBulkAction::make()
                         ->visible(fn() => auth()->user()?->isAdmin())
-                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                        ->action(function (Collection $records) {
                             $unlockedRecords = $records->filter(function ($record) {
                                 $settledSum = floatval($record->settled_children_sum ?? 0);
                                 $netAmount = floatval($record->net_amount_usd ?? 0);
@@ -1662,7 +1662,7 @@ class PayoutLogResource extends Resource
                             $unlockedRecords->each->forceDelete();
                         }),
                     Tables\Actions\DeleteBulkAction::make()
-                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                        ->action(function (Collection $records) {
                             $unlockedRecords = $records->filter(function ($record) {
                                 $settledSum = floatval($record->settled_children_sum ?? 0);
                                 $netAmount = floatval($record->net_amount_usd ?? 0);
