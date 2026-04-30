@@ -7,6 +7,9 @@ use App\Filament\Resources\PayoutLogResource\RelationManagers;
 use App\Models\PayoutLog;
 use App\Models\PayoutMethod;
 use App\Models\Account;
+use App\Models\User;
+use App\Services\GoogleSyncService;
+use Illuminate\Database\Eloquent\Collection;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -361,7 +364,7 @@ class PayoutLogResource extends Resource
                         Forms\Components\Select::make('user_id')
                             ->label(__('system.labels.user'))
                             ->placeholder(__('system.payout_logs.fields.select_user_first'))
-                            ->options(\App\Models\User::whereHas('rebateTrackers')->pluck('name', 'id'))
+                            ->options(User::whereHas('rebateTrackers')->pluck('name', 'id'))
                             ->searchable()
                             // 🟢 THIẾU DÒNG NÀY: Tự động gán ID của người đang đăng nhập
                             ->default(fn() => auth()->id())
@@ -1008,7 +1011,7 @@ class PayoutLogResource extends Resource
                     ->label(__('system.labels.user'))
                     ->visible(fn() => auth()->user()?->isAdmin() || auth()->user()?->isFinance()) // 🟢 HIỆN CHO ADMIN & FINANCE
                     ->options(
-                        fn() => \App\Models\User::query()
+                        fn() => User::query()
                             ->whereIn('id', PayoutLog::distinct()->pluck('user_id'))
                             ->pluck('name', 'id')
                             ->toArray()
@@ -1418,7 +1421,7 @@ class PayoutLogResource extends Resource
                         ->color('success')
                         ->visible(fn() => auth()->user()?->isAdmin() || auth()->user()?->isFinance())
                         ->requiresConfirmation()
-                        ->action(function (\Illuminate\Database\Eloquent\Collection $records, \App\Services\GoogleSyncService $syncService) {
+                        ->action(function (Collection $records, GoogleSyncService $syncService) {
                             try {
                                 $syncService->syncPayoutLogs($records);
 
