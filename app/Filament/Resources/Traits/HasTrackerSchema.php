@@ -895,8 +895,22 @@ trait HasTrackerSchema
                         ->color('success')
                         // Có thể yêu cầu điền thông tin mới trước khi tạo
                         ->form([
-                            Forms\Components\TextInput::make('store_name')->required(),
-                            Forms\Components\TextInput::make('order_value')->numeric()->required(),
+                            Forms\Components\TextInput::make('store_name')
+                                ->label(__('system.labels.store_name'))
+                                ->placeholder(__('system.placeholders.store_name_example'))
+                                ->required()
+                                ->maxLength(255),
+                            Forms\Components\TextInput::make('order_value')
+                                ->label(__('system.labels.order_value'))
+                                ->placeholder(__('system.placeholders.order_value_example'))
+                                ->numeric()
+                                ->required(),
+                            Forms\Components\TextInput::make('cashback_percent')
+                                ->label(__('system.labels.cashback_percent'))
+                                ->numeric()
+                                ->suffix('%')
+                                ->reactive()
+                                ->default(10),
                         ])
                         ->beforeReplicaSaved(function ($replica, $data) {
                             // Ghi đè dữ liệu mới vào bản sao
