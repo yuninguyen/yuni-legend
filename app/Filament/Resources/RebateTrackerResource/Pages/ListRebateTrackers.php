@@ -17,6 +17,7 @@ class ListRebateTrackers extends ListRecords
     {
         return [
             $this->getSyncToSheetAction('syncTrackers', __('system.trackers.all_rebate')),
+            $this->getImportTrackersFromSheetAction(),
             // 2. NÚT TẠO MỚI MẶC ĐỊNH CỦA FILAMENT (MÀU CAM)
             Actions\CreateAction::make()
                 ->label(__('system.trackers.create', ['tracker' => strtolower(__('system.trackers.all_rebate'))])),

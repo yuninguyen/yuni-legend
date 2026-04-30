@@ -104,4 +104,46 @@ trait HasSyncToSheetAction
                 }
             });
     }
+
+    /**
+     * Tạo Action để đồng bộ Tracker TỪ Google Sheet về Database (Tất cả platform)
+     */
+    protected function getImportTrackersFromSheetAction(): Action
+    {
+        return Action::make('sync_from_google_sheet_trackers')
+            ->label(__('system.notifications.sync_from_google_sheet'))
+            ->icon('heroicon-o-cloud-arrow-down')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading(__('system.notifications.sync_from_google_sheet'))
+            ->modalDescription(__('system.notifications.sync_from_confirm_msg'))
+            ->modalSubmitActionLabel(__('system.account_claim.submit'))
+            ->visible(fn() => auth()->user()?->isAdmin())
+            ->action(function () {
+                try {
+                    $syncService = app(GoogleSyncService::class);
+                    $result = $syncService->importTrackers();
+
+                    Notification::make()
+                        ->title(__('system.notifications.sync_success'))
+                        ->body(__('system.notifications.sync_from_success_msg', [
+                            'updated' => $result['updated'],
+                            'created' => $result['created'],
+                            'failed' => $result['failed']
+                        ]))
+                        ->success()
+                        ->send();
+
+                } catch (\Exception $e) {
+                    Log::error("Manual Import Trackers Error: " . $e->getMessage());
+
+                    Notification::make()
+                        ->title(__('system.notifications.sync_error'))
+                        ->body($e->getMessage())
+                        ->danger()
+                        ->persistent()
+                        ->send();
+                }
+            });
+    }
 }

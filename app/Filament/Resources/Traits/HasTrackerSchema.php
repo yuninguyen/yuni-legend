@@ -200,25 +200,28 @@ trait HasTrackerSchema
                                 if (empty($statuses))
                                     return __('system.n/a');
                                 $htmlResult = collect($statuses)->map(function ($status, $index) use ($statuses) {
-                                    $color = match ($status) {
-                                        'active' => '#6b7280',
-                                        'used' => '#3b82f6',
-                                        'no_paypal_needed' => '#1e3a8a',
-                                        'not_linked', 'unlinked' => '#f59e0b',
-                                        'linked' => '#22c55e',
-                                        'limited', 'banned' => '#ef4444',
+                                    $s_lower = strtolower($status);
+                                    $color = match ($s_lower) {
+                                        'active', 'live' => '#6b7280',
+                                        'used', 'in_use' => '#3b82f6',
+                                        'no_paypal_needed', 'no_paypal_required' => '#1e3a8a',
+                                        'not_linked', 'not_linked_paypal' => '#f59e0b',
+                                        'unlinked', 'unlinked_paypal' => '#f59e0b',
+                                        'linked', 'linked_paypal' => '#22c55e',
+                                        'limited', 'paypal_limited' => '#ef4444',
+                                        'banned' => '#ef4444',
                                         default => '#6b7280'
                                     };
-                                    $label = match ($status) {
-                                        'active' => __('system.status.active'),
-                                        'used' => __('system.status.used'),
-                                        'no_paypal_needed' => __('system.status.no_paypal_required'),
-                                        'not_linked' => __('system.status.not_linked_paypal'),
-                                        'unlinked' => __('system.status.unlinked_paypal'),
-                                        'linked' => __('system.status.linked_paypal'),
-                                        'limited' => __('system.status.paypal_limited'),
+                                    $label = match ($s_lower) {
+                                        'used', 'in_use' => __('system.status.used'),
+                                        'limited', 'paypal_limited' => __('system.status.paypal_limited'),
+                                        'linked', 'linked_paypal' => __('system.status.linked_paypal'),
+                                        'unlinked', 'unlinked_paypal' => __('system.status.unlinked_paypal'),
+                                        'not_linked', 'not_linked_paypal' => __('system.status.not_linked_paypal'),
+                                        'no_paypal_needed', 'no_paypal_required' => __('system.status.no_paypal_required'),
                                         'banned' => __('system.status.banned'),
-                                        default => __('system.status.' . $status)
+                                        'active', 'live' => __('system.status.active'),
+                                        default => __('system.status.' . $s_lower)
                                     };
                                     $arrow = ($index < count($statuses) - 1) ? " <span style='color: #d1d5db; margin: 0 4px;'>→</span> " : "";
                                     return "<span style='color: {$color}; font-weight: 800; font-size: 0.85rem;'>{$label}</span>{$arrow}";
@@ -376,26 +379,29 @@ trait HasTrackerSchema
                                     : json_decode($account->status, true) ?? [$account->status];
 
                                 $htmlResult = collect($statusHistory)->map(function ($status, $index) use ($statusHistory) {
-                                    $color = match ($status) {
-                                        'active' => '#6b7280',
-                                        'used' => '#3b82f6',
-                                        'no_paypal_needed' => '#1e3a8a',
-                                        'not_linked', 'unlinked' => '#f59e0b',
-                                        'linked' => '#22c55e',
-                                        'limited', 'banned' => '#ef4444',
+                                    $s_lower = strtolower($status);
+                                    $color = match ($s_lower) {
+                                        'active', 'live' => '#6b7280',
+                                        'used', 'in_use' => '#3b82f6',
+                                        'no_paypal_needed', 'no_paypal_required' => '#1e3a8a',
+                                        'not_linked', 'not_linked_paypal' => '#f59e0b',
+                                        'unlinked', 'unlinked_paypal' => '#f59e0b',
+                                        'linked', 'linked_paypal' => '#22c55e',
+                                        'limited', 'paypal_limited' => '#ef4444',
+                                        'banned' => '#ef4444',
                                         default => '#6b7280'
                                     };
 
-                                    $label = match ($status) {
-                                        'active' => __('system.status.active'),
-                                        'used' => __('system.status.used'),
-                                        'no_paypal_needed' => __('system.status.no_paypal_required'),
-                                        'not_linked' => __('system.status.not_linked_paypal'),
-                                        'unlinked' => __('system.status.unlinked_paypal'),
-                                        'linked' => __('system.status.linked_paypal'),
-                                        'limited' => __('system.status.paypal_limited'),
+                                    $label = match ($s_lower) {
+                                        'used', 'in_use' => __('system.status.used'),
+                                        'limited', 'paypal_limited' => __('system.status.paypal_limited'),
+                                        'linked', 'linked_paypal' => __('system.status.linked_paypal'),
+                                        'unlinked', 'unlinked_paypal' => __('system.status.unlinked_paypal'),
+                                        'not_linked', 'not_linked_paypal' => __('system.status.not_linked_paypal'),
+                                        'no_paypal_needed', 'no_paypal_required' => __('system.status.no_paypal_required'),
                                         'banned' => __('system.status.banned'),
-                                        default => __('system.status.' . $status)
+                                        'active', 'live' => __('system.status.active'),
+                                        default => __('system.status.' . $s_lower)
                                     };
 
                                     $isLast = $index === count($statusHistory) - 1;

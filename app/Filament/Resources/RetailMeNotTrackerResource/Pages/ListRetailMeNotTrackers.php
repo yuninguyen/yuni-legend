@@ -15,6 +15,7 @@ class ListRetailMeNotTrackers extends ListRecords
     {
         return [
             $this->getSyncToSheetAction('syncTrackers', __('system.trackers.retail_me_not')),
+            $this->getImportTrackersFromSheetAction(),
             Actions\CreateAction::make()
                 ->label(__('system.trackers.create', ['tracker' => strtolower(__('system.trackers.retail_me_not'))])),
         ];

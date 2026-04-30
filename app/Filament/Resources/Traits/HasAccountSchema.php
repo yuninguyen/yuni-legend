@@ -267,31 +267,32 @@ trait HasAccountSchema
                                     : array_map('trim', explode(',', (string) $state));
                                 
                                 $html = collect($statuses)->filter()->map(function($s) {
-                                    $label = match ($s) {
-                                        'used' => __('system.status.used'),
-                                        'limited' => __('system.status.paypal_limited'),
-                                        'linked' => __('system.status.linked_paypal'),
-                                        'unlinked' => __('system.status.unlinked_paypal'),
-                                        'not_linked' => __('system.status.not_linked_paypal'),
-                                        'no_paypal_needed' => __('system.status.no_paypal_required'),
+                                    $s_lower = strtolower($s);
+                                    $label = match ($s_lower) {
+                                        'used', 'in_use' => __('system.status.used'),
+                                        'limited', 'paypal_limited' => __('system.status.paypal_limited'),
+                                        'linked', 'linked_paypal' => __('system.status.linked_paypal'),
+                                        'unlinked', 'unlinked_paypal' => __('system.status.unlinked_paypal'),
+                                        'not_linked', 'not_linked_paypal' => __('system.status.not_linked_paypal'),
+                                        'no_paypal_needed', 'no_paypal_required' => __('system.status.no_paypal_required'),
                                         'banned' => __('system.status.banned'),
-                                        'active' => __('system.status.active'),
-                                        default => __('system.status.' . $s),
+                                        'active', 'live' => __('system.status.active'),
+                                        default => __('system.status.' . $s_lower),
                                     };
 
-                                    $color = match ($s) {
-                                        'active' => '#6b7280',
-                                        'used' => '#3b82f6',
-                                        'no_paypal_needed' => '#f59e0b',
-                                        'not_linked' => '#f59e0b',
-                                        'linked' => '#22c55e',
-                                        'limited' => '#ef4444',
-                                        'unlinked' => '#f59e0b',
+                                    $color = match ($s_lower) {
+                                        'active', 'live' => '#6b7280',
+                                        'used', 'in_use' => '#3b82f6',
+                                        'no_paypal_needed', 'no_paypal_required' => '#f59e0b',
+                                        'not_linked', 'not_linked_paypal' => '#f59e0b',
+                                        'linked', 'linked_paypal' => '#22c55e',
+                                        'limited', 'paypal_limited' => '#ef4444',
+                                        'unlinked', 'unlinked_paypal' => '#f59e0b',
                                         'banned' => '#ef4444',
                                         default => '#6b7280',
                                     };
 
-                                    return "<span style='color: {$color}; font-weight: 600; padding: 2px 8px; border-radius: 4px);'>{$label}</span>";
+                                    return "<span style='color: {$color}; font-weight: 600; padding: 2px 8px; border-radius: 4px;'>{$label}</span>";
                                 })->implode("<span style='margin: 0 6px; color: #94a3b8; font-weight: bold;'>→</span>");
 
                                 return $html;
@@ -459,26 +460,27 @@ trait HasAccountSchema
                             : array_map('trim', explode(',', (string) $state));
                         
                         $html = collect($statuses)->filter()->map(function($s) {
-                            $label = match ($s) {
-                                'used' => __('system.status.used'),
-                                'limited' => __('system.status.paypal_limited'),
-                                'linked' => __('system.status.linked_paypal'),
-                                'unlinked' => __('system.status.unlinked_paypal'),
-                                'not_linked' => __('system.status.not_linked_paypal'),
-                                'no_paypal_needed' => __('system.status.no_paypal_required'),
+                            $s_lower = strtolower($s);
+                            $label = match ($s_lower) {
+                                'used', 'in_use' => __('system.status.used'),
+                                'limited', 'paypal_limited' => __('system.status.paypal_limited'),
+                                'linked', 'linked_paypal' => __('system.status.linked_paypal'),
+                                'unlinked', 'unlinked_paypal' => __('system.status.unlinked_paypal'),
+                                'not_linked', 'not_linked_paypal' => __('system.status.not_linked_paypal'),
+                                'no_paypal_needed', 'no_paypal_required' => __('system.status.no_paypal_required'),
                                 'banned' => __('system.status.banned'),
-                                'active' => __('system.status.active'),
-                                default => __('system.status.' . $s),
+                                'active', 'live' => __('system.status.active'),
+                                default => __('system.status.' . $s_lower),
                             };
 
-                            $color = match ($s) {
-                                'active' => '#6b7280', // Gray
-                                'used' => '#3b82f6',   // Info Blue
-                                'no_paypal_needed' => '#f59e0b', // Warning Orange
-                                'not_linked' => '#f59e0b',
-                                'linked' => '#22c55e',   // Success Green
-                                'limited' => '#ef4444',  // Danger Red
-                                'unlinked' => '#f59e0b',
+                            $color = match ($s_lower) {
+                                'active', 'live' => '#6b7280', // Gray
+                                'used', 'in_use' => '#3b82f6',   // Info Blue
+                                'no_paypal_needed', 'no_paypal_required' => '#f59e0b', // Warning Orange
+                                'not_linked', 'not_linked_paypal' => '#f59e0b',
+                                'linked', 'linked_paypal' => '#22c55e',   // Success Green
+                                'limited', 'paypal_limited' => '#ef4444',  // Danger Red
+                                'unlinked', 'unlinked_paypal' => '#f59e0b',
                                 'banned' => '#ef4444',
                                 default => '#6b7280',
                             };

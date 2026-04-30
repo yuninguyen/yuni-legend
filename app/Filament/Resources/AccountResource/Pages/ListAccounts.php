@@ -36,7 +36,7 @@ class ListAccounts extends ListRecords
                     try {
                         $result = $syncService->importAccounts();
                         
-                        \Filament\Notifications\Notification::make()
+                        Notification::make()
                             ->title(__('system.notifications.sync_success'))
                             ->success()
                             ->body(__('system.notifications.sync_from_success_msg', [
@@ -46,7 +46,7 @@ class ListAccounts extends ListRecords
                             ]))
                             ->send();
                     } catch (\Exception $e) {
-                        \Filament\Notifications\Notification::make()
+                        Notification::make()
                             ->title('Synchronization Failed')
                             ->danger()
                             ->body($e->getMessage())

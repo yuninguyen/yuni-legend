@@ -37,6 +37,7 @@ RebateOps is a professional, high-performance internal tool built with **Laravel
 - **Smart Formatting**: Automatic sheet tab creation, frozen headers, and status-based conditional coloring.
 - **Language-Independent Nav**: Strict sidebar hierarchy (Dashboard → Resource → Work → Wallet → Settings → Logs) enforced regardless of active locale.
 - **Activity Logging**: Full audit trail for Admin oversight on every data mutation.
+- **Advanced Rebate Tracking**: Robust parsing of status timelines from Google Sheets with automated mapping to localized system keys and semantic color coding (Green/Orange/Blue) across both Table and Infolist views.
 
 ---
 
@@ -153,6 +154,7 @@ REBATEOPS
 - [x] v5.4.3: Railway Production Stability — SQLite compatibility refactor (CONCAT/YEAR), forced HTTPS, anti-SEO hardening, and disbursement slug update.
 - [x] v5.5: Dynamic Google Sheets Integration — Independent Import/Export IDs, Intelligent Email Onboarding (7-column spec), and Contextual Hover Tooltips.
 - [x] v5.5.1: Bidirectional Account Sync — Cross-platform import, and unified UI-driven sync actions.
+- [x] v5.5.2: Advanced Rebate Tracking — Robust status timeline parsing, high-resiliency regex-based sanitization, and case-insensitive cross-context UI visualization.
 ---
 
 ## 🔐 Security & Access Control

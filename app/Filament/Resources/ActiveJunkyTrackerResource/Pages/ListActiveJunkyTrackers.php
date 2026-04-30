@@ -16,6 +16,7 @@ class ListActiveJunkyTrackers extends ListRecords
     {
         return [
             $this->getSyncToSheetAction('syncTrackers', __('system.trackers.active_junky')),
+            $this->getImportTrackersFromSheetAction(),
             Actions\CreateAction::make()
                 ->label(__('system.trackers.create', ['tracker' => strtolower(__('system.trackers.active_junky'))])),
         ];

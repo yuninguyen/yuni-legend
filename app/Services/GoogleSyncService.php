@@ -8,11 +8,13 @@ use App\Models\PayoutLog;
 use App\Models\PayoutMethod;
 use App\Models\RebateTracker;
 use App\Models\Platform;
+use App\Models\User;
 use App\Filament\Resources\Traits\HasUsStates;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class GoogleSyncService
 {
@@ -322,11 +324,7 @@ class GoogleSyncService
 
                 // 3. Mapping dữ liệu:
                 // Status mapping
-                $statusRaw = strtolower(trim($row[1] ?? 'active'));
-                $status = ($statusRaw === 'live' || $statusRaw === 'active') ? 'active' : $statusRaw;
-                if (in_array($status, ['active', 'disabled', 'locked'])) {
-                    $emailRecord->status = $status;
-                }
+                $emailRecord->status = $this->sanitizeStatus($row[1] ?? 'active');
 
                 // Password
                 if (!empty($row[3])) $emailRecord->email_password = trim($row[3]);
@@ -438,8 +436,10 @@ class GoogleSyncService
 
     public function syncPayoutMethods($records = null): array
     {
-        if ($records === null) {
-            $records = PayoutMethod::all();
+        if ($records instanceof Builder) {
+            $records = $records->with(['user'])->get();
+        } elseif ($records === null) {
+            $records = PayoutMethod::with(['user'])->get();
         }
 
         $targetTab = 'Payout_Methods';
@@ -521,8 +521,10 @@ class GoogleSyncService
 
     public function syncPayoutLogs($records = null): array
     {
-        if ($records === null) {
-            $records = PayoutLog::with(['account.email', 'payoutMethod'])->orderBy('created_at', 'desc')->get();
+        if ($records instanceof Builder) {
+            $records = $records->with(['account.email', 'payoutMethod', 'user'])->get();
+        } elseif ($records === null) {
+            $records = PayoutLog::with(['account.email', 'payoutMethod', 'user'])->orderBy('created_at', 'desc')->get();
         } elseif ($records instanceof \Illuminate\Support\Collection || is_array($records)) {
             $records = Collection::make($records);
             $records->load(['account.email', 'payoutMethod']);
@@ -615,7 +617,9 @@ class GoogleSyncService
 
     public function syncTrackers($records = null): array
     {
-        if ($records === null) {
+        if ($records instanceof Builder) {
+            $records = $records->with(['account.email', 'user'])->get();
+        } elseif ($records === null) {
             $records = RebateTracker::with(['account.email', 'user'])->get();
         } elseif ($records instanceof \Illuminate\Support\Collection || is_array($records)) {
             $records = Collection::make($records);
@@ -783,9 +787,9 @@ class GoogleSyncService
                                 $account->account_created_at = $this->parseDate($row[9]);
                             }
 
-                            // Status Account (Array) - Luôn lưu lowercase
+                            // Status Account (Array)
                             if (!empty($row[10])) {
-                                $account->status = [strtolower(trim($row[10]))];
+                                $account->status = [$this->sanitizeStatus($row[10])];
                             }
 
                             $account->note = trim($row[11] ?? $account->note);
@@ -876,5 +880,240 @@ class GoogleSyncService
         ]);
 
         $this->sheetService->formatColumnsAsClip($targetTab, 16, 18); // Note & Detail Transaction
+    }
+
+    /**
+     * ✅ CHIỀU 2: SHEET -> WEB (Dành cho Tracker/Đơn hàng)
+     * Đồng bộ dữ liệu từ Google Sheet (6 tab Tracker) về Database.
+     */
+    public function importTrackers(?string $spreadsheetId = null): array
+    {
+        $id = $spreadsheetId ?: (config('services.google.import_spreadsheet_id') ?: config('services.google.spreadsheet_id'));
+
+        $sheetMappings = [
+            'RKT_Tracker'   => 'Rakuten',
+            'RMN_Tracker'   => 'RetailMeNot',
+            'JH_Tracker'    => 'JoinHoney',
+            'AJ_Tracker'    => 'ActiveJunky',
+            'TCB_Tracker'   => 'TopCashback',
+            'Price_Tracker' => 'Price',
+        ];
+
+        $totalCreated = 0;
+        $totalUpdated = 0;
+        $totalFailed = 0;
+        $totalSkipped = 0;
+
+        foreach ($sheetMappings as $sheetName => $platform) {
+            try {
+                // Đọc dải ô A:P (16 cột)
+                $rows = $this->sheetService->readSheet('A:P', $sheetName, $id);
+                if (empty($rows)) continue;
+
+                // Bỏ qua hàng tiêu đề
+                array_shift($rows);
+
+                foreach ($rows as $index => $row) {
+                    $emailRaw = trim($row[0] ?? '');
+                    if (empty($emailRaw) || !str_contains($emailRaw, '@')) {
+                        $totalSkipped++;
+                        continue;
+                    }
+
+                    try {
+                        DB::transaction(function () use ($row, $platform, &$totalCreated, &$totalUpdated, &$totalFailed) {
+                            // 1. Resolve Email & Account (Giống importAccounts)
+                            $email = Email::firstOrCreate(['email' => trim($row[0])]);
+                            
+                            $account = Account::firstOrCreate([
+                                'email_id' => $email->id,
+                                'platform' => $platform
+                            ]);
+
+                            // Cập nhật thông tin Account nếu có trong sheet
+                            if (!empty($row[1])) $account->password = trim($row[1]);
+                            // Status (Account Status Tracking)
+                            if (!empty($row[3])) {
+                                $account->status = $this->sanitizeStatus($row[3], asArray: true);
+                            }
+                            if ($account->isDirty()) $account->save();
+
+                            // 2. Resolve User
+                            $userName = trim($row[2] ?? '');
+                            $userId = null;
+                            if (!empty($userName)) {
+                                $userId = User::where('name', $userName)->value('id');
+                            }
+
+                            // 3. Sync Tracker
+                            $orderId = trim($row[6] ?? '');
+                            if (empty($orderId)) return; // Bắt buộc có Order ID
+
+                            $tracker = RebateTracker::firstOrNew([
+                                'account_id' => $account->id,
+                                'order_id'   => $orderId
+                            ]);
+
+                            $isNew = !$tracker->exists;
+
+                            // Mapping các trường
+                            if (!empty($row[4])) $tracker->transaction_date = $this->parseDate($row[4]);
+                            $tracker->store_name = trim($row[5] ?? $tracker->store_name);
+                            
+                            // Các giá trị số
+                            $tracker->order_value = $this->parseNumeric($row[7] ?? 0);
+                            $tracker->cashback_percent = $this->parseNumeric($row[8] ?? 0);
+                            
+                            // Nếu trong sheet có cột Rebate Amount (index 9) thì ưu tiên lấy, 
+                            // nếu không Model sẽ tự tính lúc save().
+                            if (!empty($row[9])) {
+                                $tracker->rebate_amount = $this->parseNumeric($row[9]);
+                            }
+
+                            // Status & Payout Date
+                            // Đối với Tracker, sanitizeStatus trả về chuỗi (mặc định asArray = false)
+                            $statusRaw = $this->sanitizeStatus($row[10] ?? '');
+                            // Mapping Tracker Status specific for Enum
+                            $trackerStatus = match($statusRaw) {
+                                'active', 'live', 'confirmed' => 'confirmed',
+                                'pending' => 'pending',
+                                'ineligible', 'rejected' => 'ineligible',
+                                'missing' => 'missing',
+                                default => 'clicked'
+                            };
+                            $tracker->status = $trackerStatus;
+                            if (!empty($row[11])) $tracker->payout_date = $this->parseDate($row[11]);
+
+                            // Info khác
+                            $tracker->device = trim($row[12] ?? $tracker->device);
+                            $tracker->state = trim($row[13] ?? $tracker->state);
+                            $tracker->note = trim($row[14] ?? $tracker->note);
+                            $tracker->detail_transaction = trim($row[15] ?? $tracker->detail_transaction);
+                            $tracker->user_id = $userId ?: $tracker->user_id;
+
+                            $tracker->save();
+
+                            if ($isNew) {
+                                $totalCreated++;
+                            } else {
+                                $totalUpdated++;
+                            }
+                        });
+                    } catch (\Exception $e) {
+                        Log::error("Row Import Error [{$sheetName}] row " . ($index + 2) . ": " . $e->getMessage());
+                        $totalFailed++;
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::error("Import Sheet Error [{$sheetName}]: " . $e->getMessage());
+                $totalFailed++;
+            }
+        }
+
+        return [
+            'created' => $totalCreated,
+            'updated' => $totalUpdated,
+            'failed'  => $totalFailed,
+            'skipped' => $totalSkipped
+        ];
+    }
+
+    /**
+     * Chuyển đổi chuỗi tiền/phần trăm từ Google Sheet sang số Float chuẩn.
+     * Xử lý cả dấu phẩy (,) và dấu chấm (.) làm dấu thập phân.
+     */
+    private function parseNumeric($value): float
+    {
+        if (empty($value)) return 0;
+        
+        $value = (string) $value;
+        // Loại bỏ ký hiệu tiền tệ, phần trăm và khoảng trắng
+        $value = str_replace(['$', '%', ' ', '₫'], '', $value);
+        
+        // Nếu có cả dấu chấm và dấu phẩy (ví dụ: 1,234.56 hoặc 1.234,56)
+        if (str_contains($value, ',') && str_contains($value, '.')) {
+            if (strpos($value, ',') < strpos($value, '.')) {
+                // Kiểu Mỹ: 1,234.56 -> Xóa dấu phẩy
+                $value = str_replace(',', '', $value);
+            } else {
+                // Kiểu Âu/Việt: 1.234,56 -> Xóa dấu chấm, đổi phẩy thành chấm
+                $value = str_replace('.', '', $value);
+                $value = str_replace(',', '.', $value);
+            }
+        } else {
+            // Chỉ có một loại dấu ngăn cách
+            // Nếu dấu phẩy xuất hiện ở cuối (cách 2-3 chữ số), coi đó là dấu thập phân
+            if (str_contains($value, ',')) {
+                $value = str_replace(',', '.', $value);
+            }
+        }
+        
+        return (float) $value;
+    }
+
+    /**
+     * Chuẩn hóa Status để khớp với Translation Keys (Xóa dấu cách, viết thường, mapping...)
+     * Hỗ trợ chuỗi có dấu mũi tên (Timeline) hoặc dấu phẩy.
+     */
+    private function sanitizeStatus(?string $status, bool $asArray = false)
+    {
+        if (empty($status)) {
+            return $asArray ? ['active'] : 'active';
+        }
+
+        $status = (string) $status;
+        
+        // Sử dụng Regex mạnh mẽ hơn để tách chuỗi:
+        // Tách bởi bất kỳ tổ hợp nào của dấu gạch ngang, dấu mũi tên, dấu bằng, dấu lớn hơn: ->, →, =>, >>, ---
+        // Hoặc dấu phẩy (,)
+        $parts = preg_split('/\s*[\-=>→>]+\s*|,\s*/u', $status, -1, PREG_SPLIT_NO_EMPTY);
+        
+        if (count($parts) > 1) {
+            $sanitized = array_map(fn($p) => $this->sanitizeSingleStatus($p), $parts);
+            $sanitized = array_values(array_filter($sanitized));
+            return $asArray ? $sanitized : implode(' -> ', $sanitized);
+        }
+
+        $sanitized = $this->sanitizeSingleStatus($status);
+        return $asArray ? [$sanitized] : $sanitized;
+    }
+
+    /**
+     * Xử lý chuẩn hóa cho một status đơn lẻ
+     */
+    private function sanitizeSingleStatus(string $status): string
+    {
+        $status = strtolower(trim($status));
+        // Xóa tất cả ký tự không phải chữ cái, số, dấu cách, gạch ngang
+        $status = preg_replace('/[^a-z0-9\s\-_]/', '', $status);
+        
+        $status = str_replace([' ', '-'], '_', $status);
+        
+        // Loại bỏ các dấu gạch dưới dư thừa (ví dụ: linked__paypal -> linked_paypal)
+        $status = preg_replace('/_+/', '_', $status);
+        // Loại bỏ gạch dưới ở đầu và cuối
+        $status = trim($status, '_');
+
+        $mappings = [
+            'in_use'             => 'used',
+            'live'               => 'live',
+            'active'             => 'active',
+            'not_linked'         => 'not_linked_paypal',
+            'not_linked_paypal'  => 'not_linked_paypal',
+            'linked'             => 'linked_paypal',
+            'linked_paypal'      => 'linked_paypal',
+            'unlinked'           => 'unlinked_paypal',
+            'unlinked_paypal'    => 'unlinked_paypal',
+            'paypal_limited'     => 'paypal_limited',
+            'limited'            => 'paypal_limited',
+            'no_paypal'          => 'no_paypal_required',
+            'no_paypal_needed'   => 'no_paypal_required',
+            'no_paypal_required' => 'no_paypal_required',
+            'banned'             => 'banned',
+            'locked'             => 'locked',
+            'disabled'           => 'disabled',
+        ];
+        
+        return $mappings[$status] ?? $status;
     }
 }

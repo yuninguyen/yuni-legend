@@ -16,6 +16,7 @@ class ListRakutenTrackers extends ListRecords
     {
         return [
             $this->getSyncToSheetAction('syncTrackers', __('system.trackers.rakuten')),
+            $this->getImportTrackersFromSheetAction(),
             Actions\CreateAction::make()
                 ->label(__('system.trackers.create', ['tracker' => strtolower(__('system.trackers.rakuten'))])),
         ];

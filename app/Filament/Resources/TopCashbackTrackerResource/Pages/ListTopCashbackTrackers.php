@@ -15,6 +15,7 @@ class ListTopCashbackTrackers extends ListRecords
     {
         return [
             $this->getSyncToSheetAction('syncTrackers', __('system.trackers.top_cashback')),
+            $this->getImportTrackersFromSheetAction(),
             Actions\CreateAction::make()
                 ->label(__('system.trackers.create', ['tracker' => strtolower(__('system.trackers.top_cashback'))])),
         ];
