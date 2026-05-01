@@ -8,6 +8,7 @@ return [
     'get_account' => 'Get Account',
     'email_detail_section' => 'Email Information Details',
     'n/a' => 'N/A',
+    'no_email' => 'No Email',
 
     'auth' => [
         'login_title' => 'Sign in to your account',
@@ -79,6 +80,8 @@ return [
 
     // COMMON LABELS (FORMS/TABLES)
     'labels' => [
+        'n/a' => 'N/A',
+        'no_email' => 'No Email',
         'account' => 'Account',
         'user' => 'User',
         'platform' => 'Platform',
@@ -146,6 +149,7 @@ return [
         'role' => 'Role',
         'id' => 'ID',
         'brand' => 'Brand',
+        'brand_name' => 'Brand Name',
         'wallet' => 'Wallet',
         'my_accounts' => 'My Accounts',
         'detail' => 'Detail',
@@ -488,17 +492,22 @@ return [
         'notifications' => [
             'synced_wallets' => 'Synced :count wallets!',
         ],
+        'method_types' => [
+            'paypal_us' => 'PayPal US',
+            'paypal_vn' => 'PayPal VN',
+            'bank_account' => 'Bank Account',
+        ],
     ],
     'accounts' => [
         'status_explanations' => [
             'active' => 'New account, working fine.',
-            'used' => 'Account has transactions.',
-            'limited' => 'PayPal is limited.',
+            'used' => 'The account is currently in use.',
+            'limited' => 'PayPal account is limited.',
             'banned' => 'Account is banned/disabled.',
-            'linked' => 'Linked to PayPal wallet.',
-            'unlinked' => 'Unlinked from PayPal.',
-            'not_linked' => 'Not linked to PayPal.',
-            'no_paypal_needed' => 'Platform does not require PayPal.',
+            'linked' => 'The account has been linked to a PayPal account.',
+            'unlinked' => 'The account has been unlinked from the PayPal account.',
+            'not_linked' => 'The account has not been linked to a PayPal account.',
+            'no_paypal_needed' => 'This platform does not require linking to a PayPal account.',
             'default' => 'Status information.',
         ],
     ],
@@ -520,5 +529,3 @@ return [
         ],
     ],
 ];
-
-

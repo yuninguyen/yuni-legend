@@ -63,6 +63,7 @@
     min-height: 64px !important;
     display: flex !important;
     align-items: center !important;
+    justify-content: center !important;
     box-sizing: border-box !important;
 }
 
@@ -98,6 +99,9 @@
 /* Brand name / logo — chỉ nhắm vào nội dung thương hiệu */
 .fi-sidebar-header a,
 .fi-sidebar-header > span {
+    display: flex !important;
+    justify-content: center !important;
+    width: 100% !important;
     color: #E2E8F0 !important;
     font-weight: 700 !important;
     font-size: 15px !important;

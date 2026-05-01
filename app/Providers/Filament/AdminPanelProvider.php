@@ -34,20 +34,7 @@ class AdminPanelProvider extends PanelProvider
 
             // 🎨 BRANDING
             ->brandName('RebateOps')
-            ->brandLogo(
-                fn() => file_exists(public_path('images/logo.png'))
-                ? asset('images/logo.png')
-                : new \Illuminate\Support\HtmlString('
-                    <div style="display: flex; align-items: center; justify-content: flex-start; gap: 10px;">
-                        <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 50%, #D97706 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(245,158,11,0.35), inset 0 1px 1px rgba(255,255,255,0.15); flex-shrink: 0;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.15));"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                        </div>
-                        <div style="display: flex; align-items: baseline; gap: 0; line-height: 1;">
-                            <span style="font-size: 17px; font-weight: 600; color: #CBD5E1; letter-spacing: -0.02em; font-family: Inter, sans-serif;">Rebate</span><span style="font-size: 17px; font-weight: 800; color: #FBBF24; letter-spacing: -0.02em; font-family: Inter, sans-serif;">Ops</span>
-                        </div>
-                    </div>
-                ')
-            )
+            ->brandLogo(fn () => view('filament.components.brand-logo'))
             ->brandLogoHeight('32px')
             ->favicon(asset('favicon.ico'))
 

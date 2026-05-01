@@ -12,8 +12,8 @@ class Dashboard extends BaseDashboard
         return 2;
     }
 
-    // 🟢 Dynamic welcome heading
-    public function getHeading(): string
+    // 🟢 Branded heading with Logo
+    public function getHeading(): \Illuminate\Contracts\Support\Htmlable
     {
         $hour = (int) now()->format('H');
         $greeting = match (true) {
@@ -24,12 +24,19 @@ class Dashboard extends BaseDashboard
 
         $name = auth()->user()?->name ?? __('system.n/a');
 
-        return "{$greeting}, {$name} 👋";
+        return new \Illuminate\Support\HtmlString('
+            <div style="margin-bottom: 4px;">
+                <h5 style="font-size: 26px; font-weight: 800; color: #0F172A; letter-spacing: -0.025em; line-height: 1.1;">
+                    <span style="color: #64748B; font-weight: 600;">Rebate</span><span style="color: #F59E0B; font-weight: 800;">Ops</span> — ' . "{$greeting}, {$name} 👋" . '
+                </h5>
+                <p style="font-size: 15px; font-weight: 500; color: #64748B; margin-top: 6px;">' . __('system.greetings.operations_overview') . '</p>
+            </div>
+        ');
     }
 
     public function getSubheading(): ?string
     {
-        return __('system.greetings.operations_overview');
+        return null;
     }
 
     public function getWidgets(): array

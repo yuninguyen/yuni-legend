@@ -26,6 +26,7 @@ use Filament\Support\Enums\IconPosition;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use App\Filament\Resources\Shared\ActivitiesRelationManager;
+use Filament\Notifications\Notification;
 
 class PayoutLogResource extends Resource
 {
@@ -160,12 +161,12 @@ class PayoutLogResource extends Resource
                 }
             }
 
-            \Filament\Notifications\Notification::make()
+            Notification::make()
                 ->title(__('system.notifications.synced_successfully', ['count' => $count]))
                 ->success()
                 ->send();
         } catch (\Exception $e) {
-            \Filament\Notifications\Notification::make()
+            Notification::make()
                 ->title('Error: ' . $e->getMessage())
                 ->danger()
                 ->send();
@@ -293,7 +294,7 @@ class PayoutLogResource extends Resource
                                         // Thực hiện lệnh copy
                                         $livewire->dispatch('copy-to-clipboard', text: $fullText);
 
-                                        \Filament\Notifications\Notification::make()
+                                        Notification::make()
                                             ->title('Copied to clipboard!')
                                             ->success()
                                             ->send();
@@ -343,7 +344,7 @@ class PayoutLogResource extends Resource
                     ->schema([
                         Infolists\Components\TextEntry::make('note')
                             ->label(__('system.labels.note'))
-                            ->placeholder(__('system.n/a'))
+                            ->placeholder(__('system.labels.not_available'))
                             ->formatStateUsing(function ($state) {
                                 if (str_contains($state, 'Liquidity from ID')) {
                                     return str_replace('Liquidity from ID', __('system.labels.liquidity_from_id'), $state);
@@ -398,8 +399,8 @@ class PayoutLogResource extends Resource
                                         return self::getAvailableBalance($acc->id) > 0;
                                     })
                                     ->mapWithKeys(function ($acc) {
-                                        $email = (string) ($acc->email?->email ?? __('system.no_email'));
-                                        $platform = (string) (\App\Models\Platform::where('slug', $acc->platform)->value('name') ?? ucwords($acc->platform ?? __('system.n/a')));
+                                        $email = (string) ($acc->email?->email ?? __('system.labels.no_email'));
+                                        $platform = (string) (\App\Models\Platform::where('slug', $acc->platform)->value('name') ?? ucwords($acc->platform ?? __('system.labels.not_available')));
 
                                         // Hiển thị thêm số dư bên cạnh tên để nhân viên tự tin chọn
                                         $balance = number_format(self::getAvailableBalance($acc->id), 2);
@@ -740,26 +741,23 @@ class PayoutLogResource extends Resource
                 Tables\Columns\TextColumn::make('account_id')
                     ->label(__('system.labels.account_email'))
                     ->alignment(Alignment::Center)
-                    //->extraHeaderAttributes(['style' => 'width: 200px; min-width: 200px'])
-                    //->extraAttributes(['style' => 'width: 200px; min-width: 200px'])
                     ->copyable()
                     ->copyMessage(__('system.payout_logs.messages.copied'))
                     ->wrap()
-                    ->width('200px')
                     ->html() // Cho phép xuống dòng bằng thẻ <br>
                     ->formatStateUsing(function ($record) {
                         $account = $record->account;
                         if (!$account)
-                            return __('system.n/a');
+                            return __('system.labels.not_available');
 
                         // Lấy email từ bảng Email liên kết với Account
-                        $email = $account->email?->email ?? __('system.n/a');
+                        $email = $account->email?->email ?? __('system.labels.not_available');
 
                         // Lấy platform trực tiếp từ bảng Account (Cột platform có sẵn trong bảng accounts)
                         $platform_name = \App\Models\Platform::where('slug', $account->platform)->value('name');
-                        $platform = $platform_name ?? ucwords(str_replace(['_', '-'], ' ', $account->platform ?? __('system.n/a')));
+                        $platform = $platform_name ?? ucwords(str_replace(['_', '-'], ' ', $account->platform ?? __('system.labels.not_available')));
 
-                        $userName = $record->user?->name ?? __('system.n/a');
+                        $userName = $record->user?->name ?? __('system.labels.not_available');
 
                         $safeEmail = e($email);
                         $safeUserName = e($userName);
@@ -786,19 +784,18 @@ class PayoutLogResource extends Resource
                 // Hiển thị Wallet PayPal hoặc Info Gift Card    
                 Tables\Columns\TextColumn::make('asset_info')
                     ->label(__('system.labels.asset_info'))
-                    ->alignment(Alignment::Start)
+                    ->alignment(Alignment::Center)
                     ->copyable()
                     ->copyMessage('Copied to clipboard!')
                     ->wrap()
+                    ->extraHeaderAttributes(['style' => 'min-width: 230px'])
+                    ->extraAttributes(['style' => 'min-width: 230px'])
                     ->icon(fn($record): ?string => $record->asset_type === 'gift_card' ? 'heroicon-m-clipboard-document' : null)
                     ->iconColor('warning')
                     ->iconPosition(IconPosition::After)
                     ->html() // Cho phép xuống dòng bằng thẻ <br>
-                    // 🟢 PHẢI CÓ: Ngăn sự kiện click bị trôi ra ngoài hàng (Row)
-                    // 🟢 FIX 1: Thêm attribute để wrapper bao quanh toàn bộ cell
                     ->extraAttributes([
                         'class' => 'cursor-default relative',
-                        // 🟢 Dùng onclick để chặn sự kiện click lan ra hàng (Row)
                         'onclick' => 'event.stopPropagation();',
                     ])
                     ->copyableState(function ($record) {
@@ -807,54 +804,64 @@ class PayoutLogResource extends Resource
                             return '';
                         $prettyBrand = ucwords(str_replace('_', ' ', $data->gc_brand ?? 'N/A'));
                         $amount = number_format($record->net_amount_usd, 2);
-                        // Trả về text thuần, không xuống dòng để copy chuẩn nhất
                         return "Brand: {$prettyBrand} | Amount: \${$amount} | Card number: {$data->gc_code} | PIN: {$data->gc_pin}";
                     })
                     ->state(function ($record) {
                         if ($record->asset_type === 'paypal') {
                             $walletName = e($record->payoutMethod?->name ?? 'N/A');
+                            $typeSlug = $record->payoutMethod?->type;
+                            
+                            $methodType = 'N/A';
+                            if ($typeSlug) {
+                                $methodType = match ($typeSlug) {
+                                    'paypal_us' => __('system.payout_methods.method_types.paypal_us'),
+                                    'paypal_vn' => __('system.payout_methods.method_types.paypal_vn'),
+                                    'bank_account' => __('system.payout_methods.method_types.bank_account'),
+                                    default => ucwords(str_replace(['_', 'paypal'], [' ', 'PayPal'], $typeSlug)),
+                                };
+                            }
 
-                            return "<div style='line-height: 1.7;'>
+                            return "<div style='line-height: 1.6; font-size: 13px;'>
                                         <div style='margin-bottom: 4px;'>
-                                            <span style='color: #6b7280; display: inline-block;'>PayPal Withdrawal:</span> 
-                                            <strong style='color: #111827;'>$walletName</strong>
+                                            <span style='color: #64748B; font-weight: 300; display: block;'>PayPal withdrawal:</span>
+                                            <span style='color: #0F172A; font-weight: 600;'>{$methodType} - {$walletName}</span>
                                         </div>
                                     </div>";
                         }
 
-                        // Định dạng cho Gift Card theo ý bạn
-                        $assetType = $record->asset_type ? __('system.payout_logs.asset_types.' . $record->asset_type) : __('system.n/a');
-
+                        // Gift Card Formatting
+                        $assetType = $record->asset_type ? __('system.payout_logs.asset_types.' . $record->asset_type) : __('system.labels.not_available');
+                        
                         // 🟢 FIX: Handle both '-' and '_' in brand name formatting
                         $brand = $record->gc_brand;
                         $brand = match ($brand) {
                             'victoria\'s_secret', 'victorias-secret' => 'Victoria\'s Secret',
                             'visa' => 'Visa/Mastercard',
-                            default => e(ucwords(str_replace(['_', '-'], ' ', $brand ?? __('system.n/a'))))
+                            default => e(ucwords(str_replace(['_', '-'], ' ', $brand ?? __('system.labels.not_available'))))
                         };
 
                         $code = e($record->gc_code ?? '---');
                         $pin = e($record->gc_pin ?? '---');
+
                         return "
-                                <div style='line-height: 1.7;'>
+                            <div style='line-height: 1.6; font-size: 13px;'>
                                 <div style='margin-bottom: 4px;'>
-                                        <span style='color: #6b7280; display: inline-block;'>" . __('system.payout_logs.fields.asset_type') . ":</span> 
-                                        <strong style='color: #111827;'>{$assetType}</strong>
+                                    <span style='color: #64748B; font-weight: 300; display: block;'>Gift Card Information:</span>
                                     </div>
-                                    <div style='margin-bottom: 4px;'>
-                                        <span style='color: #6b7280; display: inline-block;'>" . __('system.labels.brand') . ":</span> 
-                                        <span style='color: #111827;'>{$brand}</span>
-                                    </div>
-                                    <div style='margin-bottom: 4px; white-space: nowrap;'>
-                                        <span style='color: #6b7280; display: inline-block;'>" . __('system.payout_logs.fields.card_number') . ":</span> 
-                                        <code style='background: #f3f4f6; padding: 2px 6px; border-radius: 4px;'>{$code}</code>
-                                    </div>
-                                    <div>
-                                        <span style='color: #6b7280; display: inline-block;'>" . __('system.payout_logs.fields.pin') . ":</span> 
-                                        <code style='background: #f3f4f6; padding: 2px 6px; border-radius: 4px;'>{$pin}</code>
-                                    </div>
+                                    
+                                <div style='margin-bottom: 4px;'>
+                                    <span style='color: #64748B; font-weight: 300; display: inline;'>" . __('system.labels.brand') . ": </span>
+                                    <span style='color: #0F172A; font-weight: 600;'>{$brand}</span>
                                 </div>
-                            ";
+                                <div style='margin-bottom: 4px;'>
+                                    <span style='color: #64748B; font-weight: 300; display: block;'>" . __('system.payout_logs.fields.card_number') . ": </span>
+                                    <code style='color: #0F172A; font-weight: 600; padding: 2px; font-family: JetBrains Mono, monospace; font-size: 12px; display: inline-block; margin-top: 2px;'>{$code}</code>
+                                </div>
+                                <div>
+                                    <span style='color: #64748B; font-weight: 300; display: inline-block;'>" . __('system.payout_logs.fields.pin') . ": </span>
+                                    <code style='color: #0F172A; font-weight: 600; padding: 2px; font-family: JetBrains Mono, monospace; font-size: 12px; display: inline-block; margin-top: 2px;'>{$pin}</code>
+                                </div>
+                            </div>";
                     }),
 
                 Tables\Columns\TextColumn::make('transaction_type')
@@ -946,9 +953,10 @@ class PayoutLogResource extends Resource
                 Tables\Columns\TextColumn::make('total_vnd')
                     ->label(__('system.labels.total_vnd'))
                     ->placeholder('')
-                    ->visible(fn() => auth()->user()?->isAdmin() || auth()->user()?->isFinance()) // 🟢 HIỆN CHO ADMIN & FINANCE
+                    ->visible(fn() => auth()->user()?->isAdmin() || auth()->user()?->isFinance())
                     ->formatStateUsing(fn($record, $state) => $record->transaction_type === 'liquidation' ? '₫' . number_format($state, 0, ',', '.') : '')
-                    ->alignment(Alignment::Center),
+                    ->alignment(Alignment::Center)
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('status')
                     ->label(__('system.labels.status'))
                     ->badge()
@@ -959,16 +967,23 @@ class PayoutLogResource extends Resource
                         'rejected' => 'danger',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn(string $state): string => __("system.status.{$state}")),
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                        'completed' => __('system.status.completed'),
+                        'rejected' => __('system.status.rejected'),
+                        'failed' => __('system.status.failed'),
+                        'processing' => __('system.status.processing'),
+                        default => ucwords(str_replace('_', ' ', $state)),
+                    }),
 
                 Tables\Columns\TextColumn::make('userPayment.batch_id')
                     ->label(__('system.labels.batch_id'))
                     ->badge()
-                    ->placeholder(__('system.n/a'))
+                    ->placeholder(__('system.labels.not_available'))
                     ->color('info')
                     ->weight('bold')
                     ->searchable()
-                    ->alignment(Alignment::Center),
+                    ->alignment(Alignment::Center)
+                    ->toggleable(isToggledHiddenByDefault: true),
 
             ])
             ->filters([
@@ -1253,7 +1268,7 @@ class PayoutLogResource extends Resource
                                         $set('net_amount_usd', 0);
                                         $set('total_vnd', 0);
                                         // Thêm thông báo nhẹ cho sếp
-                                        \Filament\Notifications\Notification::make()
+                                        Notification::make()
                                             ->title(__('system.payout_logs.messages.balance_exceeded', ['balance' => $balance, 'limit' => $balance]))
                                             ->danger()
                                             ->send();
@@ -1388,7 +1403,7 @@ class PayoutLogResource extends Resource
                         });
 
                         if ($exchangeCreated) {
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->title('Exchange successful!')
                                 ->success()
                                 ->send();
@@ -1641,7 +1656,7 @@ class PayoutLogResource extends Resource
                             $lockedCount = $records->count() - $unlockedRecords->count();
 
                             if ($lockedCount > 0) {
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title("Cannot force-delete $lockedCount settled records.")
                                     ->warning()
                                     ->send();
@@ -1659,7 +1674,7 @@ class PayoutLogResource extends Resource
                             $lockedCount = $records->count() - $unlockedRecords->count();
 
                             if ($lockedCount > 0) {
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title("Cannot delete $lockedCount settled records.")
                                     ->warning()
                                     ->send();
@@ -1674,7 +1689,7 @@ class PayoutLogResource extends Resource
                     ->label(__('system.labels.account'))
                     ->collapsible()
                     ->getTitleFromRecordUsing(function ($record) {
-                        $email = $record->account?->email?->email ?? __('system.n/a');
+                        $email = $record->account?->email?->email ?? __('system.labels.not_available');
                         $platform = static::getPlatformName($record->account?->platform);
 
                         // 🟢 TÍNH TỔNG CHO HEADER (Do phiên bản Filament này chưa hỗ trợ ->summary() trên Group)
