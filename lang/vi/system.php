@@ -192,6 +192,7 @@ return [
         'cancel' => 'Hủy',
         'close' => 'Đóng',
         'get_account' => 'Nhận tài khoản',
+        'bulk_actions' => 'Hành động hàng loạt',
     ],
 
     'placeholders' => [

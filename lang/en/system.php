@@ -192,6 +192,7 @@ return [
         'cancel' => 'Cancel',
         'close' => 'Close',
         'get_account' => 'Get Account',
+        'bulk_actions' => 'Bulk Actions',
     ],
 
     'placeholders' => [

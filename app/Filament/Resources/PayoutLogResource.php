@@ -25,6 +25,7 @@ use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\IconPosition;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use App\Filament\Resources\Shared\ActivitiesRelationManager;
 use Filament\Notifications\Notification;
 
@@ -1490,18 +1491,45 @@ class PayoutLogResource extends Resource
                         ->visible(fn() => auth()->user()?->isAdmin() || auth()->user()?->isFinance()) // Admin & Finance
                         ->requiresConfirmation()
                         ->form([
-                            Forms\Components\TextInput::make('manual_payout_rate')
-                                ->label('Payout Exchange Rate')
-                                ->placeholder('Eg: 20000')
-                                ->numeric()
-                                ->helperText('💡 Enter the rate YOU WANT TO PAY the user. If left blank, it will default to the Market Rate (0 profit).'),
+                            Forms\Components\Grid::make(2)
+                                ->schema([
+                                    Forms\Components\Section::make('Staff Split')
+                                        ->columnSpan(1)
+                                        ->schema([
+                                            Forms\Components\TextInput::make('manual_payout_rate')
+                                                ->label('Staff Payout Rate')
+                                                ->placeholder('Eg: 21000')
+                                                ->numeric()
+                                                ->default(21000)
+                                                ->required(),
+                                            Forms\Components\TextInput::make('payout_percentage')
+                                                ->label('Staff Percentage (%)')
+                                                ->placeholder('Eg: 35')
+                                                ->numeric()
+                                                ->default(35)
+                                                ->required(),
+                                        ]),
 
-                            Forms\Components\TextInput::make('payout_percentage')
-                                ->label('Payout Percentage (%)')
-                                ->placeholder('Eg: 35')
-                                ->numeric()
-                                ->default(100)
-                                ->helperText('💡 Percentage of the total value to pay the user (e.g. 35% of USD * Rate).'),
+                                    Forms\Components\Section::make('Leader Split')
+                                        ->columnSpan(1)
+                                        ->schema([
+                                            Forms\Components\Select::make('leader_id')
+                                                ->label('Leader')
+                                                ->options(\App\Models\User::whereIn('role', ['admin', 'finance', 'operator'])->pluck('name', 'id'))
+                                                ->searchable()
+                                                ->placeholder('Select...'),
+                                            Forms\Components\TextInput::make('leader_payout_rate')
+                                                ->label('Leader Payout Rate')
+                                                ->placeholder('Eg: 21000')
+                                                ->numeric()
+                                                ->default(21000),
+                                            Forms\Components\TextInput::make('leader_percentage')
+                                                ->label('Leader Percentage (%)')
+                                                ->placeholder('Eg: 65')
+                                                ->numeric()
+                                                ->default(65),
+                                        ]),
+                                ]),
                         ])
                         ->action(function (Collection $records, array $data) {
                             $paymentGenerated = false;
@@ -1520,6 +1548,9 @@ class PayoutLogResource extends Resource
                                 if ($validSelected->isEmpty()) {
                                     return;
                                 }
+
+                                // 🟢 TẠO BATCH ID CHUNG CHO CẢ ĐỢT CHỐT SỔ NÀY
+                                $bulkBatchId = 'B-' . now()->format('ymdHi') . '-' . strtoupper(Str::random(3));
 
                                 // 🟢 FIX LỖI NHÂN ĐÔI (DOUBLE COUNTING)
                                 $parentIds = $validSelected->map(fn($log) => $log->parent_id ?? $log->id)->unique();
@@ -1591,13 +1622,16 @@ class PayoutLogResource extends Resource
                                     if ($totalUsd <= 0) continue;
 
                                     $averageMarketRate = $totalUsd > 0 ? round($totalVndMarket / $totalUsd, 2) : 0;
+                                    
+                                    // 🟢 TÍNH TOÁN CHO NHÂN VIÊN (STAFF)
                                     $payoutRate = (float) ($data['manual_payout_rate'] ?? $averageMarketRate);
                                     $payoutPercentage = (float) ($data['payout_percentage'] ?? 100);
                                     $totalVndPayout = floor(($totalUsd * $payoutRate) * ($payoutPercentage / 100));
                                     $profitVnd = floor(($averageMarketRate - $payoutRate) * $totalUsd * ($payoutPercentage / 100));
 
-                                    $payment = \App\Models\UserPayment::create([
+                                    $staffPayment = \App\Models\UserPayment::create([
                                         'user_id' => $firstLog->user_id,
+                                        'batch_id' => $bulkBatchId,
                                         'platform' => $platformName,
                                         'asset_group' => $firstLog->asset_type === 'gift_card' ? 'gift_card' : 'paypal',
                                         'transaction_type' => ($firstLog->asset_type === 'gift_card' ? 'Gift Card' : 'PayPal') . " ({$sourceName})",
@@ -1610,14 +1644,38 @@ class PayoutLogResource extends Resource
                                         'status' => 'pending',
                                     ]);
 
+                                    // 🟢 TÍNH TOÁN CHO QUẢN LÝ (LEADER) - NẾU CÓ CHỌN
+                                    if (!empty($data['leader_id'])) {
+                                        $leaderRate = (float) ($data['leader_payout_rate'] ?? $payoutRate);
+                                        $leaderPercentage = (float) ($data['leader_percentage'] ?? 0);
+                                        $leaderVndPayout = floor(($totalUsd * $leaderRate) * ($leaderPercentage / 100));
+                                        $leaderProfitVnd = floor(($averageMarketRate - $leaderRate) * $totalUsd * ($leaderPercentage / 100));
+
+                                        \App\Models\UserPayment::create([
+                                            'user_id' => $data['leader_id'],
+                                            'batch_id' => $bulkBatchId,
+                                            'platform' => $platformName,
+                                            'asset_group' => $firstLog->asset_type === 'gift_card' ? 'gift_card' : 'paypal',
+                                            'transaction_type' => ($firstLog->asset_type === 'gift_card' ? 'Gift Card' : 'PayPal') . " ({$sourceName}) [LEADER Split]",
+                                            'total_usd' => $totalUsd,
+                                            'exchange_rate' => $averageMarketRate,
+                                            'payout_rate' => $leaderRate,
+                                            'payout_percentage' => $leaderPercentage,
+                                            'total_vnd' => $leaderVndPayout,
+                                            'profit_vnd' => $leaderProfitVnd,
+                                            'status' => 'pending',
+                                            'note' => 'Leader split from batch ' . $bulkBatchId,
+                                        ]);
+                                    }
+
                                     $paymentGenerated = true;
 
                                     if (!empty($parentIdsToUpdate)) {
-                                        PayoutLog::whereIn('id', $parentIdsToUpdate)->update(['user_payment_id' => $payment->id]);
+                                        PayoutLog::whereIn('id', $parentIdsToUpdate)->update(['user_payment_id' => $staffPayment->id]);
                                         $allProcessedIds = array_merge($allProcessedIds, $parentIdsToUpdate);
                                     }
                                     if (!empty($childIdsToUpdate)) {
-                                        PayoutLog::whereIn('id', $childIdsToUpdate)->update(['user_payment_id' => $payment->id]);
+                                        PayoutLog::whereIn('id', $childIdsToUpdate)->update(['user_payment_id' => $staffPayment->id]);
                                         $allProcessedIds = array_merge($allProcessedIds, $childIdsToUpdate);
                                     }
                                 }

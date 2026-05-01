@@ -158,6 +158,8 @@ REBATEOPS
 - [x] v5.5.1: Bidirectional Account Sync — Cross-platform import, and unified UI-driven sync actions.
 - [x] v5.5.2: Bidirectional Rebate Tracker Sync — Multi-tab order import across platforms, high-resiliency status sanitization, and automated account-email linking.
 - [x] v5.5.3: Bidirectional Payout Method Sync — Full-spec wallet import (23-column), automated Personal Security Info (PII) mapping, and unique identity-based conflict resolution.
+- [x] v5.6.0: Multi-tier Profit Sharing — Advanced settlement logic to split revenue between Leaders and Staff members, dynamically generating separate Disbursement records based on percentage allocations.
+- [x] v5.6.1: Core UI/UX Stabilization — Global systematic debugging of Filament 3 Floating UI; resolving modal z-index overlap issues by safely injecting state-driven CSS across all Admin panels.
 ---
 
 ## 🔐 Security & Access Control
