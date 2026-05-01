@@ -155,6 +155,7 @@ class AdminUserEarningsTable extends BaseWidget
                     ->collapsible(),
             ])
             ->defaultGroup('user_id')
+            ->defaultSort('user_id')
             ->recordTitle(fn($record) => $record->user?->name)
             ->paginated(false)
             ->filters([
