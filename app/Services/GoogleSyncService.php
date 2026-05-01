@@ -437,9 +437,9 @@ class GoogleSyncService
     public function syncPayoutMethods($records = null): array
     {
         if ($records instanceof Builder) {
-            $records = $records->with(['user'])->get();
+            $records = $records->get();
         } elseif ($records === null) {
-            $records = PayoutMethod::with(['user'])->get();
+            $records = PayoutMethod::all();
         }
 
         $targetTab = 'Payout_Methods';
@@ -1015,6 +1015,111 @@ class GoogleSyncService
             'updated' => $totalUpdated,
             'failed'  => $totalFailed,
             'skipped' => $totalSkipped
+        ];
+    }
+
+    /**
+     * ✅ CHIỀU 2: SHEET -> WEB (Dành cho Payout Methods)
+     * Đồng bộ dữ liệu từ Google Sheet (Tab Payout_Method) về Database.
+     */
+    public function importPayoutMethods(?string $spreadsheetId = null): array
+    {
+        $id = $spreadsheetId ?: '1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0';
+        $sheetName = 'Payout_Method';
+
+        // Đọc 23 cột (A:W)
+        $rows = $this->sheetService->readSheet('A:W', $sheetName, $id);
+        if (empty($rows)) {
+            return ['updated' => 0, 'created' => 0, 'failed' => 0];
+        }
+
+        // Bỏ qua hàng tiêu đề
+        array_shift($rows);
+
+        $totalUpdated = 0;
+        $totalCreated = 0;
+        $totalFailed = 0;
+
+        foreach ($rows as $index => $row) {
+            $name = trim($row[0] ?? '');
+            if (empty($name)) continue;
+
+            try {
+                $payoutMethod = PayoutMethod::firstOrNew(['name' => $name]);
+                $isNew = !$payoutMethod->exists;
+
+                // Mapping dữ liệu
+                // 1: Method Type
+                $payoutMethod->type = strtolower(str_replace(' ', '_', trim($row[1] ?? 'paypal')));
+                // 2: Email Address
+                $payoutMethod->email = trim($row[2] ?? $payoutMethod->email);
+                // 3: Email Password
+                $payoutMethod->password = trim($row[3] ?? $payoutMethod->password);
+                // 4: PayPal Account
+                $payoutMethod->paypal_account = trim($row[4] ?? $payoutMethod->paypal_account);
+                // 5: PayPal Password
+                $payoutMethod->paypal_password = trim($row[5] ?? $payoutMethod->paypal_password);
+                // 6: Authenticator Code
+                $payoutMethod->auth_code = trim($row[6] ?? $payoutMethod->auth_code);
+                // 7: Full Name
+                $payoutMethod->full_name = trim($row[7] ?? $payoutMethod->full_name);
+                // 8: Date of Birth
+                if (!empty($row[8])) {
+                    $payoutMethod->dob = $this->parseDate($row[8]);
+                }
+                // 9: SSN / Tax ID
+                $payoutMethod->ssn = trim($row[9] ?? $payoutMethod->ssn);
+                // 10: Phone Number
+                $payoutMethod->phone = trim($row[10] ?? $payoutMethod->phone);
+                // 11: Full Address
+                $payoutMethod->address = trim($row[11] ?? $payoutMethod->address);
+                // 12: Question Security 1
+                $payoutMethod->question_1 = trim($row[12] ?? $payoutMethod->question_1);
+                // 13: Answer 1
+                $payoutMethod->answer_1 = trim($row[13] ?? $payoutMethod->answer_1);
+                // 14: Question Security 2
+                $payoutMethod->question_2 = trim($row[14] ?? $payoutMethod->question_2);
+                // 15: Answer 2
+                $payoutMethod->answer_2 = trim($row[15] ?? $payoutMethod->answer_2);
+                // 16: Proxy Type
+                $payoutMethod->proxy_type = trim($row[16] ?? $payoutMethod->proxy_type);
+                // 17: IP Address
+                $payoutMethod->ip_address = trim($row[17] ?? $payoutMethod->ip_address);
+                // 18: Location
+                $payoutMethod->location = trim($row[18] ?? $payoutMethod->location);
+                // 19: ISP (Network Provider)
+                $payoutMethod->isp = trim($row[19] ?? $payoutMethod->isp);
+                // 20: Browser Name
+                $payoutMethod->browser = trim($row[20] ?? $payoutMethod->browser);
+                // 21: Device
+                $payoutMethod->device = trim($row[21] ?? $payoutMethod->device);
+                // 22: Note
+                $payoutMethod->note = trim($row[22] ?? $payoutMethod->note);
+                
+                // Mặc định kích hoạt nếu import mới
+                if ($isNew) {
+                    $payoutMethod->is_active = true;
+                    $payoutMethod->status = 'active';
+                }
+
+                $payoutMethod->save();
+
+                if ($isNew) {
+                    $totalCreated++;
+                } else {
+                    $totalUpdated++;
+                }
+
+            } catch (\Exception $e) {
+                Log::error("Import Payout Method Row Error at index {$index}: " . $e->getMessage());
+                $totalFailed++;
+            }
+        }
+
+        return [
+            'updated' => $totalUpdated,
+            'created' => $totalCreated,
+            'failed' => $totalFailed
         ];
     }
 

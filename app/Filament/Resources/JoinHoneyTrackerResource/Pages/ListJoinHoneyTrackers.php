@@ -18,7 +18,7 @@ class ListJoinHoneyTrackers extends ListRecords
             $this->getSyncToSheetAction('syncTrackers', __('system.trackers.join_honey')),
             $this->getImportTrackersFromSheetAction(),
             Actions\CreateAction::make()
-                ->label(__('system.trackers.create', ['tracker' => strtolower(__('system.trackers.join_honey'))])),
+                ->label(__('system.trackers.create', ['tracker' => __('system.trackers.join_honey')])),
         ];
     }
 }

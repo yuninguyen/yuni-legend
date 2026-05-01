@@ -21,6 +21,7 @@ class ListPayoutMethods extends ListRecords
     {
         return [
             $this->getSyncToSheetAction('syncPayoutMethods', 'Payout Methods'),
+            $this->getImportPayoutMethodsFromSheetAction(),
             Actions\CreateAction::make(),
         ];
     }

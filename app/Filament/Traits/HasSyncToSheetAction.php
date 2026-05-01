@@ -146,4 +146,47 @@ trait HasSyncToSheetAction
                 }
             });
     }
+
+    /**
+     * Tạo Action để đồng bộ Payout Method TỪ Google Sheet về Database
+     */
+    protected function getImportPayoutMethodsFromSheetAction(): Action
+    {
+        return Action::make('sync_from_google_sheet_payout_methods')
+            ->label(__('system.notifications.sync_from_google_sheet'))
+            ->icon('heroicon-o-cloud-arrow-down')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading(__('system.notifications.sync_from_google_sheet'))
+            ->modalDescription(__('system.notifications.sync_from_confirm_msg'))
+            ->modalSubmitActionLabel(__('system.account_claim.submit'))
+            ->visible(fn() => auth()->user()?->isAdmin())
+            ->action(function () {
+                try {
+                    $syncService = app(GoogleSyncService::class);
+                    // Dùng Spreadsheet ID người dùng cung cấp
+                    $result = $syncService->importPayoutMethods('1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0');
+
+                    Notification::make()
+                        ->title(__('system.notifications.sync_success'))
+                        ->body(__('system.notifications.sync_from_success_msg', [
+                            'updated' => $result['updated'],
+                            'created' => $result['created'] ?? 0,
+                            'failed' => $result['failed']
+                        ]))
+                        ->success()
+                        ->send();
+
+                } catch (\Exception $e) {
+                    Log::error("Manual Import Payout Methods Error: " . $e->getMessage());
+
+                    Notification::make()
+                        ->title(__('system.notifications.sync_error'))
+                        ->body($e->getMessage())
+                        ->danger()
+                        ->persistent()
+                        ->send();
+                }
+            });
+    }
 }

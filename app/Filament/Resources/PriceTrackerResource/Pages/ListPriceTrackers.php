@@ -17,7 +17,7 @@ class ListPriceTrackers extends ListRecords
             $this->getSyncToSheetAction('syncTrackers', __('system.trackers.price')),
             $this->getImportTrackersFromSheetAction(),
             Actions\CreateAction::make()
-                ->label(__('system.trackers.create', ['tracker' => strtolower(__('system.trackers.price'))])),
+                ->label(__('system.trackers.create', ['tracker' => __('system.trackers.price')])),
         ];
     }
 }

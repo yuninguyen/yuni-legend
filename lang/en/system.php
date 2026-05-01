@@ -503,7 +503,7 @@ return [
         ],
     ],
     'trackers' => [
-        'all_rebate' => 'All Rebate Tracker',
+        'all_rebate' => 'Rebate Tracker',
         'rakuten' => 'Rakuten Tracker',
         'active_junky' => 'Active Junky Tracker',
         'join_honey' => 'Join Honey Tracker',

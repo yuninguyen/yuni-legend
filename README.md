@@ -34,10 +34,12 @@ RebateOps is a professional, high-performance internal tool built with **Laravel
 - **Composite Grouping**: Advanced table grouping in Payout Logs by **Account + Brand**, providing a clear separated view for multi-brand accounts.
 - **Contextual UI**: "Exchange to VND" link intelligently disappears once a record is fully liquidated, preventing duplicate transactions.
 - **Queue-Powered Sync**: Real-time synchronization with Google Sheets (3x retry, 60s backoff).
+- **Full-Spec Wallet Sync**: Direct import/export for Payout Methods supporting 23 data points including authentication, security questions, and personal identification (PII) info.
 - **Smart Formatting**: Automatic sheet tab creation, frozen headers, and status-based conditional coloring.
 - **Language-Independent Nav**: Strict sidebar hierarchy (Dashboard → Resource → Work → Wallet → Settings → Logs) enforced regardless of active locale.
 - **Activity Logging**: Full audit trail for Admin oversight on every data mutation.
 - **Advanced Rebate Tracking**: Robust parsing of status timelines from Google Sheets with automated mapping to localized system keys and semantic color coding (Green/Orange/Blue) across both Table and Infolist views.
+- **Intelligent Tracker Sync**: Bidirectional synchronization for order trackers across 6 major platforms with automated status mapping and Payout Date resolution.
 
 ---
 
@@ -154,7 +156,8 @@ REBATEOPS
 - [x] v5.4.3: Railway Production Stability — SQLite compatibility refactor (CONCAT/YEAR), forced HTTPS, anti-SEO hardening, and disbursement slug update.
 - [x] v5.5: Dynamic Google Sheets Integration — Independent Import/Export IDs, Intelligent Email Onboarding (7-column spec), and Contextual Hover Tooltips.
 - [x] v5.5.1: Bidirectional Account Sync — Cross-platform import, and unified UI-driven sync actions.
-- [x] v5.5.2: Advanced Rebate Tracking — Robust status timeline parsing, high-resiliency regex-based sanitization, and case-insensitive cross-context UI visualization.
+- [x] v5.5.2: Bidirectional Rebate Tracker Sync — Multi-tab order import across platforms, high-resiliency status sanitization, and automated account-email linking.
+- [x] v5.5.3: Bidirectional Payout Method Sync — Full-spec wallet import (23-column), automated Personal Security Info (PII) mapping, and unique identity-based conflict resolution.
 ---
 
 ## 🔐 Security & Access Control
