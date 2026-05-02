@@ -61,7 +61,7 @@ class Email extends Model
     // Thiết lập quan hệ: Một Email có thể dùng cho NHIỀU Account Platform
     public function accounts(): HasMany
     {
-        return $this->hasMany(Account::class);
+        return $this->hasMany(Account::class, 'email_id');
     }
 
     // Cấu hình theo dõi toàn bộ các cột được phép điền

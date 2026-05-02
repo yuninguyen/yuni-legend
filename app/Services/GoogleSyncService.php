@@ -667,9 +667,9 @@ class GoogleSyncService
         'Rate (đ)'
     ];
 
-    public function formatBrand(Brand $record): array
+    public function formatBrand(Brand $record, array $platformNames = []): array
     {
-        $platformName = Platform::where('slug', $record->platform)->value('name') ?? $record->platform;
+        $platformName = $platformNames[$record->platform] ?? $record->platform;
 
         return [
             $record->name,
@@ -688,8 +688,11 @@ class GoogleSyncService
             $records = Brand::all();
         }
 
+        // Pre-load platform names để tránh N+1 query trong formatBrand()
+        $platformNames = Platform::pluck('name', 'slug')->toArray();
+
         $targetTab = 'Brand';
-        $rows = collect($records)->map(fn($r) => $this->formatBrand($r))->values()->toArray();
+        $rows = collect($records)->map(fn($r) => $this->formatBrand($r, $platformNames))->values()->toArray();
 
         $this->sheetService->createSheetIfNotExist($targetTab, $spreadsheetId);
         $result = $this->sheetService->upsertRows($rows, $targetTab, self::$brandHeaders, $spreadsheetId);
@@ -699,7 +702,7 @@ class GoogleSyncService
 
     public function importBrands(?string $spreadsheetId = null): array
     {
-        $id = $spreadsheetId ?? '1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0';
+        $id = $spreadsheetId ?: (config('services.google.import_spreadsheet_id') ?: config('services.google.spreadsheet_id'));
         $sheetName = 'Brand';
 
         $rows = $this->sheetService->readSheet('A:E', $sheetName, $id);
@@ -734,19 +737,28 @@ class GoogleSyncService
                     return strtolower($p->name) === strtolower($platformName) || strtolower($p->slug) === strtolower($platformName);
                 })?->slug ?? \Str::slug($platformName);
 
-                // Tìm hoặc Tạo mới dựa trên Name + Platform
-                $brand = Brand::where('name', $brandName)
-                    ->where('platform', $platformSlug)
+                // Lookup: name + platform (case-insensitive, chấp nhận cả slug lẫn display name)
+                // Không dùng slug vì records cũ có slug format khác (không có platform suffix)
+                $brand = Brand::withTrashed()
+                    ->whereRaw('LOWER(name) = ?', [strtolower($brandName)])
+                    ->where(function ($q) use ($platformSlug, $platformName) {
+                        $q->whereRaw('LOWER(platform) = ?', [strtolower($platformSlug)])
+                          ->orWhereRaw('LOWER(platform) = ?', [strtolower($platformName)]);
+                    })
                     ->first();
 
                 $isNew = false;
                 if (!$brand) {
                     $brand = new Brand();
-                    $brand->name = $brandName;
-                    $brand->platform = $platformSlug;
                     $brand->slug = \Str::slug($brandName . '-' . $platformSlug);
                     $isNew = true;
+                } elseif ($brand->trashed()) {
+                    $brand->restore();
                 }
+
+                // Normalize platform value sang slug
+                $brand->name = $brandName;
+                $brand->platform = $platformSlug;
 
                 // Cập nhật các trường khác
                 if (isset($row[2])) $brand->boost_percentage = $this->parseNumeric($row[2]);
@@ -793,7 +805,7 @@ class GoogleSyncService
 
     public function importPlatforms(?string $spreadsheetId = null): array
     {
-        $id = $spreadsheetId ?? '1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0';
+        $id = $spreadsheetId ?: (config('services.google.import_spreadsheet_id') ?: config('services.google.spreadsheet_id'));
         $sheetName = 'Platform';
 
         $rows = $this->sheetService->readSheet('A:B', $sheetName, $id);
@@ -878,7 +890,7 @@ class GoogleSyncService
 
     public function importUsers(?string $spreadsheetId = null): array
     {
-        $id = $spreadsheetId ?? '1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0';
+        $id = $spreadsheetId ?: (config('services.google.import_spreadsheet_id') ?: config('services.google.spreadsheet_id'));
         $sheetName = 'User';
 
         $rows = $this->sheetService->readSheet('A:D', $sheetName, $id);
@@ -1361,7 +1373,7 @@ class GoogleSyncService
      */
     public function importPayoutMethods(?string $spreadsheetId = null): array
     {
-        $id = $spreadsheetId ?: '1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0';
+        $id = $spreadsheetId ?: (config('services.google.import_spreadsheet_id') ?: config('services.google.spreadsheet_id'));
         $sheetName = 'Payout_Method';
 
         // Đọc 23 cột (A:W)

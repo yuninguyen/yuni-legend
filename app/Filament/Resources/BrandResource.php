@@ -3,23 +3,22 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\BrandResource\Pages;
-use App\Filament\Resources\BrandResource\RelationManagers;
+use App\Filament\Resources\Traits\HasPlatform;
 use App\Models\Brand;
+use App\Models\Platform;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Support\Enums\Alignment;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Support\Enums\Alignment;
 
 class BrandResource extends Resource
 {
     protected static ?string $model = Brand::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-
 
     public static function getNavigationGroup(): ?string
     {
@@ -47,6 +46,7 @@ class BrandResource extends Resource
     public static function canViewAny(): bool
     {
         $user = auth()->user();
+
         return $user && method_exists($user, 'isAdmin') && $user->isAdmin();
     }
 
@@ -57,10 +57,10 @@ class BrandResource extends Resource
                 Forms\Components\TextInput::make('name')
                     ->required()
                     ->live(onBlur: true)
-                    ->afterStateUpdated(fn($state, $set) => $set('slug', \Str::slug($state))),
+                    ->afterStateUpdated(fn ($state, $set) => $set('slug', \Str::slug($state))),
                 Forms\Components\Select::make('platform')
                     ->label(__('system.brands.fields.platform'))
-                    ->options(\App\Filament\Resources\Traits\HasPlatform::getPlatforms())
+                    ->options(HasPlatform::getPlatforms())
                     ->required(),
                 Forms\Components\TextInput::make('slug')
                     ->required()
@@ -89,15 +89,21 @@ class BrandResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('id')
+                    ->label('ID')
+                    ->alignment(Alignment::Center),
                 Tables\Columns\TextColumn::make('name')
                     ->label(__('system.brands.columns.name'))
                     ->alignment(Alignment::Center)
                     ->searchable(),
+                Tables\Columns\TextColumn::make('slug')
+                    ->alignment(Alignment::Center)
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('platform')
                     ->label(__('system.brands.columns.platform'))
                     ->alignment(Alignment::Center)
                     ->searchable()
-                    ->formatStateUsing(fn(string $state): string => \App\Models\Platform::where('slug', $state)->value('name') ?? $state),
+                    ->formatStateUsing(fn (string $state): string => Platform::where('slug', $state)->value('name') ?? $state),
                 Tables\Columns\TextColumn::make('boost_percentage')
                     ->label(__('system.brands.columns.boost'))
                     ->alignment(Alignment::Center)
@@ -119,16 +125,13 @@ class BrandResource extends Resource
                     ->alignment(Alignment::Center)
                     ->money('VND', locale: 'vi_VN')
                     ->color('primary'),
-                Tables\Columns\TextColumn::make('slug')
-                    ->alignment(Alignment::Center)
-                    ->toggleable(isToggledHiddenByDefault: true), // Ẩn bớt cho gọn, cần thì bật lên,
 
             ])
             ->filters([
                 // 1. LỌC THEO PLATFORM (Quan trọng nhất)
                 Tables\Filters\SelectFilter::make('platform')
                     ->label(__('system.brands.filters.platform'))
-                    ->options(\App\Filament\Resources\Traits\HasPlatform::getPlatforms())
+                    ->options(HasPlatform::getPlatforms())
                     ->searchable(), // Cho phép gõ tìm platform nếu danh sách dài
 
                 // 2. LỌC THEO TRẠNG THÁI BOOST (Thẻ có thưởng vs Thẻ không thưởng)
@@ -137,8 +140,8 @@ class BrandResource extends Resource
                     ->trueLabel(__('system.brands.filters.with_boost'))
                     ->falseLabel(__('system.brands.filters.no_boost'))
                     ->queries(
-                        true: fn(Builder $query) => $query->where('boost_percentage', '>', 0),
-                        false: fn(Builder $query) => $query->where(fn($q) => $q->where('boost_percentage', 0)->orWhereNull('boost_percentage')),
+                        true: fn (Builder $query) => $query->where('boost_percentage', '>', 0),
+                        false: fn (Builder $query) => $query->where(fn ($q) => $q->where('boost_percentage', 0)->orWhereNull('boost_percentage')),
                     ),
 
                 // 3. LỌC THEO GIỚI HẠN RÚT (Có Limit vs Không Limit)
@@ -147,8 +150,8 @@ class BrandResource extends Resource
                     ->trueLabel(__('system.brands.filters.limited'))
                     ->falseLabel(__('system.brands.filters.unlimited'))
                     ->queries(
-                        true: fn(Builder $query) => $query->where('maximum_limit', '>', 0),
-                        false: fn(Builder $query) => $query->where(fn($q) => $q->where('maximum_limit', 0)->orWhereNull('maximum_limit')),
+                        true: fn (Builder $query) => $query->where('maximum_limit', '>', 0),
+                        false: fn (Builder $query) => $query->where(fn ($q) => $q->where('maximum_limit', 0)->orWhereNull('maximum_limit')),
                     ),
             ])
             ->filtersLayout(Tables\Enums\FiltersLayout::AboveContent)

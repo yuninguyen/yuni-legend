@@ -17,9 +17,11 @@ class PayoutLog extends Model
     use SoftDeletes;
 
     /**
-     * CỜ ĐỒNG BỘ: Ngăn chặn vòng lặp vô tận khi đồng bộ từ Google Sheets
+     * CỜ ĐỒNG BỘ: Ngăn chặn vòng lặp vô tận khi đồng bộ từ Google Sheets.
+     * Dùng static để flag tồn tại xuyên suốt request, kể cả khi Observer nhận
+     * một instance mới từ pipeline của Eloquent.
      */
-    protected bool $is_syncing_from_sheet = false;
+    public static bool $syncingFromSheet = false;
 
     protected static function booted()
     {

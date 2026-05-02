@@ -59,6 +59,20 @@ class Account extends Model
                 });
             }
         });
+
+        // Cascade soft-delete & restore xuống RebateTracker để tránh orphaned records
+        static::deleting(function ($account) {
+            $account->rebateTrackers()->delete();
+        });
+
+        static::restoring(function ($account) {
+            $account->rebateTrackers()->withTrashed()->restore();
+        });
+
+        // forceDelete: xóa hẳn rebateTrackers trước để RESTRICT FK không chặn
+        static::forceDeleting(function ($account) {
+            $account->rebateTrackers()->withTrashed()->forceDelete();
+        });
     }
 
     public function getFilamentName(): string

@@ -44,7 +44,7 @@ class PayoutLogObserver implements ShouldHandleEventsAfterCommit
 
         // Nếu đang sync từ Google Sheet thì DỪNG, không đẩy lên Sheet lần nữa
         // (tránh vòng lặp vô tận: Sheet → Web → Sheet → Web → ...)
-        if ($payoutLog->is_syncing_from_sheet) {
+        if (PayoutLog::$syncingFromSheet) {
             return;
         }
 

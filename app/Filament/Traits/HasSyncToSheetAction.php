@@ -165,7 +165,7 @@ trait HasSyncToSheetAction
                 try {
                     $syncService = app(GoogleSyncService::class);
                     // Dùng Spreadsheet ID người dùng cung cấp
-                    $result = $syncService->importPayoutMethods('1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0');
+                    $result = $syncService->importPayoutMethods();
 
                     Notification::make()
                         ->title(__('system.notifications.sync_success'))
@@ -207,7 +207,7 @@ trait HasSyncToSheetAction
             ->action(function () {
                 try {
                     $syncService = app(GoogleSyncService::class);
-                    $result = $syncService->importBrands('1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0');
+                    $result = $syncService->importBrands();
 
                     Notification::make()
                         ->title(__('system.notifications.sync_success'))
@@ -249,7 +249,7 @@ trait HasSyncToSheetAction
             ->action(function () {
                 try {
                     $syncService = app(GoogleSyncService::class);
-                    $result = $syncService->importPlatforms('1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0');
+                    $result = $syncService->importPlatforms();
 
                     Notification::make()
                         ->title(__('system.notifications.sync_success'))
@@ -291,7 +291,7 @@ trait HasSyncToSheetAction
             ->action(function () {
                 try {
                     $syncService = app(GoogleSyncService::class);
-                    $result = $syncService->importUsers('1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0');
+                    $result = $syncService->importUsers();
 
                     Notification::make()
                         ->title(__('system.notifications.sync_success'))

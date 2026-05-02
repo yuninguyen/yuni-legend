@@ -150,13 +150,15 @@ class PayoutLogResource extends Resource
                             continue;
                         }
 
-                        // 🟢 GẮN CỜ ẢO TRƯỚC KHI UPDATE ĐỂ BÁO CHO OBSERVER BIẾT
-                        $log->is_syncing_from_sheet = true;
-
-                        $log->update([
-                            'status' => $newStatus,
-                            'note' => trim($row[$noteIdx] ?? ''),
-                        ]);
+                        PayoutLog::$syncingFromSheet = true;
+                        try {
+                            $log->update([
+                                'status' => $newStatus,
+                                'note' => trim($row[$noteIdx] ?? ''),
+                            ]);
+                        } finally {
+                            PayoutLog::$syncingFromSheet = false;
+                        }
                         $count++;
                     }
                 }
