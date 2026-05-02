@@ -2,27 +2,39 @@
 
 namespace App\Filament\Resources\Traits;
 
-use Filament\Infolists\Infolist;
-use Filament\Support\Enums\Alignment;
-use Filament\Support\Enums\IconPosition;
+use App\Filament\Resources\RebateTrackerResource;
+use App\Models\Account;
+use App\Models\Platform;
+use App\Models\RebateTracker;
+use App\Models\User;
+use App\Services\GoogleSyncService;
+use Carbon\Carbon;
 use Filament\Forms;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Form;
-use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Table;
-use Filament\Tables\Grouping\Group;
-use Illuminate\Support\HtmlString;
+use Filament\Infolists\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Infolist;
+use Filament\Notifications\Notification;
+use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\IconPosition;
+use Filament\Tables;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Grouping\Group;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use App\Filament\Resources\Traits\HasUsStates;
-use App\Filament\Resources\Traits\HasPlatform;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 
 trait HasTrackerSchema
 {
-    // FIX #8: $usStates được kế thừa từ HasUsStates — KHÔNG khai báo lại ở đây.
-    use HasUsStates;
     use HasPlatform;
     use HasPlatformCache;
+
+    // FIX #8: $usStates được kế thừa từ HasUsStates — KHÔNG khai báo lại ở đây.
+    use HasUsStates;
 
     /**
      * Scope lọc các bản ghi đang ở trạng thái có thể rút tiền
@@ -44,9 +56,9 @@ trait HasTrackerSchema
                                 // 1. USER (Chỉ Admin thấy)
                                 Forms\Components\Select::make('user_id')
                                     ->label(__('system.labels.user'))
-                                    ->relationship('user', 'name', fn(Builder $query) => $query->whereHas('accounts'))
-                                    ->default(fn() => auth()->id())
-                                    ->hidden(fn() => !auth()->user()?->isAdmin())
+                                    ->relationship('user', 'name', fn (Builder $query) => $query->whereHas('accounts'))
+                                    ->default(fn () => auth()->id())
+                                    ->hidden(fn () => ! auth()->user()?->isAdmin())
                                     ->dehydrated(true)
                                     ->searchable()
                                     ->preload()
@@ -65,10 +77,11 @@ trait HasTrackerSchema
                                     ->options(function (Forms\Get $get, $record) {
                                         $userId = $get('user_id') ?? $record?->user_id;
                                         $allPlatforms = self::getPlatforms();
-                                        if (!$userId)
+                                        if (! $userId) {
                                             return $allPlatforms;
+                                        }
 
-                                        $activePlatformKeys = \App\Models\Account::where('user_id', $userId)
+                                        $activePlatformKeys = Account::where('user_id', $userId)
                                             ->whereNotNull('platform')
                                             ->distinct()
                                             ->pluck('platform')
@@ -78,6 +91,7 @@ trait HasTrackerSchema
                                         foreach ($activePlatformKeys as $key) {
                                             $filteredPlatforms[$key] = $allPlatforms[$key] ?? ucfirst((string) $key);
                                         }
+
                                         return $filteredPlatforms;
                                     })
                                     ->live()
@@ -95,23 +109,25 @@ trait HasTrackerSchema
                                     ->options(function ($get, $record) {
                                         $userId = $get('user_id') ?? $record?->user_id;
                                         $platform = $get('platform') ?? $record?->account?->platform;
-                                        if (!$userId || !$platform)
+                                        if (! $userId || ! $platform) {
                                             return [];
+                                        }
 
-                                        return \App\Models\Account::query()
+                                        return Account::query()
                                             ->where('user_id', $userId)
                                             ->where('platform', $platform)
                                             ->select(['id', 'email_id', 'user_id', 'platform'])
                                             ->with('email:id,email')
-                                            ->withSum(['rebateTrackers as pending_amount' => fn($q) => $q->whereIn('status', ['pending', 'clicked'])], 'rebate_amount')
-                                            ->withSum(['rebateTrackers as confirmed_amount' => fn($q) => $q->whereIn('status', ['confirmed'])], 'rebate_amount')
-                                            ->withSum(['payoutLogs as paid_amount' => fn($q) => $q->whereIn('transaction_type', ['withdrawal', 'hold'])->where('status', 'completed')], 'amount_usd')
+                                            ->withSum(['rebateTrackers as pending_amount' => fn ($q) => $q->whereIn('status', ['pending', 'clicked'])], 'rebate_amount')
+                                            ->withSum(['rebateTrackers as confirmed_amount' => fn ($q) => $q->whereIn('status', ['confirmed'])], 'rebate_amount')
+                                            ->withSum(['payoutLogs as paid_amount' => fn ($q) => $q->whereIn('transaction_type', ['withdrawal', 'hold'])->where('status', 'completed')], 'amount_usd')
                                             ->get()
                                             ->mapWithKeys(function ($account) {
                                                 $pending = number_format($account->pending_amount ?? 0, 2);
                                                 $paid = number_format($account->paid_amount ?? 0, 2);
                                                 $available = number_format(max(0, ($account->confirmed_amount ?? 0) - ($account->paid_amount ?? 0)), 2);
                                                 $email = $account->email?->email ?? 'N/A';
+
                                                 return [$email => "{$email} - \${$paid} ➔ [Pending: \${$pending}] - [Confirmed: \${$available}]"];
                                             });
                                     })
@@ -123,7 +139,7 @@ trait HasTrackerSchema
                                         Forms\Components\Actions\Action::make('copyEmail')
                                             ->icon('heroicon-m-clipboard-document')
                                             ->color('warning')
-                                            ->tooltip(__('system.actions.copy') . ' Email')
+                                            ->tooltip(__('system.actions.copy').' Email')
                                             ->action(function (Forms\Get $get, $livewire) {
                                                 $email = $get('account_email');
 
@@ -131,7 +147,7 @@ trait HasTrackerSchema
                                                     // Sử dụng chung công nghệ dispatch copy của Sếp
                                                     $livewire->dispatch('copy-to-clipboard', text: $email);
 
-                                                    \Filament\Notifications\Notification::make()
+                                                    Notification::make()
                                                         ->title(__('system.labels.email_copied'))
                                                         ->success()
                                                         ->send();
@@ -139,12 +155,13 @@ trait HasTrackerSchema
                                             })
                                     )
                                     ->afterStateUpdated(function ($state, $get, $set) {
-                                        if (!$state) {
+                                        if (! $state) {
                                             $set('account_id', null);
                                             $set('account_password_display', null);
+
                                             return;
                                         }
-                                        $account = \App\Models\Account::whereHas('email', fn($q) => $q->where('email', $state))
+                                        $account = Account::whereHas('email', fn ($q) => $q->where('email', $state))
                                             ->where('user_id', $get('user_id'))
                                             ->where('platform', $get('platform'))
                                             ->first();
@@ -163,19 +180,19 @@ trait HasTrackerSchema
                                     ->password()
                                     ->revealable()
                                     ->dehydrated(false)
-                                    ->formatStateUsing(fn($record) => $record?->account?->password)
+                                    ->formatStateUsing(fn ($record) => $record?->account?->password)
                                     ->suffixAction(
                                         Forms\Components\Actions\Action::make('copyPassword')
                                             ->icon('heroicon-m-clipboard-document')
                                             ->color('warning')
                                             ->action(function (Forms\Get $get, $livewire) {
                                                 $accountId = $get('account_id');
-                                                $password = \App\Models\Account::find($accountId)?->password;
+                                                $password = Account::find($accountId)?->password;
 
                                                 if ($password) {
                                                     $livewire->dispatch('copy-to-clipboard', text: $password);
 
-                                                    \Filament\Notifications\Notification::make()
+                                                    Notification::make()
                                                         ->title(__('system.labels.copied'))
                                                         ->success()
                                                         ->send();
@@ -189,16 +206,18 @@ trait HasTrackerSchema
                         // PHẦN HIỂN THỊ TRẠNG THÁI (Giữ nguyên logic của Sếp)
                         Forms\Components\Placeholder::make('account_status_display')
                             ->label(__('system.labels.account_status_tracking'))
-                            ->visible(fn($get) => $get('account_email'))
+                            ->visible(fn ($get) => $get('account_email'))
                             ->content(function ($get) {
                                 // ... (Giữ nguyên toàn bộ nội dung HtmlString bên trong của Sếp)
                                 $emailState = $get('account_email');
-                                $account = \App\Models\Account::whereHas('email', fn($q) => $q->where('email', $emailState))->first();
-                                if (!$account)
-                                    return new HtmlString("<div class='text-danger'>⚠️ " . __('system.notifications.no_records_found') . "</div>");
+                                $account = Account::whereHas('email', fn ($q) => $q->where('email', $emailState))->first();
+                                if (! $account) {
+                                    return new HtmlString("<div class='text-danger'>⚠️ ".__('system.notifications.no_records_found').'</div>');
+                                }
                                 $statuses = (array) $account->status;
-                                if (empty($statuses))
+                                if (empty($statuses)) {
                                     return __('system.n/a');
+                                }
                                 $htmlResult = collect($statuses)->map(function ($status, $index) use ($statuses) {
                                     $s_lower = strtolower($status);
                                     $color = match ($s_lower) {
@@ -221,11 +240,13 @@ trait HasTrackerSchema
                                         'no_paypal_needed', 'no_paypal_required' => __('system.status.no_paypal_required'),
                                         'banned' => __('system.status.banned'),
                                         'active', 'live' => __('system.status.active'),
-                                        default => __('system.status.' . $s_lower)
+                                        default => __('system.status.'.$s_lower)
                                     };
-                                    $arrow = ($index < count($statuses) - 1) ? " <span style='color: #d1d5db; margin: 0 4px;'>→</span> " : "";
+                                    $arrow = ($index < count($statuses) - 1) ? " <span style='color: #d1d5db; margin: 0 4px;'>→</span> " : '';
+
                                     return "<span style='color: {$color}; font-weight: 800; font-size: 0.85rem;'>{$label}</span>{$arrow}";
                                 })->implode('');
+
                                 return new HtmlString("<div style='padding:12px; background:#f0f9ff; border-radius:8px;'>{$htmlResult}</div>");
                             })
                             ->columnSpanFull(),
@@ -240,7 +261,7 @@ trait HasTrackerSchema
                     ->schema([
                         Forms\Components\Grid::make(3)
                             ->schema([
-                                Forms\Components\DatePicker::make('transaction_date')
+                                DatePicker::make('transaction_date')
                                     ->label(__('system.labels.transaction_date'))
                                     ->placeholder('dd/mm/yyyy')
                                     ->displayFormat('d/m/Y')
@@ -252,7 +273,7 @@ trait HasTrackerSchema
                                     ->default(null)
                                     ->columns(5), // Đảm bảo không tự động lấy ngày hiện tại
 
-                                Forms\Components\DatePicker::make('payout_date')
+                                DatePicker::make('payout_date')
                                     ->label(__('system.labels.payout_date'))
                                     ->placeholder('dd/mm/yyyy')
                                     ->displayFormat('d/m/Y')
@@ -262,7 +283,7 @@ trait HasTrackerSchema
                                     // Logic Validation: Phải sau hoặc bằng ngày giao dịch
                                     ->after('transaction_date')
                                     ->validationMessages([
-                                        'after' => __('system.notifications.date_updated_sync') // Tạm dùng key này hoặc tạo mới
+                                        'after' => __('system.notifications.date_updated_sync'), // Tạm dùng key này hoặc tạo mới
                                     ])
                                     ->nullable() // Cho phép để trống
                                     ->default(null)
@@ -307,7 +328,8 @@ trait HasTrackerSchema
                                     ->label(__('system.labels.rebate_amount'))
                                     ->content(function ($get) {
                                         $total = (float) $get('order_value') * ((float) $get('cashback_percent') / 100);
-                                        return '$ ' . number_format($total, 2);
+
+                                        return '$ '.number_format($total, 2);
                                     })
                                     ->extraAttributes(['class' => 'text-success font-bold text-xl']),
                             ]),
@@ -343,35 +365,36 @@ trait HasTrackerSchema
         return $infolist
             ->schema([
                 // PHẦN 1: EMAIL INFORMATION
-                \Filament\Infolists\Components\Section::make(__('system.account_claim.section_title'))
+                Section::make(__('system.account_claim.section_title'))
                     ->schema([
-                        \Filament\Infolists\Components\TextEntry::make('account.email.email')
+                        TextEntry::make('account.email.email')
                             ->label(__('system.labels.email_address'))
                             ->placeholder('N/A')
                             ->copyable(), // Cho phép click để copy nhanh
                         // Password (Lấy từ quan hệ: account -> password)
-                        \Filament\Infolists\Components\TextEntry::make('account.password')
+                        TextEntry::make('account.password')
                             ->label(__('system.labels.password'))
                             ->placeholder('N/A'),
                         // Platform (Lấy từ quan hệ: account -> platform)
-                        \Filament\Infolists\Components\TextEntry::make('account.platform')
+                        TextEntry::make('account.platform')
                             ->label(__('system.labels.platform'))
                             ->placeholder('N/A')
-                            ->formatStateUsing(fn($state) => $state ? static::getPlatformName($state) : 'N/A'),
+                            ->formatStateUsing(fn ($state) => $state ? static::getPlatformName($state) : 'N/A'),
                         // User (Để hiện tên thay vì ID số 1)
-                        \Filament\Infolists\Components\TextEntry::make('user.name')
+                        TextEntry::make('user.name')
                             ->label(__('system.labels.user'))
                             ->placeholder('N/A'),
                         // Status (Đảm bảo đúng tên cột trong DB
-                        \Filament\Infolists\Components\TextEntry::make('account.status')
+                        TextEntry::make('account.status')
                             ->label(__('system.labels.account_status_tracking'))
                             ->html() // Bắt buộc phải có để Filament render thẻ <span> và <div>
                             ->placeholder('No status history found.')
                             ->formatStateUsing(function ($state, $record) {
                                 // Lấy account từ record hiện tại của Infolist
                                 $account = $record->account;
-                                if (!$account || !$account->status)
+                                if (! $account || ! $account->status) {
                                     return null;
+                                }
 
                                 // Đảm bảo dữ liệu là mảng để chạy vòng lặp map
                                 $statusHistory = is_array($account->status)
@@ -401,11 +424,11 @@ trait HasTrackerSchema
                                         'no_paypal_needed', 'no_paypal_required' => __('system.status.no_paypal_required'),
                                         'banned' => __('system.status.banned'),
                                         'active', 'live' => __('system.status.active'),
-                                        default => __('system.status.' . $s_lower)
+                                        default => __('system.status.'.$s_lower)
                                     };
 
                                     $isLast = $index === count($statusHistory) - 1;
-                                    $arrow = !$isLast ? " <span style='color: #9ca3af; margin: 0 10px;'>→</span> " : "";
+                                    $arrow = ! $isLast ? " <span style='color: #9ca3af; margin: 0 10px;'>→</span> " : '';
 
                                     return "<span style='color: {$color}; font-weight: 800; font-size: 0.9rem;'>{$label}</span>{$arrow}";
                                 })->implode('');
@@ -416,25 +439,25 @@ trait HasTrackerSchema
                                     </div>
                                 ");
                             })
-                            ->columnSpanFull()
+                            ->columnSpanFull(),
                     ])->columns(2),
 
                 // PHẦN 2: PLATFORM & SOURCE INFORMATION
-                \Filament\Infolists\Components\Section::make(__('system.rebate_tracker.order_detail'))
+                Section::make(__('system.rebate_tracker.order_detail'))
                     ->schema([
-                        \Filament\Infolists\Components\TextEntry::make('transaction_date')
+                        TextEntry::make('transaction_date')
                             ->label(__('system.labels.transaction_date'))
                             ->dateTime('d/m/Y')
                             ->placeholder('N/A'),
-                        \Filament\Infolists\Components\TextEntry::make('payout_date')
+                        TextEntry::make('payout_date')
                             ->label(__('system.labels.payout_date'))
                             ->dateTime('d/m/Y')
                             ->placeholder('N/A'),
-                        \Filament\Infolists\Components\TextEntry::make('status')
+                        TextEntry::make('status')
                             ->label(__('system.labels.status'))
                             ->placeholder('N/A')
                             ->badge()
-                            ->icon(fn(string $state): string => match ($state) {
+                            ->icon(fn (string $state): string => match ($state) {
                                 'clicked' => 'heroicon-m-cursor-arrow-rays',
                                 'pending' => 'heroicon-m-clock',
                                 'confirmed' => 'heroicon-m-check-badge',
@@ -442,7 +465,7 @@ trait HasTrackerSchema
                                 'ineligible' => 'heroicon-m-x-circle',        // Hình dấu X tròn
                                 default => 'heroicon-m-question-mark-circle',
                             })
-                            ->formatStateUsing(fn(string $state): string => match ($state) {
+                            ->formatStateUsing(fn (string $state): string => match ($state) {
                                 'clicked' => __('system.status.clicked'),
                                 'pending' => __('system.status.pending'),
                                 'confirmed' => __('system.status.confirmed'),
@@ -450,7 +473,7 @@ trait HasTrackerSchema
                                 'ineligible' => __('system.status.ineligible'),
                                 default => ucfirst($state), // Các nhãn khác chỉ viết hoa chữ cái đầu
                             })
-                            ->color(fn(string $state): string => match ($state) {
+                            ->color(fn (string $state): string => match ($state) {
                                 'clicked' => 'gray',
                                 'pending' => 'info',
                                 'confirmed' => 'success',
@@ -458,20 +481,20 @@ trait HasTrackerSchema
                                 'ineligible' => 'danger',
                                 default => 'gray',
                             }),
-                        \Filament\Infolists\Components\TextEntry::make('store_name')
+                        TextEntry::make('store_name')
                             ->label(__('system.labels.store_name'))
                             ->placeholder(__('system.n/a')),
 
-                        \Filament\Infolists\Components\TextEntry::make('order_id')
+                        TextEntry::make('order_id')
                             ->label(__('system.labels.order_id'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('order_value')
+                        TextEntry::make('order_value')
                             ->label(__('system.labels.order_value'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('cashback_percent')
+                        TextEntry::make('cashback_percent')
                             ->label(__('system.labels.cashback_percent'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('rebate_amount')
+                        TextEntry::make('rebate_amount')
                             ->label(__('system.labels.rebate_amount'))
                             ->money('USD')
                             ->weight(FontWeight::Bold)
@@ -479,41 +502,41 @@ trait HasTrackerSchema
                     ])->columns(3),
 
                 // PHẦN 3: Logistics & Note
-                \Filament\Infolists\Components\Section::make(__('system.labels.note'))
+                Section::make(__('system.labels.note'))
                     ->schema([
-                        \Filament\Infolists\Components\TextEntry::make('device')
+                        TextEntry::make('device')
                             ->label(__('system.labels.device'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('state')
+                        TextEntry::make('state')
                             ->label(__('system.labels.state_us'))
                             ->placeholder(__('system.n/a'))
-                            ->formatStateUsing(fn($state) => $state ? "{$state} - " . (self::$usStates[$state] ?? '') : 'N/A'),
-                        \Filament\Infolists\Components\TextEntry::make('note')
+                            ->formatStateUsing(fn ($state) => $state ? "{$state} - ".(self::$usStates[$state] ?? '') : 'N/A'),
+                        TextEntry::make('note')
                             ->label(__('system.labels.note'))
                             ->placeholder(__('system.n/a'))
                             ->columnSpanFull()
                             ->html() // Cho phép tự định nghĩa HTML để ép khoảng cách
-                            ->formatStateUsing(fn($state) => $state ? '
+                            ->formatStateUsing(fn ($state) => $state ? '
                                 <div style="
                                     white-space: pre-wrap;
                                     line-height: 1.6; /* Thu hẹp tối đa khoảng cách giữa các dòng */
                                     margin: 0;
                                     padding: 0;
-                                ">' . e(trim($state)) . '</pre>' : 'N/A'),
-                        \Filament\Infolists\Components\TextEntry::make('detail_transaction')
+                                ">'.e(trim($state)).'</pre>' : 'N/A'),
+                        TextEntry::make('detail_transaction')
                             ->label(__('system.labels.transaction_details'))
                             ->columnSpanFull()
                             ->html() // Cho phép tự định nghĩa HTML để ép khoảng cách
-                            ->formatStateUsing(fn($state) => $state ? '
+                            ->formatStateUsing(fn ($state) => $state ? '
                                 <div style="
                                     white-space: pre-wrap;
                                     line-height: 1.6; /* Thu hẹp tối đa khoảng cách giữa các dòng */
                                     margin: 0;
                                     padding: 0;
-                                ">' . e(trim($state)) . '</pre>' : 'N/A')
+                                ">'.e(trim($state)).'</pre>' : 'N/A')
                             ->extraAttributes([
                                 'class' => 'bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm transition',
-                                'style' => 'max-height: 300px; overflow-y: auto; line-height: 1.6;'
+                                'style' => 'max-height: 300px; overflow-y: auto; line-height: 1.6;',
                             ])
                             ->placeholder('No details available'),
 
@@ -524,7 +547,7 @@ trait HasTrackerSchema
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn(Builder $query) => $query->with(['account.email', 'user'])) // 🟢 TỐI ƯU: Tránh N+1
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['account.email', 'user'])) // 🟢 TỐI ƯU: Tránh N+1
             ->defaultGroup('account_id')
             ->groups([
                 Group::make('account_id')
@@ -535,11 +558,11 @@ trait HasTrackerSchema
                         $platform = static::getPlatformName($record->account?->platform);
 
                         // 🟢 TÍNH TỔNG CHO HEADER (Do phiên bản này chưa hỗ trợ ->summary() trên Group)
-                        $totalRebate = \App\Models\RebateTracker::query()
+                        $totalRebate = RebateTracker::query()
                             ->where('account_id', $record->account_id)
                             ->sum('rebate_amount');
 
-                        $rebateStr = '$' . number_format($totalRebate, 2);
+                        $rebateStr = '$'.number_format($totalRebate, 2);
 
                         return "{$email} | {$platform} | Total: {$rebateStr}";
                     }),
@@ -552,9 +575,9 @@ trait HasTrackerSchema
                     ->extraHeaderAttributes(['style' => 'width: 90px; min-width: 90px'])
                     ->extraAttributes(['style' => 'width: 90px; min-width: 90px'])
                     ->searchable(query: function ($query, $search) {
-                        $query->whereHas('account', fn($q) => $q->where('platform', 'like', "%{$search}%"));
+                        $query->whereHas('account', fn ($q) => $q->where('platform', 'like', "%{$search}%"));
                     })
-                    ->formatStateUsing(fn($state) => $state ? static::getPlatformName($state) : 'N/A')
+                    ->formatStateUsing(fn ($state) => $state ? static::getPlatformName($state) : 'N/A')
                     ->visible(false),
 
                 // 1. STORE (Đẩy lùi vào để phân cấp)
@@ -564,9 +587,6 @@ trait HasTrackerSchema
                     ->icon('heroicon-m-shopping-bag')
                     ->iconColor('gray')
                     ->alignment(Alignment::Left)
-                    ->extraAttributes(['class' => 'pl-10'])
-                    ->wrap()
-                    ->width('18%')
                     ->searchable(),
 
                 // 1b. ORDER ID
@@ -604,7 +624,7 @@ trait HasTrackerSchema
                     ->alignment(Alignment::Center)
                     ->badge()
                     // 1. Giữ nguyên Icon trạng thái ở phía trước (trái)
-                    ->icon(fn(string $state): string => match ($state) {
+                    ->icon(fn (string $state): string => match ($state) {
                         'clicked' => 'heroicon-m-cursor-arrow-rays',
                         'pending' => 'heroicon-m-clock',
                         'confirmed' => 'heroicon-m-check-badge',
@@ -613,13 +633,13 @@ trait HasTrackerSchema
                         default => 'heroicon-m-question-mark-circle',
                     })
                     // 2. Dùng formatStateUsing để "vẽ" thêm icon bút chì vào phía sau (phải)
-                    ->formatStateUsing(fn(string $state) => new HtmlString('
+                    ->formatStateUsing(fn (string $state) => new HtmlString('
                         <div class="flex items-center gap-1.5 justify-center">
-                            <span>' . __('system.status.' . $state) . '</span>
-                                ' . \Illuminate\Support\Facades\Blade::render('<x-heroicon-m-pencil-square class="w-4 h-4 text-gray-400" />') . '
+                            <span>'.__('system.status.'.$state).'</span>
+                                '.Blade::render('<x-heroicon-m-pencil-square class="w-4 h-4 text-gray-400" />').'
                          </div>
                     '))
-                    ->color(fn(string $state): string => match ($state) {
+                    ->color(fn (string $state): string => match ($state) {
                         'confirmed' => 'success',
                         'pending' => 'info',
                         'missing' => 'warning',
@@ -642,7 +662,7 @@ trait HasTrackerSchema
                                         'missing' => __('system.status.missing'),
                                         'ineligible' => __('system.status.ineligible'),
                                     ])
-                                    ->default(fn($record) => $record->status)
+                                    ->default(fn ($record) => $record->status)
                                     ->required(),
                             ])
                             ->action(function ($record, array $data) {
@@ -653,15 +673,16 @@ trait HasTrackerSchema
                                 try {
                                     static::syncTrackerWithService($record);
                                 } catch (\Exception $e) {
-                                    \Filament\Notifications\Notification::make()
+                                    Notification::make()
                                         ->title(__('system.notifications.sync_sheet_failed'))
                                         ->body($e->getMessage())
                                         ->warning()
                                         ->send();
+
                                     return;
                                 }
 
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title(__('system.notifications.status_updated_sync'))
                                     ->success()
                                     ->send();
@@ -680,13 +701,14 @@ trait HasTrackerSchema
                     ->label(__('system.labels.payout_date'))
                     ->alignment(Alignment::Center)
                     // 1. Dùng state() để ép giá trị null thành chuỗi 'N/A' TRƯỚC khi render
-                    ->state(fn($record) => $record->payout_date ? $record->payout_date : 'N/A')
+                    ->state(fn ($record) => $record->payout_date ? $record->payout_date : 'N/A')
                     // 2. Định dạng hiển thị: Nếu là 'N/A' thì giữ nguyên, nếu là ngày thì format
                     ->formatStateUsing(function ($state) {
-                        if ($state === 'N/A')
+                        if ($state === 'N/A') {
                             return $state;
+                        }
                         try {
-                            return \Carbon\Carbon::parse($state)->format('d/m/Y');
+                            return Carbon::parse($state)->format('d/m/Y');
                         } catch (\Exception $e) {
                             return $state;
                         }
@@ -703,9 +725,9 @@ trait HasTrackerSchema
                             ->modalSubmitActionLabel(__('system.actions.submit'))
                             ->modalCancelActionLabel(__('system.actions.cancel'))
                             ->form([
-                                Forms\Components\DatePicker::make('payout_date')
+                                DatePicker::make('payout_date')
                                     ->label(__('system.labels.select_payout_date'))
-                                    ->default(fn($record) => $record->payout_date ?? now())
+                                    ->default(fn ($record) => $record->payout_date ?? now())
                                     ->required(),
                             ])
                             ->action(function ($record, array $data) {
@@ -714,15 +736,16 @@ trait HasTrackerSchema
                                 try {
                                     static::syncTrackerWithService($record);
                                 } catch (\Exception $e) {
-                                    \Filament\Notifications\Notification::make()
+                                    Notification::make()
                                         ->title(__('system.notifications.sync_sheet_failed'))
                                         ->body($e->getMessage())
                                         ->warning()
                                         ->send();
+
                                     return;
                                 }
 
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title(__('system.notifications.date_updated_sync'))
                                     ->success()
                                     ->send();
@@ -732,46 +755,45 @@ trait HasTrackerSchema
             ])
             ->striped()
 
-
             ->filters([
                 // Lọc theo Tài khoản (Email)
                 Tables\Filters\SelectFilter::make('account_id')
                     ->label(__('system.labels.account_email'))
                     ->options(function () {
                         // B1: Lấy danh sách các account_id ĐÃ ĐƯỢC LÀM trong bảng RebateTracker
-                        $activeAccountIds = \App\Models\RebateTracker::whereNotNull('account_id')
+                        $activeAccountIds = RebateTracker::whereNotNull('account_id')
                             ->distinct()
                             ->pluck('account_id');
 
                         // B2: Chỉ móc Email của những account_id nằm trong danh sách trên
-                        return \App\Models\Account::whereIn('id', $activeAccountIds)
+                        return Account::whereIn('id', $activeAccountIds)
                             ->with('email')
                             ->get()
-                            ->filter(fn($account) => $account->email) // Bỏ qua nếu lỗi mất email
+                            ->filter(fn ($account) => $account->email) // Bỏ qua nếu lỗi mất email
                             ->pluck('email.email', 'id')
                             ->toArray();
                     })
                     ->searchable()
                     ->preload()
-                    ->columnSpan(fn() => auth()->user()?->role === 'operator' ? 2 : 1),
+                    ->columnSpan(fn () => auth()->user()?->role === 'operator' ? 2 : 1),
 
                 // Bộ lọc Platform (Quan trọng để Sub-menu chạy)
                 Tables\Filters\SelectFilter::make('platform')
                     ->label(__('system.labels.platform'))
                     ->options(function () {
                         // Tương tự, chỉ lấy những Platform của các Account đã có đơn
-                        $activeAccountIds = \App\Models\RebateTracker::whereNotNull('account_id')
+                        $activeAccountIds = RebateTracker::whereNotNull('account_id')
                             ->distinct()
                             ->pluck('account_id');
 
-                        $platforms = \App\Models\Account::whereIn('id', $activeAccountIds)
+                        $platforms = Account::whereIn('id', $activeAccountIds)
                             ->whereNotNull('platform')
                             ->distinct()
                             ->pluck('platform') // Chỉ pluck 1 cột để lấy mảng value
                             ->toArray();
 
                         // 🟢 2. FORMAT LẠI NHÃN (LABEL) NGAY BÊN TRONG HÀM OPTIONS
-                        $platforms_map = \App\Models\Platform::pluck('name', 'slug')->toArray();
+                        $platforms_map = Platform::pluck('name', 'slug')->toArray();
                         $formattedOptions = [];
                         foreach ($platforms as $p) {
                             $formattedOptions[$p] = $platforms_map[$p] ?? $p;
@@ -780,12 +802,12 @@ trait HasTrackerSchema
                         return $formattedOptions;
                     })
                     ->query(function (Builder $query, array $data) {
-                        if (!empty($data['value'])) {
-                            $query->whereHas('account', fn($q) => $q->where('platform', $data['value']));
+                        if (! empty($data['value'])) {
+                            $query->whereHas('account', fn ($q) => $q->where('platform', $data['value']));
                         }
                     })
                     ->searchable()
-                    ->visible(static::class === \App\Filament\Resources\RebateTrackerResource::class)
+                    ->visible(static::class === RebateTrackerResource::class)
                     ->columnSpan(1),
 
                 // Bộ lọc Trạng thái (CHỈ HIỆN TRẠNG THÁI ĐÃ CÓ TRONG DỮ LIỆU THỰC TẾ)
@@ -793,7 +815,7 @@ trait HasTrackerSchema
                     ->label(__('system.labels.status'))
                     ->options(function () {
                         // 1. Quét tìm các status đang thực sự tồn tại trong DB
-                        $activeStatuses = \App\Models\RebateTracker::whereNotNull('status')
+                        $activeStatuses = RebateTracker::whereNotNull('status')
                             ->distinct()
                             ->pluck('status');
 
@@ -821,15 +843,15 @@ trait HasTrackerSchema
                 // Bộ lọc theo User (CHỈ HIỆN USER ĐÃ CÓ ĐƠN)
                 Tables\Filters\SelectFilter::make('user_id')
                     ->label(__('system.labels.user'))
-                    ->visible(fn() => auth()->user()?->isAdmin()) // 🟢 ẨN KHỎI NHÂN VIÊN
+                    ->visible(fn () => auth()->user()?->isAdmin()) // 🟢 ẨN KHỎI NHÂN VIÊN
                     ->options(function () {
                         // 1. Quét lấy danh sách user_id đang thực sự có đơn
-                        $activeUserIds = \App\Models\RebateTracker::whereNotNull('user_id')
+                        $activeUserIds = RebateTracker::whereNotNull('user_id')
                             ->distinct()
                             ->pluck('user_id');
 
                         // 2. Lấy tên của đúng những User đó
-                        return \App\Models\User::whereIn('id', $activeUserIds)
+                        return User::whereIn('id', $activeUserIds)
                             ->pluck('name', 'id')
                             ->toArray();
                     })
@@ -841,7 +863,7 @@ trait HasTrackerSchema
                 Tables\Filters\SelectFilter::make('store_name')
                     ->label(__('system.labels.store_name'))
                     ->options(
-                        fn() => \App\Models\RebateTracker::select('store_name')
+                        fn () => RebateTracker::select('store_name')
                             ->whereNotNull('store_name')
                             ->distinct()
                             ->pluck('store_name', 'store_name')
@@ -853,36 +875,36 @@ trait HasTrackerSchema
                 // Lọc theo Ngày Giao dịch (Từ ngày - Đến ngày)
                 Tables\Filters\Filter::make('transaction_date')
                     ->form([
-                        \Filament\Forms\Components\DatePicker::make('transaction_from')->label(__('system.trackers.filters.transaction_from')),
-                        \Filament\Forms\Components\DatePicker::make('transaction_to')->label(__('system.trackers.filters.transaction_to')),
+                        DatePicker::make('transaction_from')->label(__('system.trackers.filters.transaction_from')),
+                        DatePicker::make('transaction_to')->label(__('system.trackers.filters.transaction_to')),
                     ])
                     ->columns(2)     // 👈 Ép 2 ô Date nằm ngang nhau
                     ->columnSpan(2)  // 👈 Chiếm 2 phần lưới
                     ->query(function (Builder $query, array $data): Builder {
                         return $query
-                            ->when($data['transaction_from'], fn($q, $date) => $q->whereDate('transaction_date', '>=', $date))
-                            ->when($data['transaction_to'], fn($q, $date) => $q->whereDate('transaction_date', '<=', $date));
+                            ->when($data['transaction_from'], fn ($q, $date) => $q->whereDate('transaction_date', '>=', $date))
+                            ->when($data['transaction_to'], fn ($q, $date) => $q->whereDate('transaction_date', '<=', $date));
                     }),
 
                 // Lọc theo Ngày Payout (Từ ngày - Đến ngày)
                 Tables\Filters\Filter::make('payout_date')
                     ->form([
-                        \Filament\Forms\Components\DatePicker::make('payout_from')->label(__('system.trackers.filters.payout_from')),
-                        \Filament\Forms\Components\DatePicker::make('payout_to')->label(__('system.trackers.filters.payout_to')),
+                        DatePicker::make('payout_from')->label(__('system.trackers.filters.payout_from')),
+                        DatePicker::make('payout_to')->label(__('system.trackers.filters.payout_to')),
                     ])
                     ->columns(2)     // 👈 Ép 2 ô Date nằm ngang nhau
                     ->columnSpan(2)  // 👈 Chiếm 2 phần lưới
                     ->query(function (Builder $query, array $data): Builder {
                         return $query
-                            ->when($data['payout_from'], fn($q, $date) => $q->whereDate('payout_date', '>=', $date))
-                            ->when($data['payout_to'], fn($q, $date) => $q->whereDate('payout_date', '<=', $date));
+                            ->when($data['payout_from'], fn ($q, $date) => $q->whereDate('payout_date', '>=', $date))
+                            ->when($data['payout_to'], fn ($q, $date) => $q->whereDate('payout_date', '<=', $date));
                     }),
                 Tables\Filters\TrashedFilter::make(), // 🟢 BẬT TÍNH NĂNG THÙNG RÁC
             ])
-            ->filtersLayout(\Filament\Tables\Enums\FiltersLayout::AboveContentCollapsible)
+            ->filtersLayout(FiltersLayout::AboveContentCollapsible)
 
             // 2. CHÌA KHÓA Ở ĐÂY: TỰ ĐỘNG CHIA 5 CỘT HOẶC 4 CỘT TÙY VÀO TRANG ĐANG XEM
-            ->filtersFormColumns(static::class === \App\Filament\Resources\RebateTrackerResource::class ? 5 : 4)
+            ->filtersFormColumns(static::class === RebateTrackerResource::class ? 5 : 4)
 
             ->actions([
                 // Nút Xem chi tiết (Hình con mắt) hiện ra bên ngoài
@@ -931,10 +953,10 @@ trait HasTrackerSchema
                         }),
                     Tables\Actions\RestoreAction::make(), // 🟢 Nút khôi phục dòng bị xóa
                     Tables\Actions\ForceDeleteAction::make()
-                        ->visible(fn() => auth()->user()?->isAdmin()),
+                        ->visible(fn () => auth()->user()?->isAdmin()),
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\DeleteAction::make(),
-                ])
+                ]),
             ])
 
             ->bulkActions([
@@ -944,18 +966,18 @@ trait HasTrackerSchema
                         ->label(__('system.actions.export_to_sheet'))
                         ->icon('heroicon-o-table-cells')
                         ->color('success')
-                        ->visible(fn() => auth()->user()?->isAdmin())
+                        ->visible(fn () => auth()->user()?->isAdmin())
                         ->requiresConfirmation()
-                        ->action(function (\Illuminate\Database\Eloquent\Collection $records, \App\Services\GoogleSyncService $syncService) {
+                        ->action(function (Collection $records, GoogleSyncService $syncService) {
                             try {
                                 $syncService->syncTrackers($records);
 
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title(__('system.notifications.sync_success'))
                                     ->success()
                                     ->send();
                             } catch (\Exception $e) {
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title(__('system.notifications.sync_error'))
                                     ->body($e->getMessage())
                                     ->danger()
@@ -965,8 +987,6 @@ trait HasTrackerSchema
                         ->deselectRecordsAfterCompletion(),
                     // Tự động bỏ tick sau khi xuất xong
 
-
-
                     // Nút đổi nhanh sang Pending
                     static::makeBulkStatusAction('pending', __('system.actions.mark_as_pending') ?: 'Mark as Pending', 'heroicon-o-clock', 'info'),
                     // Nút đổi nhanh sang Confirme
@@ -974,7 +994,7 @@ trait HasTrackerSchema
 
                     Tables\Actions\RestoreBulkAction::make(),     // 🟢 Khôi phục nhiều dòng
                     Tables\Actions\ForceDeleteBulkAction::make()
-                        ->visible(fn() => auth()->user()?->isAdmin()),
+                        ->visible(fn () => auth()->user()?->isAdmin()),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
@@ -983,7 +1003,7 @@ trait HasTrackerSchema
     /**
      * 🟢 HÀM GỘP: Xử lý đổi trạng thái và đồng bộ cho hàng loạt record
      */
-    public static function bulkUpdateStatus(\Illuminate\Database\Eloquent\Collection $records, string $newStatus): void
+    public static function bulkUpdateStatus(Collection $records, string $newStatus): void
     {
         $count = 0;
         foreach ($records as $record) {
@@ -995,13 +1015,13 @@ trait HasTrackerSchema
         }
 
         // Thông báo thành công mượt mà góc màn hình
-        \Filament\Notifications\Notification::make()
-            ->title("Đã chuyển {$count} dòng thành " . ucfirst($newStatus))
+        Notification::make()
+            ->title("Đã chuyển {$count} dòng thành ".ucfirst($newStatus))
             ->success()
             ->send();
 
         // 💡 LƯU Ý: Chúng ta chỉ cần update DB.
-        // RebateTrackerObserver của bạn sẽ tự động "bắt" được sự thay đổi này 
+        // RebateTrackerObserver của bạn sẽ tự động "bắt" được sự thay đổi này
         // và tự động đẩy Job lên Google Sheets. Không cần viết lệnh gọi Sheet ở đây nữa!
     }
 
@@ -1010,12 +1030,12 @@ trait HasTrackerSchema
      */
     private static function makeBulkStatusAction(string $status, string $label, string $icon, string $color): Tables\Actions\BulkAction
     {
-        return Tables\Actions\BulkAction::make('markAs' . ucfirst($status))
+        return Tables\Actions\BulkAction::make('markAs'.ucfirst($status))
             ->label($label)
             ->icon($icon)
             ->color($color)
             ->requiresConfirmation()
-            ->action(fn(\Illuminate\Database\Eloquent\Collection $records) => static::bulkUpdateStatus($records, $status));
+            ->action(fn (Collection $records) => static::bulkUpdateStatus($records, $status));
     }
 
     // =========================================================
@@ -1023,10 +1043,8 @@ trait HasTrackerSchema
     // =========================================================
     public static function syncTrackerWithService($record): void
     {
-        app(\App\Services\GoogleSyncService::class)->syncTrackers(collect([$record]));
+        app(GoogleSyncService::class)->syncTrackers(collect([$record]));
     }
-
-
 
     // =========================================================
 

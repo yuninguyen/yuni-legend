@@ -1,4 +1,5 @@
 <?php
+
 return [
     'dashboard' => 'Dashboard',
     'unassigned' => 'Unassigned',
@@ -208,6 +209,8 @@ return [
         'password_hint' => 'Minimum 8 characters, including letters and numbers',
         'date' => 'Select date...',
         'date_format' => 'DD/MM/YYYY',
+        'store_name_example' => 'e.g. Nike, Walmart, Adidas...',
+        'order_value_example' => 'e.g. 99.99',
     ],
 
     'tooltips' => [
@@ -390,7 +393,6 @@ return [
             'gift_card_details' => 'Gift Card Details',
             'financials' => 'Financials',
         ],
-
 
         'fields' => [
             'source_account' => 'Source Account',

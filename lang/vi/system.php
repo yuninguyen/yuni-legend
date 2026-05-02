@@ -1,4 +1,5 @@
 <?php
+
 return [
     'dashboard' => 'Bảng điều khiển',
     'unassigned' => 'Chưa gán',
@@ -208,6 +209,8 @@ return [
         'password_hint' => 'Tối thiểu 8 ký tự, bao gồm cả chữ và số',
         'date' => 'Chọn ngày...',
         'date_format' => 'DD/MM/YYYY',
+        'store_name_example' => 'VD: Nike, Walmart, Adidas...',
+        'order_value_example' => 'VD: 99.99',
     ],
 
     'tooltips' => [
@@ -390,7 +393,6 @@ return [
             'gift_card_details' => 'Chi tiết Gift Card',
             'financials' => 'Tài chính',
         ],
-
 
         'fields' => [
             'source_account' => 'Tài khoản nguồn',
