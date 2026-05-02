@@ -3,9 +3,11 @@
 namespace App\Filament\Widgets;
 
 use App\Models\PayoutLog;
+use App\Models\RebateTracker;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Livewire\Attributes\On;
+use Illuminate\Database\Eloquent\Builder;
 
 class PayoutStats extends BaseWidget
 {
@@ -13,8 +15,8 @@ class PayoutStats extends BaseWidget
     {
         return !auth()->user()?->isFinance();
     }
-    // 1. Phải khai báo biến này ở đây để lưu trữ ID User khi nhận được từ Table
-    public ?int $selectedUserId = null;
+
+    public array $filters = [];
 
     // 🟢 Đổi từ '10s' thành null để tắt Polling. 
     // Data sẽ cập nhật khi User F5 hoặc có tương tác.
@@ -23,67 +25,111 @@ class PayoutStats extends BaseWidget
     // Thêm hiệu ứng làm mờ khi đang tải (Loading state)
     protected static bool $isLazy = false;
 
-    // 2. Lắng nghe sự kiện từ Table truyền lên
-    #[On('updateStatsUser')]
-    public function updateUserId($userId): void
+    // 2. Lắng nghe sự kiện từ Table truyền lên (Nhận toàn bộ filter)
+    #[On('updateStatsFilters')]
+    public function updateFilters(array $filters): void
     {
-        $this->selectedUserId = $userId;
+        $this->filters = $filters;
         // Tín hiệu này sẽ tự động kích hoạt hàm getStats() chạy lại
     }
+
+    protected int|string|array $columns = 4;
 
     protected function getStats(): array
     {
         // 1. Khởi tạo Query cho RebateTracker (Dành cho Card 1 - Confirmed)
-        // Đây là nguồn dữ liệu chính xác nhất cho doanh thu đã xác nhận từ platform
-        $rebateQuery = \App\Models\RebateTracker::query();
+        $rebateQuery = RebateTracker::query();
 
         // 2. Khởi tạo Query cho PayoutLog (Dành cho Card 2 & 3 - Paid/Exchanged)
-        // Đây là nguồn dữ liệu phản ánh chính xác các giao dịch thực tế trong hệ thống
-        $payoutQuery = \App\Models\PayoutLog::query();
+        $payoutQuery = PayoutLog::query();
 
-        // 3. Áp dụng logic lọc theo User cho các Query
+        $filters = $this->filters;
+
+        /**
+         * Helper: Áp dụng bộ lọc đồng nhất cho cả 2 loại query
+         */
+        $applyFilters = function (Builder $query, bool $isRebate = true) use ($filters) {
+            $table = $isRebate ? 'rebate_trackers' : 'payout_logs';
+            
+            // 1. Lọc theo User
+            $query->when($filters['user_id'] ?? null, function ($q, $userId) use ($table) {
+                $q->where("{$table}.user_id", $userId);
+            });
+
+            // 2. Lọc theo Platform (Cần join với bảng accounts)
+            $query->when($filters['platform'] ?? null, function ($q, $platform) use ($table) {
+                $q->join('accounts', "{$table}.account_id", '=', 'accounts.id')
+                  ->where('accounts.platform', $platform);
+            });
+
+            // 3. Lọc theo Thời gian
+            $dateColumn = "{$table}.created_at";
+            
+            $query->when($filters['date_preset'] ?? null, function ($q, $preset) use ($dateColumn) {
+                if (str_starts_with($preset, 'year_')) {
+                    return $q->whereYear($dateColumn, (int) str_replace('year_', '', $preset));
+                }
+                return match ($preset) {
+                    'today' => $q->whereDate($dateColumn, now()->toDateString()),
+                    'this_month' => $q->whereMonth($dateColumn, now()->month)->whereYear($dateColumn, now()->year),
+                    'this_quarter' => $q->whereBetween($dateColumn, [now()->firstOfQuarter(), now()->lastOfQuarter()]),
+                    'this_year' => $q->whereYear($dateColumn, now()->year),
+                    default => $q,
+                };
+            });
+
+            $query->when($filters['from_date'] ?? null, fn($q, $date) => $q->whereDate($dateColumn, '>=', $date));
+            $query->when($filters['to_date'] ?? null, fn($q, $date) => $q->whereDate($dateColumn, '<=', $date));
+        };
+
+        // 3. Bảo mật: Nếu không phải Admin, luôn giới hạn dữ liệu của chính mình
         if (!auth()->user()?->isAdmin()) {
-            // Nếu là Staff, chỉ xem của chính mình
-            $rebateQuery->where('user_id', auth()->id());
-            $payoutQuery->where('user_id', auth()->id());
-        } elseif ($this->selectedUserId) {
-            // Nếu là Admin và đang chọn 1 User cụ thể
-            $rebateQuery->where('user_id', $this->selectedUserId);
-            $payoutQuery->where('user_id', $this->selectedUserId);
+            $rebateQuery->where('rebate_trackers.user_id', auth()->id());
+            $payoutQuery->where('payout_logs.user_id', auth()->id());
         }
 
-        // --- TÍNH TOÁN CARD 1: CONFIRMED (Từ RebateTracker) ---
-        $totalConfirmedUsd = (clone $rebateQuery)->where('status', 'confirmed')
+        // 4. Áp dụng bộ lọc động từ UI
+        $applyFilters($rebateQuery, true);
+        $applyFilters($payoutQuery, false);
+
+        // --- TÍNH TOÁN CARD 0: PENDING (Từ RebateTracker) ---
+        $totalPendingUsd = (clone $rebateQuery)->where('rebate_trackers.status', 'pending')
             ->sum('rebate_amount');
 
-        // --- TÍNH TOÁN CARD 2: PAID USD (Tổng tiền thực nhận từ Withdrawal và Hold) ---
+        // --- TÍNH TOÁN CARD 1: CONFIRMED (Từ RebateTracker) ---
+        $totalConfirmedUsd = (clone $rebateQuery)->where('rebate_trackers.status', 'confirmed')
+            ->sum('rebate_amount');
+
+        // --- TÍNH TOÁN CARD 2: PAID USD (Từ PayoutLog) ---
         $totalPaidUsd = (clone $payoutQuery)
             ->whereIn('transaction_type', ['withdrawal', 'hold'])
-            ->where('status', 'completed')
+            ->where('payout_logs.status', 'completed')
             ->sum('net_amount_usd');
 
-        // --- TÍNH TOÁN CARD 3: EXCHANGED VND (Tổng tiền đã đổi từ Liquidation) ---
+        // --- TÍNH TOÁN CARD 3: EXCHANGED VND (Từ PayoutLog) ---
         $totalVnd = (clone $payoutQuery)
             ->where('transaction_type', 'liquidation')
-            ->where('status', 'completed')
+            ->where('payout_logs.status', 'completed')
             ->sum('total_vnd');
 
-        // Hiển thị nhãn để biết đang lọc hay xem tổng
-        $labelSuffix = $this->selectedUserId ? __('system.payout_logs.fields.filtered') : '';
-
         return [
-            Stat::make(__('system.payout_logs.fields.total_confirmed') . $labelSuffix, '$' . number_format($totalConfirmedUsd, 2))
+            Stat::make(__('system.payout_logs.fields.total_pending'), '$' . number_format($totalPendingUsd, 2))
+                ->description(__('system.widgets.cashback_pending_desc'))
+                ->descriptionIcon('heroicon-m-clock')
+                ->color('warning'),
+
+            Stat::make(__('system.payout_logs.fields.total_confirmed'), '$' . number_format($totalConfirmedUsd, 2))
                 ->description(__('system.widgets.cashback_confirmed_desc'))
                 ->descriptionIcon('heroicon-m-check-circle')
                 ->color('success')
                 ->chart([7, 2, 10, 3, 15, 4, 17]),
 
-            Stat::make(__('system.payout_logs.fields.total_paid_usd') . $labelSuffix, '$' . number_format($totalPaidUsd, 2))
+            Stat::make(__('system.payout_logs.fields.total_paid_usd'), '$' . number_format($totalPaidUsd, 2))
                 ->description(__('system.widgets.completed_payments_desc'))
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('warning'),
 
-            Stat::make(__('system.payout_logs.fields.total_exchanged_vnd') . $labelSuffix, number_format($totalVnd, 0, ',', '.') . ' ₫')
+            Stat::make(__('system.payout_logs.fields.total_exchanged_vnd'), number_format($totalVnd, 0, ',', '.') . ' ₫')
                 ->description(__('system.widgets.converted_to_vnd_desc'))
                 ->descriptionIcon('heroicon-m-arrows-right-left')
                 ->color('info'),

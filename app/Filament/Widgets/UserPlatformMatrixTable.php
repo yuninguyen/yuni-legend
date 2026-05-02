@@ -36,11 +36,11 @@ class UserPlatformMatrixTable extends BaseWidget
     // Thêm vào trong class UserPlatformMatrixTable
     public function updatedTableFilters(): void
     {
-        // Lấy ID user từ filter hiện tại của bảng
-        $userId = $this->tableFilters['table_filter']['user_id'] ?? null;
+        // Lấy toàn bộ giá trị từ bộ lọc 'table_filter'
+        $filters = $this->tableFilters['table_filter'] ?? [];
 
-        // Bắn tín hiệu kèm theo ID user ra toàn hệ thống Dashboard
-        $this->dispatch('updateStatsUser', userId: $userId);
+        // Bắn tín hiệu kèm theo toàn bộ filter ra Dashboard
+        $this->dispatch('updateStatsFilters', filters: $filters);
     }
 
     public function getTableRecordKey($record): string
@@ -160,9 +160,9 @@ class UserPlatformMatrixTable extends BaseWidget
                                 fn(Builder $query, $date): Builder => $query->whereDate('rebate_trackers.created_at', '<=', $date)
                             );
                     })
-                    ->columns(auth()->user()?->isAdmin() ? 5 : 4)
+                    ->columns(2)
                     ->columnSpanFull(),
-            ], layout: Tables\Enums\FiltersLayout::AboveContent) // Ép hiển thị lên trên bảng
+            ], layout: Tables\Enums\FiltersLayout::Dropdown)
 
             ->defaultSort('user_name', 'asc')
             ->paginated(false)
