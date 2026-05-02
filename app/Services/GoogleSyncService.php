@@ -7,6 +7,7 @@ use App\Models\Email;
 use App\Models\PayoutLog;
 use App\Models\PayoutMethod;
 use App\Models\RebateTracker;
+use App\Models\Brand;
 use App\Models\Platform;
 use App\Models\User;
 use App\Filament\Resources\Traits\HasUsStates;
@@ -655,6 +656,324 @@ class GoogleSyncService
     }
 
     // =========================================================================
+    // 6. BRANDS
+    // =========================================================================
+
+    public static array $brandHeaders = [
+        'Brand Name',
+        'Platform',
+        'Boost (%)',
+        'Maximum Withdrawal Limit ($)',
+        'Rate (đ)'
+    ];
+
+    public function formatBrand(Brand $record): array
+    {
+        $platformName = Platform::where('slug', $record->platform)->value('name') ?? $record->platform;
+
+        return [
+            $record->name,
+            $platformName,
+            ($record->boost_percentage ?? 0) . '%',
+            $record->maximum_limit ?? 0,
+            $record->gc_rate ?? 0,
+        ];
+    }
+
+    public function syncBrands($records = null, ?string $spreadsheetId = null): array
+    {
+        if ($records instanceof Builder) {
+            $records = $records->get();
+        } elseif ($records === null) {
+            $records = Brand::all();
+        }
+
+        $targetTab = 'Brand';
+        $rows = collect($records)->map(fn($r) => $this->formatBrand($r))->values()->toArray();
+
+        $this->sheetService->createSheetIfNotExist($targetTab, $spreadsheetId);
+        $result = $this->sheetService->upsertRows($rows, $targetTab, self::$brandHeaders, $spreadsheetId);
+
+        return $result;
+    }
+
+    public function importBrands(?string $spreadsheetId = null): array
+    {
+        $id = $spreadsheetId ?? '1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0';
+        $sheetName = 'Brand';
+
+        $rows = $this->sheetService->readSheet('A:E', $sheetName, $id);
+
+        $updated = 0;
+        $created = 0;
+        $skipped = 0;
+        $failed = 0;
+
+        if (empty($rows)) {
+            return ['updated' => 0, 'created' => 0, 'failed' => 0];
+        }
+
+        // Bỏ qua hàng tiêu đề
+        array_shift($rows);
+
+        // Lấy danh sách platform để map name -> slug
+        $platforms = Platform::all();
+
+        foreach ($rows as $index => $row) {
+            $brandName = trim($row[0] ?? '');
+            $platformName = trim($row[1] ?? '');
+
+            if (empty($brandName)) {
+                $skipped++;
+                continue;
+            }
+
+            try {
+                // Map platform name to slug
+                $platformSlug = $platforms->first(function ($p) use ($platformName) {
+                    return strtolower($p->name) === strtolower($platformName) || strtolower($p->slug) === strtolower($platformName);
+                })?->slug ?? \Str::slug($platformName);
+
+                // Tìm hoặc Tạo mới dựa trên Name + Platform
+                $brand = Brand::where('name', $brandName)
+                    ->where('platform', $platformSlug)
+                    ->first();
+
+                $isNew = false;
+                if (!$brand) {
+                    $brand = new Brand();
+                    $brand->name = $brandName;
+                    $brand->platform = $platformSlug;
+                    $brand->slug = \Str::slug($brandName . '-' . $platformSlug);
+                    $isNew = true;
+                }
+
+                // Cập nhật các trường khác
+                if (isset($row[2])) $brand->boost_percentage = $this->parseNumeric($row[2]);
+                if (isset($row[3])) $brand->maximum_limit = $this->parseNumeric($row[3]);
+                if (isset($row[4])) $brand->gc_rate = $this->parseNumeric($row[4]);
+
+                $brand->save();
+
+                if ($isNew) {
+                    $created++;
+                } else {
+                    $updated++;
+                }
+            } catch (\Exception $e) {
+                Log::error("Import Brand Row Error at index {$index}: " . $e->getMessage());
+                $failed++;
+            }
+        }
+
+        return [
+            'updated' => $updated,
+            'created' => $created,
+            'failed' => $failed,
+            'skipped' => $skipped
+        ];
+    }
+
+    // =========================================================================
+    // 7. PLATFORMS
+    // =========================================================================
+
+    public static array $platformHeaders = [
+        'Platform Name',
+        'Sort'
+    ];
+
+    public function formatPlatform(Platform $record): array
+    {
+        return [
+            $record->name,
+            $record->sort_order ?? 0,
+        ];
+    }
+
+    public function importPlatforms(?string $spreadsheetId = null): array
+    {
+        $id = $spreadsheetId ?? '1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0';
+        $sheetName = 'Platform';
+
+        $rows = $this->sheetService->readSheet('A:B', $sheetName, $id);
+
+        $updated = 0;
+        $created = 0;
+        $skipped = 0;
+        $failed = 0;
+
+        if (empty($rows)) {
+            return ['updated' => 0, 'created' => 0, 'failed' => 0];
+        }
+
+        // Bỏ qua hàng tiêu đề
+        array_shift($rows);
+
+        foreach ($rows as $index => $row) {
+            $platformName = trim($row[0] ?? '');
+
+            if (empty($platformName)) {
+                $skipped++;
+                continue;
+            }
+
+            try {
+                $platform = Platform::where('name', $platformName)->first();
+                $isNew = false;
+
+                if (!$platform) {
+                    $platform = new Platform();
+                    $platform->name = $platformName;
+                    $platform->slug = \Str::slug($platformName);
+                    $platform->is_active = true;
+                    $isNew = true;
+                }
+
+                if (isset($row[1])) {
+                    $platform->sort_order = (int) $this->parseNumeric($row[1]);
+                }
+
+                $platform->save();
+
+                if ($isNew) {
+                    $created++;
+                } else {
+                    $updated++;
+                }
+            } catch (\Exception $e) {
+                Log::error("Import Platform Row Error at index {$index}: " . $e->getMessage());
+                $failed++;
+            }
+        }
+
+        return [
+            'updated' => $updated,
+            'created' => $created,
+            'failed' => $failed,
+            'skipped' => $skipped
+        ];
+    }
+
+    // =========================================================================
+    // 8. USERS
+    // =========================================================================
+
+    public static array $userHeaders = [
+        'Holder',
+        'Username',
+        'Email Address',
+        'Role'
+    ];
+
+    public function formatUser(User $record): array
+    {
+        return [
+            $record->name,
+            $record->username,
+            $record->email,
+            $record->role,
+        ];
+    }
+
+    public function importUsers(?string $spreadsheetId = null): array
+    {
+        $id = $spreadsheetId ?? '1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0';
+        $sheetName = 'User';
+
+        $rows = $this->sheetService->readSheet('A:D', $sheetName, $id);
+
+        $updated = 0;
+        $created = 0;
+        $skipped = 0;
+        $failed = 0;
+
+        if (empty($rows)) {
+            return ['updated' => 0, 'created' => 0, 'failed' => 0];
+        }
+
+        // Bỏ qua hàng tiêu đề
+        array_shift($rows);
+
+        foreach ($rows as $index => $row) {
+            $holder = trim($row[0] ?? '');
+            $username = trim($row[1] ?? '');
+            $email = trim($row[2] ?? '');
+            $roleInput = strtolower(trim($row[3] ?? 'operator'));
+
+            // Map role names (Hỗ trợ cả label tiếng Anh/Việt trong Sheet)
+            $role = match($roleInput) {
+                'admin specialist', 'admin' => 'admin',
+                'financial officer', 'finance' => 'finance',
+                'system operator', 'operator', 'staff', 'nhân viên' => 'operator',
+                default => 'operator',
+            };
+
+            if (empty($username) || empty($email)) {
+                $skipped++;
+                continue;
+            }
+
+            try {
+                // Ưu tiên tìm theo username trước, sau đó mới đến email
+                $user = User::where('username', $username)->first();
+                if (!$user) {
+                    $user = User::where('email', $email)->first();
+                }
+
+                $isNew = false;
+
+                if (!$user) {
+                    $user = new User();
+                    $user->username = $username;
+                    $user->email = $email;
+                    $user->password = \Hash::make('password123');
+                    $isNew = true;
+                }
+
+                // 🛑 BẢO VỆ NGƯỜI DÙNG HIỆN TẠI & ADMINS
+                // 1. Không đổi role của chính mình
+                if (auth()->check() && $user->id === auth()->id()) {
+                    $user->name = $holder ?: $username;
+                    $user->save();
+                    $updated++;
+                    continue;
+                }
+
+                // 2. Không cho phép hạ cấp Admin qua Sync (để tránh mất quyền truy cập hệ thống)
+                if (!$isNew && $user->isAdmin() && $role !== 'admin') {
+                    $role = 'admin'; 
+                }
+
+                $user->name = $holder ?: $username;
+                $user->role = $role;
+
+                // Cập nhật lại email/username nếu có thay đổi (email thường là duy nhất)
+                $user->email = $email;
+                $user->username = $username;
+
+                $user->save();
+
+                if ($isNew) {
+                    $created++;
+                } else {
+                    $updated++;
+                }
+            } catch (\Exception $e) {
+                Log::error("Import User Row Error at index {$index}: " . $e->getMessage());
+                $failed++;
+            }
+        }
+
+        return [
+            'updated' => $updated,
+            'created' => $created,
+            'failed' => $failed,
+            'skipped' => $skipped
+        ];
+    }
+
+    // =========================================================================
     // SYNC RECORD (Dùng cho Jobs/Observers - sync 1 bản ghi)
     // =========================================================================
 
@@ -699,6 +1018,24 @@ class GoogleSyncService
                 $targetTabs = ['Payout_Methods'];
                 $headers = self::$payoutMethodHeaders;
                 $formattedRow = $this->formatPayoutMethod($record);
+                break;
+
+            case Brand::class:
+                $targetTabs = ['Brand'];
+                $headers = self::$brandHeaders;
+                $formattedRow = $this->formatBrand($record);
+                break;
+
+            case Platform::class:
+                $targetTabs = ['Platform'];
+                $headers = self::$platformHeaders;
+                $formattedRow = $this->formatPlatform($record);
+                break;
+
+            case User::class:
+                $targetTabs = ['User'];
+                $headers = self::$userHeaders;
+                $formattedRow = $this->formatUser($record);
                 break;
         }
 

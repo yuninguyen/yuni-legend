@@ -356,6 +356,12 @@ return [
             'limited' => 'Brand có giới hạn',
             'unlimited' => 'Brand không giới hạn',
         ],
+        'actions' => [
+            'sync_from_sheet' => 'Đồng bộ từ Google Sheet',
+        ],
+        'notifications' => [
+            'sync_success' => 'Đồng bộ Brand thành công',
+        ],
     ],
     'platforms' => [
         'label' => 'Nền tảng',

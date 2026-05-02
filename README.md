@@ -35,11 +35,14 @@ RebateOps is a professional, high-performance internal tool built with **Laravel
 - **Contextual UI**: "Exchange to VND" link intelligently disappears once a record is fully liquidated, preventing duplicate transactions.
 - **Queue-Powered Sync**: Real-time synchronization with Google Sheets (3x retry, 60s backoff).
 - **Full-Spec Wallet Sync**: Direct import/export for Payout Methods supporting 23 data points including authentication, security questions, and personal identification (PII) info.
+- **Administrative Sync Tools**: Integrated UI actions for bulk importing Users and Platforms from Google Sheets with automated role mapping and badge color persistence.
 - **Smart Formatting**: Automatic sheet tab creation, frozen headers, and status-based conditional coloring.
 - **Language-Independent Nav**: Strict sidebar hierarchy (Dashboard → Resource → Work → Wallet → Settings → Logs) enforced regardless of active locale.
 - **Activity Logging**: Full audit trail for Admin oversight on every data mutation.
 - **Advanced Rebate Tracking**: Robust parsing of status timelines from Google Sheets with automated mapping to localized system keys and semantic color coding (Green/Orange/Blue) across both Table and Infolist views.
 - **Intelligent Tracker Sync**: Bidirectional synchronization for order trackers across 6 major platforms with automated status mapping and Payout Date resolution.
+- **Leader Split Customization**: Advanced transaction labeling for multi-tier profit sharing (`[Asset] - [Wallet Name] [[Staff Name]]`) with automated dynamic account retrieval.
+- **Optimized Disbursement UI**: High-efficiency payroll management featuring copyable financial data, disabled row-click redirects, and toggleable status columns for maximum information density.
 
 ---
 
@@ -160,6 +163,7 @@ REBATEOPS
 - [x] v5.5.3: Bidirectional Payout Method Sync — Full-spec wallet import (23-column), automated Personal Security Info (PII) mapping, and unique identity-based conflict resolution.
 - [x] v5.6.0: Multi-tier Profit Sharing — Advanced settlement logic to split revenue between Leaders and Staff members, dynamically generating separate Disbursement records based on percentage allocations.
 - [x] v5.6.1: Core UI/UX Stabilization — Global systematic debugging of Filament 3 Floating UI; resolving modal z-index overlap issues by safely injecting state-driven CSS across all Admin panels.
+- [x] v5.6.2: Disbursement Refinement & Google Sync — Streamlined UserPayment UI with removal of file uploads, copyable data columns, dynamic PayPal region detection, and bulk Google Sheets sync for Users/Platforms/Logs.
 ---
 
 ## 🔐 Security & Access Control

@@ -118,13 +118,6 @@ class UserPaymentResource extends Resource
                             ->label(__('system.labels.payment_date'))
                             ->native(false),
 
-                        Forms\Components\FileUpload::make('payment_proof')
-                            ->label(__('system.user_payments.fields.payment_proof'))
-                            ->image()
-                            ->directory('payment-proofs')
-                            ->openable()
-                            ->downloadable(),
-
                         Forms\Components\Textarea::make('note')
                             ->label(__('system.labels.note'))
                             ->columnSpanFull(),
@@ -145,13 +138,27 @@ class UserPaymentResource extends Resource
                     ->description(function ($record) {
                         // 🟢 DÒNG 2: Danh sách email account
                         $emails = $record->payoutLogs->map(fn($log) => $log->account?->email?->email)->filter()->unique();
+
+                        // 🟢 FIX: Nếu là Leader Split (không có payoutLogs trực tiếp), tìm theo batch_id
+                        if ($emails->isEmpty() && !empty($record->batch_id)) {
+                            $emails = \App\Models\PayoutLog::whereHas('userPayment', function ($q) use ($record) {
+                                $q->where('batch_id', $record->batch_id);
+                            })
+                                ->with('account.email')
+                                ->get()
+                                ->map(fn($log) => $log->account?->email?->email)
+                                ->filter()
+                                ->unique();
+                        }
+
                         $emailList = $emails->isNotEmpty() ? e($emails->implode(', ')) : __('system.n/a');
                         $accLine = "📧 Account: {$emailList}";
 
                         // 🟢 DÒNG 3: Tỉ giá (Market rate & Payout rate)
                         $rateLine = '';
                         if (auth()->user()?->isAdmin() || auth()->user()?->isFinance()) {
-                            $rateLine = "📈 " . __('system.payout_logs.fields.market_rate') . ': ' . number_format($record->exchange_rate) . ' | ' . __('system.payout_logs.fields.payout_rate') . ': ' . number_format($record->payout_rate) . ' (' . ($record->payout_percentage ?? 100) . '%)';
+                            $pct = number_format($record->payout_percentage ?? 100, 2);
+                            $rateLine = "📈 " . __('system.payout_logs.fields.market_rate') . ': ' . number_format($record->exchange_rate) . ' | ' . __('system.payout_logs.fields.payout_rate') . ': ' . number_format($record->payout_rate) . " ({$pct}%)";
                         } else {
                             $rateLine = "📈 " . __('system.labels.exchange_rate') . ': ' . number_format($record->payout_rate);
                         }
@@ -160,6 +167,7 @@ class UserPaymentResource extends Resource
                         return new \Illuminate\Support\HtmlString("{$accLine}<br>{$rateLine}");
                     })
                     ->searchable()
+                    ->copyable()
                     ->alignment(Alignment::Center), // Chỉnh sát lề trái để dễ đọc hơn khi nhiều dòng
 
                 Tables\Columns\TextColumn::make('total_usd')
@@ -167,6 +175,7 @@ class UserPaymentResource extends Resource
                     ->money('USD') // Tự format có chữ $
                     ->color('success')
                     ->alignment(Alignment::Center)
+                    ->copyable()
                     ->summarize(Tables\Columns\Summarizers\Sum::make()->label('Total')->money('USD')),
 
                 Tables\Columns\TextColumn::make('total_vnd')
@@ -175,6 +184,7 @@ class UserPaymentResource extends Resource
                     ->color('primary')
                     ->weight('bold')
                     ->alignment(Alignment::Center)
+                    ->copyable()
                     ->summarize(
                         Tables\Columns\Summarizers\Sum::make()
                             ->label('Total')
@@ -321,9 +331,10 @@ class UserPaymentResource extends Resource
             ->filtersFormColumns(auth()->user()?->isAdmin() || auth()->user()?->isFinance() ? 5 : 4)
             ->filtersLayout(FiltersLayout::AboveContent)
             ->actions([
-                Tables\Actions\EditAction::make()
-                    ->label(fn() => (auth()->user()?->isAdmin() || auth()->user()?->isFinance()) ? __('system.user_payments.actions.up_bill') : __('system.user_payments.actions.view_bill')),
+                //
             ])
+            ->recordUrl(null)
+            ->recordAction(null)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     // 🟢 1. GOM NHÓM (BATCHING)
@@ -365,12 +376,6 @@ class UserPaymentResource extends Resource
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->form([
-                            Forms\Components\FileUpload::make('payment_proof')
-                                ->label(__('system.user_payments.fields.payment_proof'))
-                                ->image()
-                                ->directory('payment-proofs')
-                                ->openable()
-                                ->downloadable(),
                             Forms\Components\Textarea::make('note')
                                 ->label(__('system.labels.note_for_all')),
                         ])
@@ -378,7 +383,6 @@ class UserPaymentResource extends Resource
                             \Illuminate\Support\Facades\DB::transaction(function () use ($records, $data) {
                                 $records->each->update([
                                     'status' => 'paid',
-                                    'payment_proof' => $data['payment_proof'] ?? null,
                                     'note' => $data['note'] ?? null,
                                 ]);
                             });

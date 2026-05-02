@@ -356,6 +356,12 @@ return [
             'limited' => 'Limited Brands',
             'unlimited' => 'Unlimited Brands',
         ],
+        'actions' => [
+            'sync_from_sheet' => 'Sync from Google Sheet',
+        ],
+        'notifications' => [
+            'sync_success' => 'Brand Sync Successful',
+        ],
     ],
     'platforms' => [
         'label' => 'Platform',

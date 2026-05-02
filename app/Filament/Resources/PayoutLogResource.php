@@ -960,6 +960,7 @@ class PayoutLogResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('status')
                     ->label(__('system.labels.status'))
+                    ->toggleable()
                     ->badge()
                     ->alignment(Alignment::Center)
                     ->color(fn(string $state): string => match ($state) {
@@ -1557,7 +1558,7 @@ class PayoutLogResource extends Resource
 
                                 // Lấy lại danh sách các đơn Gốc (Parent) sạch sẽ từ Database
                                 $parentLogs = PayoutLog::whereIn('id', $parentIds)
-                                    ->with(['account', 'payoutMethod'])
+                                    ->with(['account', 'payoutMethod', 'user'])
                                     ->lockForUpdate()
                                     ->get();
 
@@ -1623,6 +1624,14 @@ class PayoutLogResource extends Resource
 
                                     $averageMarketRate = $totalUsd > 0 ? round($totalVndMarket / $totalUsd, 2) : 0;
                                     
+                                    // 🟢 XÁC ĐỊNH TIỀN TỐ (PayPal US / PayPal VN)
+                                    $assetPrefix = $firstLog->asset_type === 'gift_card' ? 'Gift Card' : 'PayPal';
+                                    if ($firstLog->asset_type === 'paypal') {
+                                        $mType = $firstLog->payoutMethod?->type;
+                                        if ($mType === 'paypal_us') $assetPrefix = 'PayPal US';
+                                        elseif ($mType === 'paypal_vn') $assetPrefix = 'PayPal VN';
+                                    }
+
                                     // 🟢 TÍNH TOÁN CHO NHÂN VIÊN (STAFF)
                                     $payoutRate = (float) ($data['manual_payout_rate'] ?? $averageMarketRate);
                                     $payoutPercentage = (float) ($data['payout_percentage'] ?? 100);
@@ -1634,7 +1643,7 @@ class PayoutLogResource extends Resource
                                         'batch_id' => $bulkBatchId,
                                         'platform' => $platformName,
                                         'asset_group' => $firstLog->asset_type === 'gift_card' ? 'gift_card' : 'paypal',
-                                        'transaction_type' => ($firstLog->asset_type === 'gift_card' ? 'Gift Card' : 'PayPal') . " ({$sourceName})",
+                                        'transaction_type' => "{$assetPrefix} - {$sourceName}",
                                         'total_usd' => $totalUsd,
                                         'exchange_rate' => $averageMarketRate,
                                         'payout_rate' => $payoutRate,
@@ -1646,6 +1655,7 @@ class PayoutLogResource extends Resource
 
                                     // 🟢 TÍNH TOÁN CHO QUẢN LÝ (LEADER) - NẾU CÓ CHỌN
                                     if (!empty($data['leader_id'])) {
+                                        $leaderName = \App\Models\User::find($data['leader_id'])?->name ?? 'Leader';
                                         $leaderRate = (float) ($data['leader_payout_rate'] ?? $payoutRate);
                                         $leaderPercentage = (float) ($data['leader_percentage'] ?? 0);
                                         $leaderVndPayout = floor(($totalUsd * $leaderRate) * ($leaderPercentage / 100));
@@ -1656,7 +1666,7 @@ class PayoutLogResource extends Resource
                                             'batch_id' => $bulkBatchId,
                                             'platform' => $platformName,
                                             'asset_group' => $firstLog->asset_type === 'gift_card' ? 'gift_card' : 'paypal',
-                                            'transaction_type' => ($firstLog->asset_type === 'gift_card' ? 'Gift Card' : 'PayPal') . " ({$sourceName}) [LEADER Split]",
+                                            'transaction_type' => ($firstLog->asset_type === 'gift_card' ? "Gift Card - {$sourceName}" : "PayPal VN - {$sourceName}") . " [{$leaderName}]",
                                             'total_usd' => $totalUsd,
                                             'exchange_rate' => $averageMarketRate,
                                             'payout_rate' => $leaderRate,

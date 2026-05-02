@@ -189,4 +189,130 @@ trait HasSyncToSheetAction
                 }
             });
     }
+
+    /**
+     * Tạo Action để đồng bộ Brand TỪ Google Sheet về Database
+     */
+    protected function getImportBrandsFromSheetAction(): Action
+    {
+        return Action::make('sync_from_google_sheet_brands')
+            ->label(__('system.notifications.sync_from_google_sheet'))
+            ->icon('heroicon-o-cloud-arrow-down')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading(__('system.notifications.sync_from_google_sheet'))
+            ->modalDescription(__('system.notifications.sync_from_confirm_msg'))
+            ->modalSubmitActionLabel(__('system.account_claim.submit'))
+            ->visible(fn() => auth()->user()?->isAdmin())
+            ->action(function () {
+                try {
+                    $syncService = app(GoogleSyncService::class);
+                    $result = $syncService->importBrands('1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0');
+
+                    Notification::make()
+                        ->title(__('system.notifications.sync_success'))
+                        ->body(__('system.notifications.sync_from_success_msg', [
+                            'updated' => $result['updated'],
+                            'created' => $result['created'] ?? 0,
+                            'failed' => $result['failed']
+                        ]))
+                        ->success()
+                        ->send();
+
+                } catch (\Exception $e) {
+                    Log::error("Manual Import Brands Error: " . $e->getMessage());
+
+                    Notification::make()
+                        ->title(__('system.notifications.sync_error'))
+                        ->body($e->getMessage())
+                        ->danger()
+                        ->persistent()
+                        ->send();
+                }
+            });
+    }
+
+    /**
+     * Tạo Action để đồng bộ Platform TỪ Google Sheet về Database
+     */
+    protected function getImportPlatformsFromSheetAction(): Action
+    {
+        return Action::make('sync_from_google_sheet_platforms')
+            ->label(__('system.notifications.sync_from_google_sheet'))
+            ->icon('heroicon-o-cloud-arrow-down')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading(__('system.notifications.sync_from_google_sheet'))
+            ->modalDescription(__('system.notifications.sync_from_confirm_msg'))
+            ->modalSubmitActionLabel(__('system.account_claim.submit'))
+            ->visible(fn() => auth()->user()?->isAdmin())
+            ->action(function () {
+                try {
+                    $syncService = app(GoogleSyncService::class);
+                    $result = $syncService->importPlatforms('1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0');
+
+                    Notification::make()
+                        ->title(__('system.notifications.sync_success'))
+                        ->body(__('system.notifications.sync_from_success_msg', [
+                            'updated' => $result['updated'],
+                            'created' => $result['created'] ?? 0,
+                            'failed' => $result['failed']
+                        ]))
+                        ->success()
+                        ->send();
+
+                } catch (\Exception $e) {
+                    Log::error("Manual Import Platforms Error: " . $e->getMessage());
+
+                    Notification::make()
+                        ->title(__('system.notifications.sync_error'))
+                        ->body($e->getMessage())
+                        ->danger()
+                        ->persistent()
+                        ->send();
+                }
+            });
+    }
+
+    /**
+     * Tạo Action để đồng bộ User TỪ Google Sheet về Database
+     */
+    protected function getImportUsersFromSheetAction(): Action
+    {
+        return Action::make('sync_from_google_sheet_users')
+            ->label(__('system.notifications.sync_from_google_sheet'))
+            ->icon('heroicon-o-cloud-arrow-down')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading(__('system.notifications.sync_from_google_sheet'))
+            ->modalDescription(__('system.notifications.sync_from_confirm_msg'))
+            ->modalSubmitActionLabel(__('system.account_claim.submit'))
+            ->visible(fn() => auth()->user()?->isAdmin())
+            ->action(function () {
+                try {
+                    $syncService = app(GoogleSyncService::class);
+                    $result = $syncService->importUsers('1R2DCjZJ3jJ7ixH66_ny2nrvq2uOxVz46ccalOpon-z0');
+
+                    Notification::make()
+                        ->title(__('system.notifications.sync_success'))
+                        ->body(__('system.notifications.sync_from_success_msg', [
+                            'updated' => $result['updated'],
+                            'created' => $result['created'] ?? 0,
+                            'failed' => $result['failed']
+                        ]))
+                        ->success()
+                        ->send();
+
+                } catch (\Exception $e) {
+                    Log::error("Manual Import Users Error: " . $e->getMessage());
+
+                    Notification::make()
+                        ->title(__('system.notifications.sync_error'))
+                        ->body($e->getMessage())
+                        ->danger()
+                        ->persistent()
+                        ->send();
+                }
+            });
+    }
 }
