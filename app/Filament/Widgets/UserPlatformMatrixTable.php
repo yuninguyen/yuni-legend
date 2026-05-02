@@ -86,7 +86,7 @@ class UserPlatformMatrixTable extends BaseWidget
                             ->options(function (Get $get) {
                                 $userId = $get('user_id') ?? (auth()->user()?->isAdmin() ? null : auth()->id());
 
-                                $usedPlatforms = \App\Models\RebateTracker::query()
+                                $usedPlatforms = RebateTracker::query()
                                     ->join('accounts', 'rebate_trackers.account_id', '=', 'accounts.id')
                                     ->when($userId, fn($q) => $q->where('rebate_trackers.user_id', $userId))
                                     ->distinct()
@@ -111,7 +111,7 @@ class UserPlatformMatrixTable extends BaseWidget
                                 $currentYear = now()->year;
 
                                 // Tìm năm của RebateTracker cũ nhất trong hệ thống
-                                $oldestRecord = \App\Models\RebateTracker::min('created_at');
+                                $oldestRecord = RebateTracker::min('created_at');
                                 $oldestYear = $oldestRecord ? \Carbon\Carbon::parse($oldestRecord)->year : $currentYear;
 
                                 for ($y = $currentYear - 1; $y >= $oldestYear; $y--) {

@@ -2,45 +2,41 @@
 
 namespace App\Filament\Resources\Traits;
 
+use App\Filament\Resources\AccountResource;
 use App\Models\Account;
 use App\Models\Platform;
 use App\Models\RebateTracker;
+use App\Models\User;
+use App\Services\GoogleSyncService;
+use Carbon\Carbon;
 use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Table;
-use Filament\Support\Enums\Alignment;
-use Filament\Tables\Columns\TextColumn;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Infolists\Infolist;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Js;
 use Filament\Forms\Components\Select;
-use Filament\Tables\Actions\Action;
+use Filament\Forms\Form;
+use Filament\Infolists\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
-use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\Alignment;
+use Filament\Tables;
+use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\BulkAction;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
-use Filament\Tables\Enums\FiltersLayout;
-use Illuminate\Support\HtmlString;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Filament\Navigation\NavigationItem;
-use App\Filament\Resources\Traits\HasUsStates;
-use App\Filament\Resources\Traits\HasPlatform;
-
-use function Livewire\wrap;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\Js;
 
 trait HasAccountSchema
 {
-
-    use HasUsStates;
     use HasPlatform;
     use HasPlatformCache;
-
+    use HasUsStates;
 
     public static function form(Form $form): Form
     {
@@ -48,22 +44,22 @@ trait HasAccountSchema
             ->schema([
                 Forms\Components\Section::make(__('system.account_claim.section_title'))
                     ->schema([
-                        Forms\Components\Select::make('platform')
+                        Select::make('platform')
                             ->label(__('system.labels.platform'))
                             ->placeholder(__('system.placeholders.search_platform'))
                             ->options(self::getPlatforms())
                             ->required()
-                            ->disabled(fn() => !auth()->user()?->isAdmin())
+                            ->disabled(fn () => ! auth()->user()?->isAdmin())
                             ->native(false),
 
-                        Forms\Components\Select::make('email_id')
+                        Select::make('email_id')
                             ->label(__('system.labels.email_address'))
                             ->placeholder(__('system.placeholders.select_email'))
                             ->relationship('email', 'email')
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->disabled(fn() => !auth()->user()?->isAdmin())
+                            ->disabled(fn () => ! auth()->user()?->isAdmin())
                             ->createOptionForm([
                                 Forms\Components\TextInput::make('email')->email()->required(),
                                 Forms\Components\TextInput::make('email_password')
@@ -75,7 +71,7 @@ trait HasAccountSchema
                                 Forms\Components\TextInput::make('two_factor_code')
                                     ->label(__('system.labels.two_factor_code'))
                                     ->placeholder(__('system.placeholders.enter_2fa')),
-                                Forms\Components\Select::make('status')
+                                Select::make('status')
                                     ->label(__('system.labels.status'))
                                     ->options([
                                         'active' => __('system.status.live'),
@@ -96,18 +92,18 @@ trait HasAccountSchema
                             ->password()
                             ->revealable()
                             ->required()
-                            ->disabled(fn() => !auth()->user()?->isAdmin()),
+                            ->disabled(fn () => ! auth()->user()?->isAdmin()),
 
-                        Forms\Components\Select::make('state')
+                        Select::make('state')
                             ->label(__('system.labels.state_us'))
                             ->placeholder(__('system.placeholders.select_state'))
                             ->options(self::$usStates)
-                            ->disabled(fn() => !auth()->user()?->isAdmin()),
+                            ->disabled(fn () => ! auth()->user()?->isAdmin()),
 
                         Forms\Components\TextInput::make('device')
                             ->label(__('system.labels.device_create'))
                             ->placeholder(__('system.placeholders.device_placeholder'))
-                            ->disabled(fn() => !auth()->user()?->isAdmin()),
+                            ->disabled(fn () => ! auth()->user()?->isAdmin()),
 
                         Forms\Components\TextInput::make('account_created_at')
                             ->label(__('system.labels.date_create'))
@@ -116,12 +112,13 @@ trait HasAccountSchema
                             ->default(null)
                             ->mask('99/99/9999')
                             ->rules(['date_format:d/m/Y'])
-                            ->disabled(fn() => !auth()->user()?->isAdmin())
+                            ->disabled(fn () => ! auth()->user()?->isAdmin())
                             ->dehydrateStateUsing(function ($state) {
-                                if (blank($state))
+                                if (blank($state)) {
                                     return null;
+                                }
                                 try {
-                                    return \Carbon\Carbon::createFromFormat('d/m/Y', $state)->format('Y-m-d');
+                                    return Carbon::createFromFormat('d/m/Y', $state)->format('Y-m-d');
                                 } catch (\Exception $e) {
                                     return null;
                                 }
@@ -130,12 +127,12 @@ trait HasAccountSchema
                         Forms\Components\TextInput::make('paypal_info')
                             ->label(__('system.labels.paypal_address'))
                             ->placeholder(__('system.placeholders.paypal_info_placeholder'))
-                            ->disabled(fn() => !auth()->user()?->isAdmin()),
+                            ->disabled(fn () => ! auth()->user()?->isAdmin()),
 
                         Forms\Components\TextInput::make('device_linked_paypal')
                             ->label(__('system.labels.device_linked_paypal'))
                             ->placeholder(__('system.placeholders.device_placeholder'))
-                            ->disabled(fn() => !auth()->user()?->isAdmin()),
+                            ->disabled(fn () => ! auth()->user()?->isAdmin()),
 
                         Forms\Components\TextInput::make('paypal_linked_at')
                             ->label(__('system.labels.linked_paypal_date'))
@@ -144,25 +141,26 @@ trait HasAccountSchema
                             ->default(null)
                             ->mask('99/99/9999')
                             ->rules(['date_format:d/m/Y'])
-                            ->disabled(fn() => !auth()->user()?->isAdmin())
+                            ->disabled(fn () => ! auth()->user()?->isAdmin())
                             ->dehydrateStateUsing(function ($state) {
-                                if (blank($state))
+                                if (blank($state)) {
                                     return null;
+                                }
                                 try {
-                                    return \Carbon\Carbon::createFromFormat('d/m/Y', $state)->format('Y-m-d');
+                                    return Carbon::createFromFormat('d/m/Y', $state)->format('Y-m-d');
                                 } catch (\Exception $e) {
                                     return null;
                                 }
                             }),
 
-                        Forms\Components\Select::make('user_id')
+                        Select::make('user_id')
                             ->relationship('user', 'name')
                             ->label(__('system.labels.holder'))
                             ->searchable()
                             ->preload()
-                            ->disabled(fn() => !auth()->user()?->isAdmin()),
+                            ->disabled(fn () => ! auth()->user()?->isAdmin()),
 
-                        Forms\Components\Select::make('status')
+                        Select::make('status')
                             ->label(__('system.labels.status'))
                             ->multiple()
                             ->options([
@@ -177,7 +175,7 @@ trait HasAccountSchema
                             ])
                             ->searchable()
                             ->preload()
-                            ->disabled(fn() => !auth()->user()?->isAdmin())
+                            ->disabled(fn () => ! auth()->user()?->isAdmin())
                             ->native(false),
 
                         Forms\Components\Textarea::make('note')
@@ -188,7 +186,7 @@ trait HasAccountSchema
                     ->extraAttributes([
                         'style' => 'overflow: visible !important; z-index: 50 !important; position: relative;',
                         'class' => '!overflow-visible !z-50',
-                    ])
+                    ]),
             ]);
     }
 
@@ -196,77 +194,79 @@ trait HasAccountSchema
     {
         return $infolist
             ->schema([
-                \Filament\Infolists\Components\Section::make(__('system.heading_infolist.email_information'))
+                Section::make(__('system.heading_infolist.email_information'))
                     ->schema([
-                        \Filament\Infolists\Components\TextEntry::make('email.email')
+                        TextEntry::make('email.email')
                             ->label(__('system.labels.email_address'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('email.email_password')
+                        TextEntry::make('email.email_password')
                             ->label(__('system.labels.password'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('email.recovery_email')
+                        TextEntry::make('email.recovery_email')
                             ->label(__('system.labels.account_email'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('email.two_factor_code')
+                        TextEntry::make('email.two_factor_code')
                             ->label(__('system.labels.two_factor_code'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('email.note')
+                        TextEntry::make('email.note')
                             ->label(__('system.labels.note'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('email.status')
+                        TextEntry::make('email.status')
                             ->label(__('system.labels.status'))
                             ->placeholder(__('system.n/a'))
-                            ->formatStateUsing(fn(string $state): string => match ($state) {
+                            ->formatStateUsing(fn (string $state): string => match ($state) {
                                 'active', 'Live' => __('system.email_status.active'),
                                 'disabled', 'Disabled' => __('system.email_status.disabled'),
                                 'locked', 'Locked' => __('system.email_status.locked'),
-                                default => __('system.email_status.' . $state),
+                                default => __('system.email_status.'.$state),
                             })
-                            ->color(fn(string $state): string => match ($state) {
+                            ->color(fn (string $state): string => match ($state) {
                                 'active', 'Live' => 'success',
                                 'disabled', 'Disabled' => 'warning',
                                 'locked', 'Locked' => 'danger',
                                 default => 'gray',
-                            })
+                            }),
                     ])->columns(2),
 
-                \Filament\Infolists\Components\Section::make(__('system.heading_infolist.account_information'))
+                Section::make(__('system.heading_infolist.account_information'))
                     ->schema([
-                        \Filament\Infolists\Components\TextEntry::make('platform')
+                        TextEntry::make('platform')
                             ->label(__('system.labels.platform'))
                             ->placeholder(__('system.n/a'))
-                            ->formatStateUsing(fn($state) => $state ? static::getPlatformName($state) : 'N/A'),
-                        \Filament\Infolists\Components\TextEntry::make('password')
+                            ->formatStateUsing(fn ($state) => $state ? static::getPlatformName($state) : 'N/A'),
+                        TextEntry::make('password')
                             ->label(__('system.labels.password'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('state')
+                        TextEntry::make('state')
                             ->label(__('system.labels.state_us'))
                             ->placeholder(__('system.n/a'))
-                            ->formatStateUsing(fn($state) => $state ? "{$state} - " . (self::$usStates[$state] ?? '') : 'N/A'),
-                        \Filament\Infolists\Components\TextEntry::make('device')
+                            ->formatStateUsing(fn ($state) => $state ? "{$state} - ".(self::$usStates[$state] ?? '') : 'N/A'),
+                        TextEntry::make('device')
                             ->label(__('system.labels.device'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('account_created_at')
+                        TextEntry::make('account_created_at')
                             ->label(__('system.labels.date_create'))
                             ->dateTime('d/m/Y')
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('user.name')
+                        TextEntry::make('user.name')
                             ->label(__('system.labels.holder'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('status')
+                        TextEntry::make('status')
                             ->label(__('system.labels.status'))
                             ->html()
                             ->placeholder(__('system.n/a'))
                             ->columnSpanFull()
                             ->formatStateUsing(function ($state): ?string {
-                                if (blank($state)) return null;
+                                if (blank($state)) {
+                                    return null;
+                                }
 
                                 // Nếu là chuỗi (có thể có dấu phẩy), tách ra thành mảng. Nếu đã là mảng thì giữ nguyên.
-                                $statuses = is_array($state) 
-                                    ? $state 
+                                $statuses = is_array($state)
+                                    ? $state
                                     : array_map('trim', explode(',', (string) $state));
-                                
-                                $html = collect($statuses)->filter()->map(function($s) {
+
+                                $html = collect($statuses)->filter()->map(function ($s) {
                                     $s_lower = strtolower($s);
                                     $label = match ($s_lower) {
                                         'used', 'in_use' => __('system.status.used'),
@@ -277,7 +277,7 @@ trait HasAccountSchema
                                         'no_paypal_needed', 'no_paypal_required' => __('system.status.no_paypal_required'),
                                         'banned' => __('system.status.banned'),
                                         'active', 'live' => __('system.status.active'),
-                                        default => __('system.status.' . $s_lower),
+                                        default => __('system.status.'.$s_lower),
                                     };
 
                                     $color = match ($s_lower) {
@@ -297,30 +297,30 @@ trait HasAccountSchema
 
                                 return $html;
                             }),
-                        \Filament\Infolists\Components\TextEntry::make('note')
+                        TextEntry::make('note')
                             ->label(__('system.labels.note'))
                             ->placeholder(__('system.n/a'))
                             ->columnSpanFull()
                             ->html()
-                            ->formatStateUsing(fn($state) => $state ? '
+                            ->formatStateUsing(fn ($state) => $state ? '
                                 <div style="
                                     white-space: pre-wrap;
                                     line-height: 1.6;
                                     margin: 0;
                                     padding: 0;
-                                ">' . e(trim($state)) . '</pre>' : 'N/A'),
+                                ">'.e(trim($state)).'</pre>' : 'N/A'),
                     ])->columns(3),
 
-                \Filament\Infolists\Components\Section::make(__('system.heading_infolist.paypal_information'))
+                Section::make(__('system.heading_infolist.paypal_information'))
                     ->schema([
-                        \Filament\Infolists\Components\TextEntry::make('device_linked_paypal')
+                        TextEntry::make('device_linked_paypal')
                             ->label(__('system.labels.device'))
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('paypal_linked_at')
+                        TextEntry::make('paypal_linked_at')
                             ->label(__('system.labels.linked_paypal_date'))
                             ->dateTime('d/m/Y')
                             ->placeholder(__('system.n/a')),
-                        \Filament\Infolists\Components\TextEntry::make('paypal_info')
+                        TextEntry::make('paypal_info')
                             ->label(__('system.labels.address'))
                             ->placeholder(__('system.n/a'))
                             ->columnSpanFull(),
@@ -331,10 +331,10 @@ trait HasAccountSchema
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn(Builder $query) => $query->with(['email', 'user'])) // 🟢 TỐI ƯU: Eager Load để tránh N+1
+            ->modifyQueryUsing(fn (Builder $query) => $query->with(['email', 'user'])) // 🟢 TỐI ƯU: Eager Load để tránh N+1
             ->recordUrl(null)
             ->columns([
-                Tables\Columns\TextColumn::make('id')
+                TextColumn::make('id')
                     ->label('ID')
                     ->alignment(Alignment::Center)
                     ->searchable()
@@ -343,23 +343,23 @@ trait HasAccountSchema
                     ->extraAttributes(['style' => 'width: 60px; min-width: 60px'])
                     ->color('gray'),
 
-                Tables\Columns\TextColumn::make('platform')
+                TextColumn::make('platform')
                     ->label(__('system.labels.platform'))
                     ->searchable()
                     ->alignment(Alignment::Center)
-                    ->extraHeaderAttributes(['style' => 'width: 80px; min-width: 80px'])
-                    ->extraAttributes(['style' => 'width: 80px; min-width: 80px'])
-                    ->visible(static::class === \App\Filament\Resources\AccountResource::class)
-                    ->formatStateUsing(fn($state) => $state ? static::getPlatformName($state) : 'N/A'),
+                    // ->extraHeaderAttributes(['style' => 'width: 80px; min-width: 80px'])
+                    // ->extraAttributes(['style' => 'width: 80px; min-width: 80px'])
+                    ->visible(static::class === AccountResource::class)
+                    ->formatStateUsing(fn ($state) => $state ? static::getPlatformName($state) : 'N/A'),
 
                 TextColumn::make('email.email')
                     ->label(__('system.labels.email_address'))
-                    ->alignment(Alignment::Left)
-                    ->extraHeaderAttributes(['style' => 'width: 250px; min-width: 250px'])
-                    ->extraAttributes(['style' => 'width: 250px; min-width: 250px'])
+                    ->alignment(Alignment::Center)
+                    ->extraHeaderAttributes(['style' => 'width: 280px; min-width: 280px'])
+                    ->extraAttributes(['style' => 'width: 280px; min-width: 280px'])
                     ->wrap()
                     ->searchable()
-                    ->action(fn() => null)
+                    ->action(fn () => null)
                     ->html()
                     ->formatStateUsing(function (Account $record): string {
                         $email = $record->email?->email ?? __('system.n/a');
@@ -374,70 +374,70 @@ trait HasAccountSchema
                             'disabled' => [__('system.email_status.disabled'), '#f59e0b'],
                             'locked' => [__('system.email_status.locked'), '#ef4444'],
                             default => [
-                                (blank($emailStatus) || strtolower($emailStatus) === 'n/a') ? 'N/A' : __('system.email_status.' . $emailStatus),
-                                '#6b7280'
+                                (blank($emailStatus) || strtolower($emailStatus) === 'n/a') ? 'N/A' : __('system.email_status.'.$emailStatus),
+                                '#6b7280',
                             ],
                         };
 
-                        return "
-                            <div x-data=\"{ copied: null }\" style=\"text-align: left; line-height: 1.6; padding-left: 0;\">
-                                <div style=\"margin-bottom: 2px;\">
-                                    <span style=\"color: #1e293b; font-weight: 700; cursor: pointer; position: relative;\" 
-                                          x-on:click.stop.prevent=\"window.navigator.clipboard.writeText(" . e(Js::from($email)) . "); copied = 'email'; setTimeout(() => copied = null, 5000)\"
+                        return '
+                            <div x-data="{ copied: null }" style="text-align: left; line-height: 1.6; padding-left: 0;">
+                                <div style="margin-bottom: 2px;">
+                                    <span style="color: #1e293b; font-weight: 700; cursor: pointer; position: relative;" 
+                                          x-on:click.stop.prevent="window.navigator.clipboard.writeText('.e(Js::from($email))."); copied = 'email'; setTimeout(() => copied = null, 5000)\"
                                           onclick=\"event.stopPropagation();\">
                                         {$email}
-                                        <span x-show=\"copied === 'email'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ " . __('system.labels.copied') . "</span>
+                                        <span x-show=\"copied === 'email'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ ".__('system.labels.copied').'</span>
                                     </span>
                                 </div>
 
-                                <div style=\"margin-bottom: 2px;\">
-                                    <span style=\"color: #64748b;\">" . __('system.labels.password_account') . ": </span> 
-                                    <span style=\"color: #1e293b; cursor: pointer; position: relative;\" 
-                                          x-on:click.stop.prevent=\"window.navigator.clipboard.writeText(" . e(Js::from($platformPass)) . "); copied = 'platform'; setTimeout(() => copied = null, 5000)\"
+                                <div style="margin-bottom: 2px;">
+                                    <span style="color: #64748b;">'.__('system.labels.password_account').': </span> 
+                                    <span style="color: #1e293b; cursor: pointer; position: relative;" 
+                                          x-on:click.stop.prevent="window.navigator.clipboard.writeText('.e(Js::from($platformPass))."); copied = 'platform'; setTimeout(() => copied = null, 5000)\"
                                           onclick=\"event.stopPropagation();\">
                                         {$platformPass}
-                                        <span x-show=\"copied === 'platform'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ " . __('system.labels.copied') . "</span>
+                                        <span x-show=\"copied === 'platform'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ ".__('system.labels.copied').'</span>
                                     </span>
                                 </div>
                                 
-                                <!-- <div style=\"margin-bottom: 2px;\">
-                                    <span style=\"color: #64748b;\">" . __('system.labels.password_email') . ": </span> 
-                                    <span style=\"color: #1e293b; cursor: pointer; position: relative;\" 
-                                          x-on:click.stop.prevent=\"window.navigator.clipboard.writeText(" . e(Js::from($pass)) . "); copied = 'pass'; setTimeout(() => copied = null, 5000)\"
+                                <!-- <div style="margin-bottom: 2px;">
+                                    <span style="color: #64748b;">'.__('system.labels.password_email').': </span> 
+                                    <span style="color: #1e293b; cursor: pointer; position: relative;" 
+                                          x-on:click.stop.prevent="window.navigator.clipboard.writeText('.e(Js::from($pass))."); copied = 'pass'; setTimeout(() => copied = null, 5000)\"
                                           onclick=\"event.stopPropagation();\">
                                         {$pass}
-                                        <span x-show=\"copied === 'pass'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ " . __('system.labels.copied') . "</span>
+                                        <span x-show=\"copied === 'pass'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ ".__('system.labels.copied').'</span>
                                     </span>
                                 </div>
 
-                                <div style=\"margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: wrap;\">
-                                    <span style=\"color: #64748b;\">" . __('system.labels.recovery_email') . ": </span> 
-                                    <span style=\"color: #1e293b; cursor: pointer; position: relative;\" 
-                                          x-on:click.stop.prevent=\"window.navigator.clipboard.writeText(" . e(Js::from($rec)) . "); copied = 'rec'; setTimeout(() => copied = null, 5000)\"
+                                <div style="margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: wrap;">
+                                    <span style="color: #64748b;">'.__('system.labels.recovery_email').': </span> 
+                                    <span style="color: #1e293b; cursor: pointer; position: relative;" 
+                                          x-on:click.stop.prevent="window.navigator.clipboard.writeText('.e(Js::from($rec))."); copied = 'rec'; setTimeout(() => copied = null, 5000)\"
                                           onclick=\"event.stopPropagation();\">
                                         {$rec}
-                                        <span x-show=\"copied === 'rec'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ " . __('system.labels.copied') . "</span>
+                                        <span x-show=\"copied === 'rec'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ ".__('system.labels.copied').'</span>
                                     </span>
                                 </div>
 
-                                <div style=\"margin-bottom: 2px;\">
-                                    <span style=\"color: #64748b;\">" . __('system.labels.two_factor_code') . ": </span> 
-                                    <span style=\"color: #1e293b; cursor: pointer; position: relative;\" 
-                                          x-on:click.stop.prevent=\"window.navigator.clipboard.writeText(" . e(Js::from($twoFA)) . "); copied = 'twoFA'; setTimeout(() => copied = null, 5000)\"
+                                <div style="margin-bottom: 2px;">
+                                    <span style="color: #64748b;">'.__('system.labels.two_factor_code').': </span> 
+                                    <span style="color: #1e293b; cursor: pointer; position: relative;" 
+                                          x-on:click.stop.prevent="window.navigator.clipboard.writeText('.e(Js::from($twoFA))."); copied = 'twoFA'; setTimeout(() => copied = null, 5000)\"
                                           onclick=\"event.stopPropagation();\">
                                         {$twoFA}
-                                        <span x-show=\"copied === 'twoFA'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ " . __('system.labels.copied') . "</span>
+                                        <span x-show=\"copied === 'twoFA'\" x-cloak style=\"display: none; position: absolute; left: 100%; top: 0; color: #059669; font-weight: 700; font-size: 11px; margin-left: 8px; white-space: nowrap;\">✓ ".__('system.labels.copied').'</span>
                                     </span>
                                 </div>
                                     
-                                <div style=\"margin-top: 8px; padding-top: 4px; border-top: 1px solid #f1f5f9; line-height: 1.8;\">
-                                    <div style=\"margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: wrap;\">
-                                        <span style=\"color: #64748b;\">" . __('system.labels.status') . ": </span> 
+                                <div style="margin-top: 8px; padding-top: 4px; border-top: 1px solid #f1f5f9; line-height: 1.8;">
+                                    <div style="margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: wrap;">
+                                        <span style="color: #64748b;">'.__('system.labels.status').": </span> 
                                         <span style=\"color: {$emailstatusLabelsColor};\">{$emailstatusLabels}</span>
                                     </div>
 
                                     <div style=\"margin-bottom: 2px;\">
-                                        <span style=\"color: #64748b;\">" . __('system.labels.note') . ": </span> 
+                                        <span style=\"color: #64748b;\">".__('system.labels.note').": </span> 
                                         <span style=\"color: #1e293b;\">{$emailNote}</span>
                                     </div>
                                 </div> -->
@@ -452,14 +452,16 @@ trait HasAccountSchema
                     ->alignment(Alignment::Center)
                     ->html()
                     ->formatStateUsing(function ($state): ?string {
-                        if (blank($state)) return null;
+                        if (blank($state)) {
+                            return null;
+                        }
 
                         // Tách chuỗi trạng thái nếu cần
-                        $statuses = is_array($state) 
-                            ? $state 
+                        $statuses = is_array($state)
+                            ? $state
                             : array_map('trim', explode(',', (string) $state));
-                        
-                        $html = collect($statuses)->filter()->map(function($s) {
+
+                        $html = collect($statuses)->filter()->map(function ($s) {
                             $s_lower = strtolower($s);
                             $label = match ($s_lower) {
                                 'used', 'in_use' => __('system.status.used'),
@@ -470,7 +472,7 @@ trait HasAccountSchema
                                 'no_paypal_needed', 'no_paypal_required' => __('system.status.no_paypal_required'),
                                 'banned' => __('system.status.banned'),
                                 'active', 'live' => __('system.status.active'),
-                                default => __('system.status.' . $s_lower),
+                                default => __('system.status.'.$s_lower),
                             };
 
                             $color = match ($s_lower) {
@@ -490,10 +492,11 @@ trait HasAccountSchema
 
                         return $html;
                     })
-                    ->tooltip(function (Tables\Columns\TextColumn $column, Account $record): string {
+                    ->tooltip(function (TextColumn $column, Account $record): string {
                         $statuses = is_array($record->status) ? $record->status : [$record->status];
+
                         return collect($statuses)
-                            ->map(fn($s) => match ($s) {
+                            ->map(fn ($s) => match ($s) {
                                 'active' => __('system.accounts.status_explanations.active'),
                                 'used' => __('system.accounts.status_explanations.used'),
                                 'limited' => __('system.accounts.status_explanations.limited'),
@@ -509,28 +512,30 @@ trait HasAccountSchema
 
                 TextColumn::make('user.name')
                     ->label(__('system.labels.holder'))
-                    ->alignment(Alignment::Left)
+                    ->alignment(Alignment::Center)
                     ->default(__('system.unassigned'))
-                    ->color(fn(Account $record) => $record->user_id === null ? 'gray' : 'default')
+                    ->color(fn (Account $record) => $record->user_id === null ? 'gray' : 'default')
                     ->html()
                     ->description(function (Account $record): ?HtmlString {
                         $user = auth()->user();
-                        if ($record->user_id === null && !$user?->isFinance()) {
+                        if ($record->user_id === null && ! $user?->isFinance()) {
                             return new HtmlString(
-                                '<span class = "get-account-btn">' . __('system.get_account') . '</span>'
+                                '<span class = "get-account-btn">'.__('system.get_account').'</span>'
                             );
                         }
+
                         return null;
                     })
                     ->extraAttributes(function (Account $record) {
                         $user = auth()->user();
                         $styles = 'font-weight: 400 !important; line-height: 1.2;';
-                        if ($record->user_id === null && !$user?->isFinance()) {
+                        if ($record->user_id === null && ! $user?->isFinance()) {
                             return [
                                 'class' => 'cursor-pointer transition hover:opacity-70',
                                 'wire:click.stop' => "mountTableAction('get_account', '{$record->id}')",
                             ];
                         }
+
                         return ['style' => $styles];
                     }),
             ])
@@ -543,9 +548,9 @@ trait HasAccountSchema
                         'disabled' => __('system.status.disabled'),
                         'locked' => __('system.status.locked'),
                     ])
-                    ->query(fn($query, $data) => $query->when(
+                    ->query(fn ($query, $data) => $query->when(
                         $data['value'],
-                        fn($q, $value) => $q->whereHas('email', fn($q) => $q->where('status', $value))
+                        fn ($q, $value) => $q->whereHas('email', fn ($q) => $q->where('status', $value))
                     )),
 
                 SelectFilter::make('platform')
@@ -556,13 +561,14 @@ trait HasAccountSchema
                             ->distinct()
                             ->whereNotNull('platform')
                             ->pluck('platform', 'platform')
-                            ->map(fn($label) => (string) $label)
+                            ->map(fn ($label) => (string) $label)
                             ->toArray();
                         $platforms_map = Platform::pluck('name', 'slug')->toArray();
                         $formattedOptions = [];
                         foreach ($platforms as $p) {
                             $formattedOptions[$p] = $platforms_map[$p] ?? $p;
                         }
+
                         return $formattedOptions;
                     })
                     ->searchable(),
@@ -576,7 +582,7 @@ trait HasAccountSchema
                                 return Account::query()
                                     ->selectRaw(match (DB::getDriverName()) {
                                         'sqlite' => "strftime('%Y', account_created_at) as year",
-                                        default => "YEAR(account_created_at) as year",
+                                        default => 'YEAR(account_created_at) as year',
                                     })
                                     ->whereNotNull('account_created_at')
                                     ->distinct()
@@ -588,7 +594,7 @@ trait HasAccountSchema
                     ->query(function (Builder $query, array $data): Builder {
                         return $query->when(
                             $data['year'],
-                            fn(Builder $query, $year): Builder => $query->whereYear('account_created_at', $year),
+                            fn (Builder $query, $year): Builder => $query->whereYear('account_created_at', $year),
                         );
                     }),
 
@@ -597,20 +603,20 @@ trait HasAccountSchema
                     ->trueLabel(__('system.labels.my_accounts'))
                     ->falseLabel(__('system.unassigned'))
                     ->queries(
-                        true: fn(Builder $query) => $query->where('user_id', auth()->id()),
-                        false: fn(Builder $query) => $query->whereNull('user_id'),
-                        blank: fn(Builder $query) => $query,
+                        true: fn (Builder $query) => $query->where('user_id', auth()->id()),
+                        false: fn (Builder $query) => $query->whereNull('user_id'),
+                        blank: fn (Builder $query) => $query,
                     ),
 
                 SelectFilter::make('user_id')
                     ->label(__('system.labels.holder'))
-                    ->visible(fn() => auth()->user()?->isAdmin())
+                    ->visible(fn () => auth()->user()?->isAdmin())
                     ->options(function () {
-                        return \App\Models\User::query()
+                        return User::query()
                             ->whereNotNull('name')
                             ->where('name', '!=', '')
                             ->pluck('name', 'id')
-                            ->map(fn($name) => (string) $name)
+                            ->map(fn ($name) => (string) $name)
                             ->prepend(__('system.unassigned'), 'unassigned')
                             ->toArray();
                     })
@@ -618,18 +624,19 @@ trait HasAccountSchema
                         if ($data['value'] === 'unassigned') {
                             return $query->whereNull('user_id');
                         }
-                        return $query->when($data['value'], fn($q, $id) => $q->where('user_id', $id));
+
+                        return $query->when($data['value'], fn ($q, $id) => $q->where('user_id', $id));
                     })
                     ->searchable()
                     ->preload(),
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
             ])
-            ->filtersFormColumns(fn() => auth()->user()?->isAdmin() ? 6 : 4)
+            ->filtersFormColumns(fn () => auth()->user()?->isAdmin() ? 6 : 4)
             ->filtersLayout(FiltersLayout::AboveContentCollapsible)
             ->actions([
-                Tables\Actions\Action::make('get_account')
+                Action::make('get_account')
                     ->label(__('system.get_account'))
-                    ->visible(fn() => !auth()->user()?->isFinance())
+                    ->visible(fn () => ! auth()->user()?->isFinance())
                     ->extraAttributes([
                         'style' => 'display: none !important;',
                     ])
@@ -645,8 +652,8 @@ trait HasAccountSchema
                                     ->label('')
                                     ->content(new HtmlString('
                                         <div style="color: #dc2626; font-weight: bold; padding: 12px; background-color: #fef2f2; border-radius: 8px; border: 1px solid #fecaca; font-size: 14px; line-height: 1.5;">
-                                            ⚠️ ' . __('system.gmail_warning.title') . '<br>
-                                            <span style="font-weight: 500; color: #991b1b; font-size: 13px;">' . __('system.gmail_warning.desc') . '</span>
+                                            ⚠️ '.__('system.gmail_warning.title').'<br>
+                                            <span style="font-weight: 500; color: #991b1b; font-size: 13px;">'.__('system.gmail_warning.desc').'</span>
                                         </div>
                                     ')),
                                 Forms\Components\Checkbox::make('verified')
@@ -654,7 +661,7 @@ trait HasAccountSchema
                                     ->required()
                                     ->accepted()
                                     ->validationMessages([
-                                        'accepted' => __('system.gmail_warning.validation')
+                                        'accepted' => __('system.gmail_warning.validation'),
                                     ]),
                             ];
                         }
@@ -674,6 +681,7 @@ trait HasAccountSchema
                                 ->title(__('system.notifications.cannot_claim_banned'))
                                 ->danger()
                                 ->send();
+
                             return;
                         }
 
@@ -682,6 +690,7 @@ trait HasAccountSchema
                                 ->title(__('system.notifications.cannot_claim_not_linked'))
                                 ->warning()
                                 ->send();
+
                             return;
                         }
 
@@ -694,7 +703,7 @@ trait HasAccountSchema
                     }),
 
                 // Option B: Source Information as compact modal
-                Tables\Actions\Action::make('view_source_info')
+                Action::make('view_source_info')
                     ->label('')
                     ->tooltip(__('system.labels.source_information'))
                     ->icon('heroicon-o-map-pin')
@@ -711,10 +720,10 @@ trait HasAccountSchema
                             : 'N/A';
 
                         $created = $record->account_created_at
-                            ? \Carbon\Carbon::parse($record->account_created_at)->format('d/m/Y')
+                            ? Carbon::parse($record->account_created_at)->format('d/m/Y')
                             : 'N/A';
                         $linked = $record->paypal_linked_at
-                            ? \Carbon\Carbon::parse($record->paypal_linked_at)->format('d/m/Y')
+                            ? Carbon::parse($record->paypal_linked_at)->format('d/m/Y')
                             : 'N/A';
 
                         return [
@@ -755,11 +764,11 @@ trait HasAccountSchema
                     ->color('gray'),
 
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\Action::make('add_quick_order')
+                    Action::make('add_quick_order')
                         ->label(__('system.actions.add_quick_order'))
                         ->icon('heroicon-m-plus-circle')
                         ->color('success')
-                        ->visible(fn() => !auth()->user()?->isFinance())
+                        ->visible(fn () => ! auth()->user()?->isFinance())
                         ->modalWidth('2xl')
                         ->form([
                             Forms\Components\Grid::make(2)
@@ -772,10 +781,11 @@ trait HasAccountSchema
                                         ->mask('99/99/9999')
                                         ->rules(['date_format:d/m/Y'])
                                         ->dehydrateStateUsing(function ($state) {
-                                            if (blank($state))
+                                            if (blank($state)) {
                                                 return null;
+                                            }
                                             try {
-                                                return \Carbon\Carbon::createFromFormat('d/m/Y', $state)->format('Y-m-d');
+                                                return Carbon::createFromFormat('d/m/Y', $state)->format('Y-m-d');
                                             } catch (\Exception $e) {
                                                 return null;
                                             }
@@ -817,15 +827,15 @@ trait HasAccountSchema
 
                     Tables\Actions\RestoreAction::make(),
                     Tables\Actions\ForceDeleteAction::make()
-                        ->visible(fn() => auth()->user()?->isAdmin()),
+                        ->visible(fn () => auth()->user()?->isAdmin()),
                     Tables\Actions\EditAction::make(),
                     Tables\Actions\DeleteAction::make(),
 
-                    Tables\Actions\Action::make('copy_full_info')
+                    Action::make('copy_full_info')
                         ->label(__('system.actions.copy'))
                         ->icon('heroicon-m-clipboard-document-check')
                         ->action(function ($record, $livewire) {
-                            $header = " | ID | Email Status | Year Created | Email Address | Email Password | Recovery Email | 2FA Code | Email Note | Platform | Platform Password | State | Device Create | Date Create | Platform Status | Platform Note | Holder | Personal Information | Device Linked | Date Linked PayPal | ";
+                            $header = ' | ID | Email Status | Year Created | Email Address | Email Password | Recovery Email | 2FA Code | Email Note | Platform | Platform Password | State | Device Create | Date Create | Platform Status | Platform Note | Holder | Personal Information | Device Linked | Date Linked PayPal | ';
                             $id = $record->id;
                             $emailStatus = $record->email?->status ?? 'N/A';
                             $emailstatusLabels = [
@@ -850,31 +860,31 @@ trait HasAccountSchema
                             $dateLinked = $record->paypal_linked_at ? $record->paypal_linked_at->format('d/m/Y') : 'N/A';
                             $currentStatuses = is_array($record->status) ? $record->status : explode(',', (string) $record->status);
                             $platformstatus = collect($currentStatuses)
-                                ->map(fn($s) => ucfirst(trim($s)))
+                                ->map(fn ($s) => ucfirst(trim($s)))
                                 ->join(', ');
                             $note = $record->note ?? 'N/A';
                             $holder = $record->user?->name ?? 'N/A';
 
                             $singleLine = " | {$id} | {$emailStatus} | {$yearCreated} | {$email} | {$emailPass} | {$recovery} | {$twoFA} | {$emailNote} | {$record->platform} | {$record->password} | {$stateName} | {$device} | {$platformDateCreated} | {$platformstatus} | {$note} | {$holder} | {$paypal} | {$devicePaypal} | {$dateLinked} | \n";
-                            $finalSingleLine = $header . "\n" . $singleLine;
-                            $multiLine = "EMAIL INFORMATION:\n" . "Email Status: {$emailStatus}\n" . "Year Created: {$yearCreated}\n" . "Email Address: {$email}\n" . "Email Password: {$emailPass}\n" . "Recovery Email: {$recovery}\n" . "2FA Code: {$twoFA}\n" . "Email Note: {$emailNote}\n" . "--------------------------\n" . "SOURCE & PLATFORM:\n" . "Platform: {$platform}\n" . "Platform Password: {$platformPass}\n" . "State: {$stateName}\n" . "Device Create: {$device}\n" . "Date Create: {$platformDateCreated}\n" . "Platform Status: {$platformstatus}\n" . "Platform Note: {$note}\n" . "Holder: {$holder}\n" . "--------------------------\n" . "PAYPAL INFORMATION:\n" . "Personal Information: {$paypal}\n" . "Device Linked: {$devicePaypal}\n" . "Date Linked PayPal: {$dateLinked}\n";
-                            $info = $finalSingleLine . "\n\n" . $multiLine;
+                            $finalSingleLine = $header."\n".$singleLine;
+                            $multiLine = "EMAIL INFORMATION:\n"."Email Status: {$emailStatus}\n"."Year Created: {$yearCreated}\n"."Email Address: {$email}\n"."Email Password: {$emailPass}\n"."Recovery Email: {$recovery}\n"."2FA Code: {$twoFA}\n"."Email Note: {$emailNote}\n"."--------------------------\n"."SOURCE & PLATFORM:\n"."Platform: {$platform}\n"."Platform Password: {$platformPass}\n"."State: {$stateName}\n"."Device Create: {$device}\n"."Date Create: {$platformDateCreated}\n"."Platform Status: {$platformstatus}\n"."Platform Note: {$note}\n"."Holder: {$holder}\n"."--------------------------\n"."PAYPAL INFORMATION:\n"."Personal Information: {$paypal}\n"."Device Linked: {$devicePaypal}\n"."Date Linked PayPal: {$dateLinked}\n";
+                            $info = $finalSingleLine."\n\n".$multiLine;
                             $livewire->dispatch('copy-to-clipboard', text: $info);
                             Notification::make()
                                 ->title(__('system.notifications.copied_successfully'))
                                 ->success()
                                 ->send();
                         }),
-                ])
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkAction::make('export_accounts_to_google_sheet')
+                    BulkAction::make('export_accounts_to_google_sheet')
                         ->label(__('system.actions.export_to_sheet'))
                         ->icon('heroicon-o-table-cells')
                         ->color('success')
-                        ->visible(fn() => auth()->user()?->isAdmin())
-                        ->action(function (Collection $records, \App\Services\GoogleSyncService $syncService) {
+                        ->visible(fn () => auth()->user()?->isAdmin())
+                        ->action(function (Collection $records, GoogleSyncService $syncService) {
                             try {
                                 $syncService->syncAccounts($records);
                                 Notification::make()
@@ -891,11 +901,11 @@ trait HasAccountSchema
                         })
                         ->deselectRecordsAfterCompletion(),
 
-                    Tables\Actions\BulkAction::make('get_bulk_accounts')
+                    BulkAction::make('get_bulk_accounts')
                         ->label(__('system.actions.claim_selected'))
                         ->icon('heroicon-m-user-plus')
                         ->color('success')
-                        ->visible(fn() => !auth()->user()?->isFinance())
+                        ->visible(fn () => ! auth()->user()?->isFinance())
                         ->requiresConfirmation()
                         ->action(function (Collection $records) {
                             $currentUserId = auth()->id();
@@ -912,12 +922,11 @@ trait HasAccountSchema
                         })
                         ->deselectRecordsAfterCompletion(),
 
-
-                    Tables\Actions\BulkAction::make('clear_date_create_selected')
+                    BulkAction::make('clear_date_create_selected')
                         ->label(__('system.actions.clear_date_create'))
                         ->icon('heroicon-m-x-circle')
                         ->color('danger')
-                        ->visible(fn() => auth()->user()?->isAdmin())
+                        ->visible(fn () => auth()->user()?->isAdmin())
                         ->requiresConfirmation()
                         ->action(function (Collection $records) {
                             foreach ($records as $record) {
@@ -930,13 +939,13 @@ trait HasAccountSchema
                         })
                         ->deselectRecordsAfterCompletion(),
 
-                    Tables\Actions\BulkAction::make('copy_account_selected')
+                    BulkAction::make('copy_account_selected')
                         ->label(__('system.actions.copy_selected'))
                         ->icon('heroicon-m-clipboard-document-list')
                         ->color('warning')
                         ->action(function (Collection $records, $livewire) {
-                            $header = " | ID | Email Status | Year Created | Email Address | Email Password | Recovery Email | 2FA Code | Email Note | Platform | Platform Password | State | Device Create | Date Create | Platform Status | Platform Note | Holder | Personal Information | Device Linked | Date Linked PayPal | ";
-                            $output = $header . "\n";
+                            $header = ' | ID | Email Status | Year Created | Email Address | Email Password | Recovery Email | 2FA Code | Email Note | Platform | Platform Password | State | Device Create | Date Create | Platform Status | Platform Note | Holder | Personal Information | Device Linked | Date Linked PayPal | ';
+                            $output = $header."\n";
                             foreach ($records as $record) {
                                 $id = $record->id;
                                 $emailStatus = $record->email?->status ?? 'N/A';
@@ -957,7 +966,7 @@ trait HasAccountSchema
                                 $currentStatuses = is_array($record->status) ? $record->status : [$record->status];
                                 $stateName = self::$usStates[$record->state] ?? $record->state ?? 'N/A';
                                 $platformstatus = collect($currentStatuses)
-                                    ->map(fn($s) => ucfirst(trim($s)))
+                                    ->map(fn ($s) => ucfirst(trim($s)))
                                     ->join(', ');
 
                                 $accNote = $record->note ?? 'N/A';
@@ -975,11 +984,11 @@ trait HasAccountSchema
                         })
                         ->deselectRecordsAfterCompletion(),
                     Tables\Actions\RestoreBulkAction::make()
-                        ->visible(fn() => auth()->user()?->isAdmin()),
+                        ->visible(fn () => auth()->user()?->isAdmin()),
                     Tables\Actions\ForceDeleteBulkAction::make()
-                        ->visible(fn() => auth()->user()?->isAdmin()),
+                        ->visible(fn () => auth()->user()?->isAdmin()),
                     Tables\Actions\DeleteBulkAction::make()
-                        ->visible(fn() => auth()->user()?->isAdmin()),
+                        ->visible(fn () => auth()->user()?->isAdmin()),
                 ]),
             ]);
     }

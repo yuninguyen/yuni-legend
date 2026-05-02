@@ -586,13 +586,13 @@ trait HasTrackerSchema
                     ->weight('medium')
                     ->icon('heroicon-m-shopping-bag')
                     ->iconColor('gray')
-                    ->alignment(Alignment::Left)
+                    ->alignment(Alignment::Center)
                     ->searchable(),
 
                 // 1b. ORDER ID
                 Tables\Columns\TextColumn::make('order_id')
                     ->label(__('system.labels.order_id'))
-                    ->alignment(Alignment::Left)
+                    ->alignment(Alignment::Center)
                     ->placeholder(__('system.n/a'))
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->searchable(),

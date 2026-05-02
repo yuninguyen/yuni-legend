@@ -26,7 +26,6 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\FontWeight;
-use Filament\Support\Enums\IconPosition;
 use Filament\Tables;
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Table;
@@ -751,19 +750,20 @@ class PayoutLogResource extends Resource
                 Tables\Columns\TextColumn::make('id')
                     ->label('ID')
                     ->searchable()
-                    ->sortable()
+                    ->width('60px')
                     ->alignment(Alignment::Center),
 
                 // Date - Platform
                 Tables\Columns\TextColumn::make('created_at')
                     ->label(__('system.labels.date'))
                     ->dateTime('d/m/Y')
+                    ->width('90px')
                     ->alignment(Alignment::Center),
 
                 // Account Email - Platform
                 Tables\Columns\TextColumn::make('account_id')
                     ->label(__('system.labels.account_email'))
-                    ->alignment(Alignment::Center)
+                    ->alignment(Alignment::Left)
                     ->copyable()
                     ->copyMessage(__('system.payout_logs.messages.copied'))
                     ->wrap()
@@ -787,9 +787,9 @@ class PayoutLogResource extends Resource
                         $safeUserName = e($userName);
 
                         return "
-                            <div style='line-height: 1.6; padding: 4px 0;'>
-                                <div style='font-weight: 600; color: #111827; margin-bottom: 4px;'>$safeEmail</div>
-                                <div style='font-size: 12px; color: #6b7280; display: flex; align-items: center; gap: 4px;'>
+                            <div style='line-height: 1.6; padding: 0;'>
+                                <div style='font-size: 13px; font-weight: 500; color: #111827;'>$safeEmail</div>
+                                <div style='font-size: 13px; color: #6b7280; display: flex; align-items: center; gap: 4px;'>
                                     <span style='color: #9ca3af;'>".__('system.labels.user').":</span>
                                     <span style='font-weight: 500; color: #4b5563;'>$safeUserName</span>
                                 </div>
@@ -809,18 +809,15 @@ class PayoutLogResource extends Resource
                 // Hiển thị Wallet PayPal hoặc Info Gift Card
                 Tables\Columns\TextColumn::make('asset_info')
                     ->label(__('system.labels.asset_info'))
-                    ->alignment(Alignment::Center)
+                    ->alignment(Alignment::Left)
                     ->copyable()
                     ->copyMessage('Copied to clipboard!')
                     ->wrap()
-                    ->extraHeaderAttributes(['style' => 'min-width: 230px'])
-                    ->extraAttributes(['style' => 'min-width: 230px'])
-                    ->icon(fn ($record): ?string => $record->asset_type === 'gift_card' ? 'heroicon-m-clipboard-document' : null)
-                    ->iconColor('warning')
-                    ->iconPosition(IconPosition::After)
+                    ->extraHeaderAttributes(['style' => 'min-width: 240px'])
                     ->html() // Cho phép xuống dòng bằng thẻ <br>
                     ->extraAttributes([
-                        'class' => 'cursor-default relative',
+                        'class' => 'cursor-default relative fi-asset-info-col',
+                        'style' => 'min-width: 240px;',
                         'onclick' => 'event.stopPropagation();',
                     ])
                     ->copyableState(function ($record) {
@@ -831,7 +828,7 @@ class PayoutLogResource extends Resource
                         $prettyBrand = ucwords(str_replace('_', ' ', $data->gc_brand ?? 'N/A'));
                         $amount = number_format($record->net_amount_usd, 2);
 
-                        return "Brand: {$prettyBrand} | Amount: \${$amount} | Card number: {$data->gc_code} | PIN: {$data->gc_pin}";
+                        return "Brand: {$prettyBrand} eGift Card | Amount: \${$amount} | Card number: {$data->gc_code} | PIN: {$data->gc_pin}";
                     })
                     ->state(function ($record) {
                         if ($record->asset_type === 'paypal') {
@@ -849,9 +846,9 @@ class PayoutLogResource extends Resource
                             }
 
                             return "<div style='line-height: 1.6; font-size: 13px;'>
-                                        <div style='margin-bottom: 4px;'>
+                                        <div style='margin-bottom: 2px;'>
                                             <span style='color: #64748B; font-weight: 300; display: block;'>PayPal withdrawal:</span>
-                                            <span style='color: #0F172A; font-weight: 600;'>{$methodType} - {$walletName}</span>
+                                            <span style='color: #0F172A; font-weight: 500;'>{$methodType} - {$walletName}</span>
                                         </div>
                                     </div>";
                         }
@@ -866,34 +863,34 @@ class PayoutLogResource extends Resource
                             'visa' => 'Visa/Mastercard',
                             default => e(ucwords(str_replace(['_', '-'], ' ', $brand ?? __('system.labels.n/a'))))
                         };
+                        // 🟢 FIX: Remove any extra/multiple spaces from database that causes huge padding
+                        $brand = trim(preg_replace('/\s+/', ' ', $brand));
+                        $code = e(trim(preg_replace('/\s+/', ' ', $record->gc_code ?? '---')));
+                        $pin = e(trim(preg_replace('/\s+/', ' ', $record->gc_pin ?? '---')));
 
-                        $code = e($record->gc_code ?? '---');
-                        $pin = e($record->gc_pin ?? '---');
-
-                        return "
-                            <div style='line-height: 1.6; font-size: 13px;'>
-                                <div style='margin-bottom: 4px;'>
-                                    <span style='color: #64748B; font-weight: 300; display: block;'>Gift Card Information:</span>
-                                    </div>
-                                    
-                                <div style='margin-bottom: 4px;'>
-                                    <span style='color: #64748B; font-weight: 300; display: inline;'>".__('system.labels.brand').": </span>
-                                    <span style='color: #0F172A; font-weight: 600;'>{$brand}</span>
-                                </div>
-                                <div style='margin-bottom: 4px;'>
-                                    <span style='color: #64748B; font-weight: 300; display: block;'>".__('system.payout_logs.fields.card_number').": </span>
-                                    <code style='color: #0F172A; font-weight: 600; padding: 2px; font-family: JetBrains Mono, monospace; font-size: 12px; display: inline-block; margin-top: 2px;'>{$code}</code>
-                                </div>
-                                <div>
-                                    <span style='color: #64748B; font-weight: 300; display: inline-block;'>".__('system.payout_logs.fields.pin').": </span>
-                                    <code style='color: #0F172A; font-weight: 600; padding: 2px; font-family: JetBrains Mono, monospace; font-size: 12px; display: inline-block; margin-top: 2px;'>{$pin}</code>
-                                </div>
-                            </div>";
+                        return "<div style='line-height: 1.6; font-size: 13px;'>
+                            <div style='margin-bottom: 2px;'>
+                                <span style='color: #64748B; font-weight: 300; display: block;'>Gift Card Information:</span>
+                            </div>
+                            <div style='margin-bottom: 2px;'>
+                                <span style='color: #64748B; font-weight: 300;'>".__('system.labels.brand').":</span>
+                                <span style='color: #0F172A; font-weight: 500;'>{$brand}</span>
+                            </div>
+                            <div style='margin-bottom: 2px;'>
+                                <span style='color: #64748B; font-weight: 300; display: block;'>".__('system.payout_logs.fields.card_number').":</span>
+                                <span style='color: #0F172A; font-weight: 500; font-family: JetBrains Mono, monospace; font-size: 12.5px;'>{$code}</span>
+                            </div>
+                            <div>
+                                <span style='color: #64748B; font-weight: 300;'>".__('system.payout_logs.fields.pin').":</span>
+                                <span style='color: #0F172A; font-weight: 500; font-family: JetBrains Mono, monospace; font-size: 12.5px;'>{$pin}</span>
+                            </div>
+                        </div>";
                     }),
 
                 Tables\Columns\TextColumn::make('transaction_type')
                     ->label(__('system.labels.transaction_type'))
                     ->alignment(Alignment::Center)
+                    ->width('120px')
                     ->formatStateUsing(fn (string $state): string => __('system.payout_logs.transaction_types.'.$state))
                     ->description(function ($record): ?HtmlString {
                         if ($record->transaction_type === 'liquidation') {
@@ -920,7 +917,7 @@ class PayoutLogResource extends Resource
 
                         if ($isExchanged) {
                             return new HtmlString(
-                                '<div style="color: #6b7280; font-size: 11px; font-weight: bold; margin-top: 2px;">(Exchanged!'.($dateSuffix ?: '').')</div>'
+                                '<div style="color: #6b7280; font-size: 12px; font-weight: 600;">(Exchanged!'.($dateSuffix ?: '').')</div>'
                             );
                         }
 
@@ -931,7 +928,7 @@ class PayoutLogResource extends Resource
 
                             if ($balance <= 0) {
                                 return new HtmlString(
-                                    '<div style="color: #6b7280; font-size: 11px; font-weight: bold; margin-top: 2px;">(No Liquidity'.($dateSuffix ?: '').')</div>'
+                                    '<div style="color: #6b7280; font-size: 12px; font-weight: 600;">(No Liquidity'.($dateSuffix ?: '').')</div>'
                                 );
                             }
                         }
@@ -939,7 +936,7 @@ class PayoutLogResource extends Resource
                         // Nếu chưa quy đổi hết: Hiện nút bấm (Chỉ Admin & Finance)
                         if (auth()->user()?->isAdmin() || auth()->user()?->isFinance()) {
                             return new HtmlString(
-                                '<span style="color: #FF9F40; font-weight: bold; cursor: pointer; display: block; margin-top: 4px;">'.__('system.payout_logs.actions.exchange_to_vnd').'</span>'
+                                '<span style="color: #FF9F40; font-weight: 600; cursor: pointer; display: block;">'.__('system.payout_logs.actions.exchange_to_vnd').'</span>'
                             );
                         }
 

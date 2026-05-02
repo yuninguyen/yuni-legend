@@ -2,24 +2,29 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Dashboard;
+use App\Filament\Widgets\AdminUserEarningsTable;
+use App\Filament\Widgets\EmailStatusChart;
+use App\Filament\Widgets\PayoutStats;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Facades\FilamentView;
 use Filament\Widgets;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
-use Illuminate\View\Middleware\ShareErrorsFromSession;
-use Filament\Support\Facades\FilamentView;
 use Illuminate\Support\Facades\Blade;
-use Filament\Navigation\NavigationGroup;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -30,13 +35,13 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->databaseNotifications()
             ->path('admin')
-            ->login(\App\Filament\Pages\Auth\Login::class)
+            ->login(Login::class)
 
             // 🎨 BRANDING
             ->brandName('RebateOps')
             ->brandLogo(fn () => view('filament.components.brand-logo'))
-            ->brandLogoHeight('32px')
-            ->favicon(asset('favicon.ico'))
+            ->brandLogoHeight('48px')
+                ->favicon(asset('images/rebateops-logo.png').'?v='.time())
 
             ->sidebarCollapsibleOnDesktop()
 
@@ -55,19 +60,19 @@ class AdminPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
-                \App\Filament\Pages\Dashboard::class,
+                Dashboard::class,
             ])
             ->resources([
-                config('filament-logger.activity_resource')
+                config('filament-logger.activity_resource'),
             ])
             // 📊 WIDGETS
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 Widgets\AccountWidget::class,
-                \App\Filament\Widgets\EmailStatusChart::class,
+                EmailStatusChart::class,
                 Widgets\FilamentInfoWidget::class,
-                \App\Filament\Widgets\PayoutStats::class,
-                \App\Filament\Widgets\AdminUserEarningsTable::class,
+                PayoutStats::class,
+                AdminUserEarningsTable::class,
             ])
 
             // 🗂️ SIDEBAR GROUP ORDERING (Strict machine-name keys)
@@ -103,15 +108,15 @@ class AdminPanelProvider extends PanelProvider
             // 🎨 THEME CSS — Inject professional stylesheet
             ->renderHook(
                 'panels::head.start',
-                fn(): string => '<meta name="robots" content="noindex, nofollow">'
+                fn (): string => '<meta name="robots" content="noindex, nofollow">'
             )
             ->renderHook(
                 'panels::styles.after',
-                fn(): string => Blade::render('
+                fn (): string => Blade::render('
                     <link rel="preconnect" href="https://fonts.googleapis.com">
                     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
                     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-                    <link rel="stylesheet" href="' . asset('css/filament-theme.css') . '?v=' . time() . '">
+                    <link rel="stylesheet" href="'.asset('css/filament-theme.css').'?v='.time().'">
                     @include("filament.components.selection-bar-fix")
                 '),
             );
@@ -122,7 +127,7 @@ class AdminPanelProvider extends PanelProvider
         // 🟢 CLIPBOARD POLYFILL (Giữ lại JS thiết yếu duy nhất)
         FilamentView::registerRenderHook(
             'panels::body.end',
-            fn(): string => '
+            fn (): string => '
             <script>
             // Clipboard polyfill for HTTP
             if (!navigator.clipboard) {

@@ -75,9 +75,9 @@
 .fi-sidebar-header a span,
 .fi-sidebar-header a img,
 .fi-sidebar-header a svg,
-.fi-sidebar-header > span,
-.fi-sidebar-header > img,
-.fi-sidebar-header > svg,
+.fi-sidebar-header>span,
+.fi-sidebar-header>img,
+.fi-sidebar-header>svg,
 .fi-sidebar-group-label,
 .fi-sidebar-item-label {
     display: inline-block !important;
@@ -96,7 +96,7 @@
 
 /* Brand name / logo — chỉ nhắm vào nội dung thương hiệu */
 .fi-sidebar-header a,
-.fi-sidebar-header > span {
+.fi-sidebar-header>span {
     color: #E2E8F0 !important;
     font-weight: 700 !important;
     font-size: 15px !important;
@@ -177,7 +177,8 @@
    3. TOPBAR — Clean & Subtle
    ============================================ */
 .fi-topbar {
-    position: relative !important; /* Gỡ bỏ cố định topbar */
+    position: relative !important;
+    /* Gỡ bỏ cố định topbar */
     background: var(--card-bg) !important;
     border-bottom: 1px solid var(--border-color) !important;
     box-shadow: none !important;
@@ -196,7 +197,7 @@
 }
 
 /* Sửa lỗi lệch Icon: Căn giữa hoàn hảo và thêm padding theo yêu cầu cụ thể */
-.fi-topbar nav > div:last-child {
+.fi-topbar nav>div:last-child {
     display: flex !important;
     align-items: center !important;
     gap: 1rem !important;
@@ -206,6 +207,7 @@
 
 /* Hiện menu icon ở góc trái trên Phone, ẩn trên Desktop */
 @media (min-width: 1024px) {
+
     .fi-topbar .fi-sidebar-open-button,
     .fi-topbar nav>div:first-child button[x-on\:click] {
         display: none !important;
@@ -213,16 +215,17 @@
 }
 
 @media (max-width: 1023px) {
+
     /* CHỈ áp dụng cho nút Menu (Sidebar toggle) ở bên trái */
-    .fi-topbar nav > button:first-of-type,
-    .fi-topbar nav > div:first-child button {
+    .fi-topbar nav>button:first-of-type,
+    .fi-topbar nav>div:first-child button {
         padding-top: 15px !important;
         padding-left: 5px !important;
         display: flex !important;
     }
 
     /* Đảm bảo các nút khác (như Chuông) không bị dính padding này */
-    .fi-topbar nav > div:last-child button {
+    .fi-topbar nav>div:last-child button {
         padding-top: 0 !important;
         padding-left: 0 !important;
     }
@@ -244,8 +247,10 @@
    ============================================ */
 .fi-main {
     background: var(--content-bg) !important;
-    padding-left: 1.5rem !important; /* Tăng từ 1rem lên 1.5rem cho thoáng */
-    padding-right: 1.5rem !important; /* Đồng bộ lề phải */
+    padding-left: 1.5rem !important;
+    /* Tăng từ 1rem lên 1.5rem cho thoáng */
+    padding-right: 1.5rem !important;
+    /* Đồng bộ lề phải */
     box-sizing: border-box !important;
     /* overflow-x: hidden !important; // Removed to prevent clipping dropdowns */
 }
@@ -374,16 +379,38 @@
     overflow: hidden;
 }
 
-/* Table header */
+/* Table header — Luôn luôn ở giữa */
 .fi-ta-header-cell {
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.02em !important;
-    color: var(--text-secondary) !important;
-    background: #F8FAFC !important;
-    border-bottom: 2px solid var(--border-color) !important;
-    padding: 0.75rem 1rem !important;
+    background: #F1F5F9 !important;
+    border-bottom: 1px solid var(--border-color) !important;
     white-space: nowrap !important;
+    text-align: center !important;
+}
+
+.fi-ta-header-cell>div,
+.fi-ta-header-cell-label {
+    justify-content: center !important;
+    text-align: center !important;
+    width: 100%;
+}
+
+/* Base Table Styles — Nén tối đa để tránh scroll ngang */
+.fi-ta-header-cell,
+.fi-ta-cell,
+.fi-ta-text-item,
+.fi-ta-text-item-label {
+    padding: 0.25rem 0.4rem !important;
+    /* Nén padding cực hẹp */
+    font-size: 12.5px !important;
+    /* Đảm bảo đồng nhất 12.5px cho mọi chữ */
+    vertical-align: middle !important;
+    line-height: 1.4 !important;
+}
+
+.fi-ta-header-cell {
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+    letter-spacing: 0.01em !important;
 }
 
 .fi-ta-header-cell-label,
@@ -401,14 +428,50 @@
     background: #F1F5F9 !important;
 }
 
-/* Table cells */
+/* Table cells — Sát lề trái tối đa và thẳng hàng tắp lự */
 .fi-ta-cell {
-    padding: 0.625rem 1rem !important;
+    text-align: left !important;
+    padding-left: 0.2rem !important;
+    /* Giữ khoảng đệm cực nhỏ để không dính khung */
+}
+
+/* Khử toàn bộ khoảng thụt lề của các phần tử con bên trong */
+.fi-ta-cell .fi-ta-text-item>div,
+.fi-ta-cell .fi-ta-text-item>div>div,
+.fi-ta-cell code {
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+}
+
+.fi-ta-text-item {
+    display: flex !important;
+    flex-direction: row !important;
+    /* Nút copy luôn nằm bên phải */
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    /* Đưa nút copy lên đầu dòng */
+    width: 100% !important;
+    gap: 10px;
+}
+
+/* Điều chỉnh nút Copy */
+.fi-ta-text-item button {
+    margin-top: 4px !important;
+    margin-left: 10px !important;
+}
+
+/* Đảm bảo phần text bên trong không bị nút copy chèn ép */
+.fi-ta-text-item>div {
+    flex: 1;
+}
+
+.fi-ta-text-item-label {
+    text-align: left !important;
+    width: auto !important;
 }
 
 /* Table text */
 span.fi-ta-text-item-label {
-    font-size: 13px !important;
     text-align: left !important;
 }
 
@@ -423,9 +486,11 @@ span.fi-ta-text-item-label {
 /* Targets the table-level summary specifically, excluding group-level totals */
 .fi-ta-summary-row.bg-gray-50,
 .fi-ta-summary-row.dark\:bg-white\/5 {
-    background: #1E293B !important; /* LIGHTER SIDEBAR TONE FOR PERFECT MATCH */
-    border-top: 2px solid #F59E0B !important; /* ACCENT FROM SIDEBAR */
-    box-shadow: 0 -4px 12px rgba(0,0,0,0.15) !important;
+    background: #1E293B !important;
+    /* LIGHTER SIDEBAR TONE FOR PERFECT MATCH */
+    border-top: 2px solid #F59E0B !important;
+    /* ACCENT FROM SIDEBAR */
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* 3. Global Summary Aggregate Values — High Contrast & Pro */
@@ -437,13 +502,14 @@ span.fi-ta-text-item-label {
     font-weight: 850 !important;
     font-size: 0.95rem !important;
     letter-spacing: 0.02em !important;
-    text-shadow: 0 1px 1px rgba(0,0,0,0.3) !important;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Ensure group total values stay readable in Amber theme */
 .fi-ta-summary-row:not(.bg-gray-50) td,
 .fi-ta-summary-row:not(.bg-gray-50) span {
-    color: #92400E !important; /* Amber-900 */
+    color: #92400E !important;
+    /* Amber-900 */
     font-weight: 700 !important;
 }
 
@@ -642,10 +708,13 @@ textarea.fi-input {
 
 /* Get Account button */
 .get-account-btn {
-    display: block !important;
-    font-weight: 500 !important;
+    display: inline-block !important;
+    font-weight: 600 !important;
     color: #d97706 !important;
+    font-size: 12.5px !important;
+    /* Đồng bộ phông chữ 12.5px */
     cursor: pointer !important;
+    text-decoration: underline !important;
     transition: all 200ms ease !important;
 }
 
@@ -683,7 +752,8 @@ textarea.fi-input {
     border: none !important;
     background: var(--card-bg) !important;
     box-shadow: none !important;
-    z-index: 30 !important; /* THE SWEET SPOT: Higher than table headers (z-20), lower than backdrop (z-40) */
+    z-index: 30 !important;
+    /* THE SWEET SPOT: Higher than table headers (z-20), lower than backdrop (z-40) */
 }
 
 /* Ensure filter bar container doesn't clip children */
@@ -738,13 +808,15 @@ textarea.fi-input {
     font-weight: 700 !important;
     letter-spacing: -0.02em !important;
     color: var(--text-primary) !important;
-    padding-left: 0.5rem !important; /* Thêm padding-left cho lời chào */
+    padding-left: 0.5rem !important;
+    /* Thêm padding-left cho lời chào */
 }
 
 .fi-header-subheading {
     font-size: 14px !important;
     color: var(--text-secondary) !important;
-    padding-left: 0.5rem !important; /* Thêm padding-left cho subheading */
+    padding-left: 0.5rem !important;
+    /* Thêm padding-left cho subheading */
 }
 
 /* ============================================
@@ -762,7 +834,7 @@ textarea.fi-input {
     top: 0 !important;
     z-index: 20 !important;
     background: #F8FAFC !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 }
 
 .dark .fi-ta-table th {
@@ -791,15 +863,17 @@ textarea.fi-input {
 }
 
 /* Premium Dashboard Font size (13px) for data density */
-.fi-ta-content .fi-ta-text, 
+.fi-ta-content .fi-ta-text,
 .fi-ta-content .fi-ta-cell {
-    font-size: 0.8125rem !important; /* ~13px */
+    font-size: 0.8125rem !important;
+    /* ~13px */
 }
 
 /* Global Header Font Size (13px) */
 .fi-ta-header-cell-label,
 .fi-ta-header-cell-content button span {
-    font-size: 0.8125rem !important; /* ~13px */
+    font-size: 0.8125rem !important;
+    /* ~13px */
 }
 
 /* Specific Header Padding (0.8rem) ONLY for Dashboard and Activity Log */
@@ -826,7 +900,7 @@ textarea.fi-input {
    DASHBOARD: Equal-height Chart Widgets & Cards
    ============================================ */
 /* Force all widget rows to stretch children equally */
-.fi-page-dashboard .fi-widgets > .grid {
+.fi-page-dashboard .fi-widgets>.grid {
     align-items: stretch !important;
 }
 
@@ -836,8 +910,9 @@ textarea.fi-input {
     flex-direction: column;
     height: 100%;
 }
-.fi-wi-chart > div,
-.fi-wi-chart > div > div {
+
+.fi-wi-chart>div,
+.fi-wi-chart>div>div {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -847,9 +922,11 @@ textarea.fi-input {
 .fi-wi-stats-overview {
     width: 100%;
 }
+
 .fi-wi-stats-overview .fi-wi-stats-overview-stat {
     min-width: 0;
 }
+
 .fi-wi-stats-overview .fi-wi-stats-overview-stat-content {
     width: 100%;
 }
@@ -872,7 +949,8 @@ textarea.fi-input {
     gap: 16px;
     border-bottom: 1px solid #f1f5f9;
     padding-bottom: 8px;
-    flex-wrap: wrap; /* Cho phép rớt hàng trên Mobile */
+    flex-wrap: wrap;
+    /* Cho phép rớt hàng trên Mobile */
 }
 
 /* Container cho danh sách Holders */
@@ -893,7 +971,8 @@ textarea.fi-input {
 /* Từng hàng Holder */
 .es-holder-row {
     display: grid !important;
-    grid-template-columns: 20px 100px 1fr 1fr 1fr 1fr; /* Desktop default */
+    grid-template-columns: 20px 100px 1fr 1fr 1fr 1fr;
+    /* Desktop default */
     align-items: center !important;
     gap: 8px !important;
     padding: 6px 0 !important;
@@ -908,7 +987,8 @@ textarea.fi-input {
 
 /* Nhóm các chỉ số (Stats) để điều khiển gom nhóm trên mobile */
 .es-stats-group {
-    display: contents; /* Trên desktop coi như không có div bọc này */
+    display: contents;
+    /* Trên desktop coi như không có div bọc này */
 }
 
 /* Badge chỉ số chung */
@@ -947,19 +1027,23 @@ textarea.fi-input {
     .es-header-row {
         gap: 8px;
     }
-    
+
     .es-holder-row {
-        grid-template-columns: 24px 1fr !important; /* Mobile: Avatar | Tên */
+        grid-template-columns: 24px 1fr !important;
+        /* Mobile: Avatar | Tên */
         gap: 4px 8px !important;
         padding: 8px 4px !important;
         border-bottom: 1px dotted #f1f5f9;
         height: auto !important;
     }
-    
+
     .es-stats-group {
-        display: grid !important; /* Hiện lại div bọc */
-        grid-column: 1 / -1; /* Chiếm toàn bộ chiều ngang hàng dưới */
-        grid-template-columns: repeat(2, 1fr) !important; /* Chia 2x2 */
+        display: grid !important;
+        /* Hiện lại div bọc */
+        grid-column: 1 / -1;
+        /* Chiếm toàn bộ chiều ngang hàng dưới */
+        grid-template-columns: repeat(2, 1fr) !important;
+        /* Chia 2x2 */
         gap: 4px !important;
         margin-top: 2px;
     }
@@ -980,12 +1064,14 @@ textarea.fi-input {
     background: #1e293b;
     color: white;
     border-radius: 50%;
-    display: none; /* JS điều khiển hiện/ẩn */
+    display: none;
+    /* JS điều khiển hiện/ẩn */
     align-items: center;
     justify-content: center;
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 9999 !important; /* Đảm bảo luôn nổi trên các Card */
+    z-index: 9999 !important;
+    /* Đảm bảo luôn nổi trên các Card */
     transition: all 300ms ease;
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
