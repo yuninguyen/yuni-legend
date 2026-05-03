@@ -605,7 +605,7 @@ class GoogleSheetService
         $id = $spreadsheetId ?? $this->spreadsheetId;
         $cacheKey = 'sheet_info_' . $id;
 
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, 3600, function () use ($id) {
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($id) {
             $spreadsheet = $this->service->spreadsheets->get($id);
             $info = [];
             foreach ($spreadsheet->getSheets() as $sheet) {

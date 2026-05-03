@@ -64,6 +64,15 @@ class SyncGoogleSheetJob implements ShouldQueue
         }
     }
 
+    public function failed(\Throwable $exception): void
+    {
+        Log::critical("SyncGoogleSheetJob permanently failed [{$this->modelClass} #{$this->recordId}]: " . $exception->getMessage(), [
+            'model' => $this->modelClass,
+            'record_id' => $this->recordId,
+            'action' => $this->action,
+        ]);
+    }
+
     protected function getRecordWithRelations()
     {
         $query = $this->modelClass::query();

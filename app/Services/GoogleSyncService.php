@@ -159,7 +159,7 @@ class GoogleSyncService
             $record->device_linked_paypal ?? 'N/A',
             $this->formatDate($record->paypal_linked_at),
             $record->paypal_info ?? 'N/A',
-            now('Asia/Ho_Chi_Minh')->format('d/m/Y H:i:s'),
+            now(config('app.timezone'))->format('d/m/Y H:i:s'),
         ];
     }
 
@@ -431,7 +431,7 @@ class GoogleSyncService
             (string) ucwords((string) $record->status ?: 'N/A'),
             (string) ($record->note ?? ''),
             (string) ($record->is_active ? 'On' : 'Off'),
-            now('Asia/Ho_Chi_Minh')->format('d/m/Y H:i'),
+            now(config('app.timezone'))->format('d/m/Y H:i'),
         ];
     }
 
