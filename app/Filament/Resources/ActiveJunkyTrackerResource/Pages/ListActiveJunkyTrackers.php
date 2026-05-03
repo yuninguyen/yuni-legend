@@ -11,6 +11,7 @@ class ListActiveJunkyTrackers extends ListRecords
 {
     protected static string $resource = ActiveJunkyTrackerResource::class;
     use \App\Filament\Traits\HasSyncToSheetAction;
+    use \App\Filament\Traits\HasTrackerTabs;
 
     protected function getHeaderActions(): array
     {

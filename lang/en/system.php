@@ -164,7 +164,11 @@ return [
         'batch_name' => 'Batch Name',
         'note_for_all' => 'Note for all',
         'user_batch' => 'User | Batch',
-        'batch_id' => 'Batch ID',
+        'batch_id' => 'Batch ID/Name',
+        'batch_id_placeholder' => 'Batch Name/ID (e.g., Batch 1 - May)',
+        'account_batch_group' => 'Account & Payout Batch',
+        'uncategorized' => 'Uncategorized',
+        'total' => 'Total',
         'quick_set_payment_date' => 'Update Payment Date',
         'account_balance' => 'Account Balance',
         'transaction_activity' => 'Transaction Activity',
@@ -194,6 +198,10 @@ return [
         'close' => 'Close',
         'get_account' => 'Get Account',
         'bulk_actions' => 'Bulk Actions',
+        'assign_batch' => 'Group into Batch',
+        'remove_batch' => 'Remove from Batch',
+        'assign_batch_success' => 'Successfully grouped :count transactions into: :batch',
+        'remove_batch_success' => 'Successfully removed :count transactions from batch',
     ],
 
     'placeholders' => [
@@ -532,6 +540,9 @@ return [
         'top_cashback' => 'TopCashback Tracker',
         'group' => 'Working Space',
         'create' => 'Create :tracker',
+        'tabs' => [
+            'all' => 'All',
+        ],
         'filters' => [
             'transaction_from' => 'Transaction From',
             'transaction_to' => 'Transaction To',

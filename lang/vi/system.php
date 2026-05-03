@@ -164,7 +164,11 @@ return [
         'batch_name' => 'Tên lô',
         'note_for_all' => 'Ghi chú cho tất cả',
         'user_batch' => 'Người dùng | Lô',
-        'batch_id' => 'Mã lô',
+        'batch_id' => 'Tên/ID Đợt',
+        'batch_id_placeholder' => 'Tên/ID Đợt (VD: Đợt 1 - Tháng 5)',
+        'account_batch_group' => 'Tài khoản & Đợt thanh toán',
+        'uncategorized' => 'Chưa phân đợt',
+        'total' => 'Tổng',
         'quick_set_payment_date' => 'Cập nhật Ngày thanh toán',
         'account_balance' => 'Số dư tài khoản',
         'transaction_activity' => 'Hoạt động giao dịch',
@@ -194,6 +198,10 @@ return [
         'close' => 'Đóng',
         'get_account' => 'Nhận tài khoản',
         'bulk_actions' => 'Hành động hàng loạt',
+        'assign_batch' => 'Gom vào Đợt',
+        'remove_batch' => 'Gỡ khỏi Đợt',
+        'assign_batch_success' => 'Đã gom :count giao dịch vào: :batch',
+        'remove_batch_success' => 'Đã gỡ :count giao dịch khỏi đợt',
     ],
 
     'placeholders' => [
@@ -532,6 +540,9 @@ return [
         'top_cashback' => 'Theo dõi TopCashback',
         'group' => 'Không gian làm việc',
         'create' => 'Tạo :tracker',
+        'tabs' => [
+            'all' => 'Tất cả',
+        ],
         'filters' => [
             'transaction_from' => 'Giao dịch từ',
             'transaction_to' => 'Giao dịch đến',

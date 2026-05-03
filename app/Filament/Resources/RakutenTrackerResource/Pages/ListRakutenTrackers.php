@@ -11,6 +11,7 @@ class ListRakutenTrackers extends ListRecords
 {
     protected static string $resource = RakutenTrackerResource::class;
     use \App\Filament\Traits\HasSyncToSheetAction;
+    use \App\Filament\Traits\HasTrackerTabs;
 
     protected function getHeaderActions(): array
     {

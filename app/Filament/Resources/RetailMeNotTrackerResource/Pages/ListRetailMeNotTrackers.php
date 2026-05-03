@@ -10,6 +10,7 @@ class ListRetailMeNotTrackers extends ListRecords
 {
     protected static string $resource = RetailMeNotTrackerResource::class;
     use \App\Filament\Traits\HasSyncToSheetAction;
+    use \App\Filament\Traits\HasTrackerTabs;
 
     protected function getHeaderActions(): array
     {

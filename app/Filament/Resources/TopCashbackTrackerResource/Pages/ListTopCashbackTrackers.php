@@ -10,6 +10,7 @@ class ListTopCashbackTrackers extends ListRecords
 {
     protected static string $resource = TopCashbackTrackerResource::class;
     use \App\Filament\Traits\HasSyncToSheetAction;
+    use \App\Filament\Traits\HasTrackerTabs;
 
     protected function getHeaderActions(): array
     {

@@ -11,6 +11,7 @@ class ListJoinHoneyTrackers extends ListRecords
 {
     protected static string $resource = JoinHoneyTrackerResource::class;
     use \App\Filament\Traits\HasSyncToSheetAction;
+    use \App\Filament\Traits\HasTrackerTabs;
 
     protected function getHeaderActions(): array
     {

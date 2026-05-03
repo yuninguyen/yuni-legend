@@ -10,6 +10,7 @@ class ListPriceTrackers extends ListRecords
 {
     protected static string $resource = PriceTrackerResource::class;
     use \App\Filament\Traits\HasSyncToSheetAction;
+    use \App\Filament\Traits\HasTrackerTabs;
 
     protected function getHeaderActions(): array
     {

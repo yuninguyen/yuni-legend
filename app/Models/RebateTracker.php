@@ -24,6 +24,7 @@ class RebateTracker extends Model
     ];
 
     protected $fillable = [
+        'batch_id',
         'account_id',
         'transaction_date',
         'store_name',
@@ -84,4 +85,8 @@ class RebateTracker extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function getAccountBatchGroupAttribute()
+    {
+        return $this->account_id . '_' . ($this->batch_id ?? 'uncategorized');
+    }
 }

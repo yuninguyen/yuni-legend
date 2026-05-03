@@ -164,6 +164,7 @@ REBATEOPS
 - [x] v5.6.0: Multi-tier Profit Sharing — Advanced settlement logic to split revenue between Leaders and Staff members, dynamically generating separate Disbursement records based on percentage allocations.
 - [x] v5.6.1: Core UI/UX Stabilization — Global systematic debugging of Filament 3 Floating UI; resolving modal z-index overlap issues by safely injecting state-driven CSS across all Admin panels.
 - [x] v5.6.2: Disbursement Refinement & Google Sync — Streamlined UserPayment UI with removal of file uploads, copyable data columns, dynamic PayPal region detection,and bulk Google Sheets sync for Users/Platforms/Logs.
+- [x] v5.6.3: Advanced Tracker Grouping — Transitioned Rebate Tracker to a batch-oriented grouping structure (Account + Batch ID) with manual bulk assignment actions for granular workflow management.
 ---
 
 ## 🔐 Security & Access Control

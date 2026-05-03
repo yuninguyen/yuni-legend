@@ -4,12 +4,14 @@ namespace App\Filament\Resources\RebateTrackerResource\Pages;
 
 use App\Filament\Resources\RebateTrackerResource;
 use App\Filament\Traits\HasSyncToSheetAction;
+use App\Filament\Traits\HasTrackerTabs;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
 class ListRebateTrackers extends ListRecords
 {
     use HasSyncToSheetAction;
+    use HasTrackerTabs;
 
     protected static string $resource = RebateTrackerResource::class;
 

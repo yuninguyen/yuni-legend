@@ -548,77 +548,53 @@ trait HasTrackerSchema
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query) => $query->with(['account.email', 'user'])) // 🟢 TỐI ƯU: Tránh N+1
-            ->defaultGroup('account_id')
+            ->defaultGroup('account_batch_group')
             ->groups([
-                Group::make('account_id')
-                    ->label(__('system.labels.account_email'))
+                Group::make('account_batch_group')
+                    ->label(__('system.labels.account_batch_group'))
                     ->collapsible()
+                    ->titlePrefixedWithLabel(false)
+                    ->orderQueryUsing(function (Builder $query, string $direction) {
+                        $query->orderBy('account_id', $direction)
+                              ->orderBy('batch_id', $direction);
+                    })
                     ->getTitleFromRecordUsing(function ($record) {
                         $email = $record->account?->email?->email ?? 'N/A';
                         $platform = static::getPlatformName($record->account?->platform);
+                        $batchName = $record->batch_id ? __('system.labels.batch') . ": {$record->batch_id}" : __('system.labels.uncategorized');
+                        $totalLabel = __('system.labels.total');
 
-                        // 🟢 TÍNH TỔNG CHO HEADER (Do phiên bản này chưa hỗ trợ ->summary() trên Group)
-                        $totalRebate = RebateTracker::query()
-                            ->where('account_id', $record->account_id)
-                            ->sum('rebate_amount');
-
+                        $q = RebateTracker::query()
+                            ->where('account_id', $record->account_id);
+                            
+                        if ($record->batch_id) {
+                            $q->where('batch_id', $record->batch_id);
+                        } else {
+                            $q->whereNull('batch_id');
+                        }
+                        
+                        $totalRebate = $q->sum('rebate_amount');
                         $rebateStr = '$'.number_format($totalRebate, 2);
 
-                        return "{$email} | {$platform} | Total: {$rebateStr}";
+                        return "{$email} | {$platform} | {$batchName} | {$totalLabel}: {$rebateStr}";
                     }),
             ])
             ->columns([
-                // PLATFORM => ALL REBATE TRACKER/ HIDE: SUB-TRACKER
-                Tables\Columns\TextColumn::make('account.platform')
-                    ->label(__('system.labels.platform'))
-                    ->alignment(Alignment::Center)
-                    ->extraHeaderAttributes(['style' => 'width: 90px; min-width: 90px'])
-                    ->extraAttributes(['style' => 'width: 90px; min-width: 90px'])
-                    ->searchable(query: function ($query, $search) {
-                        $query->whereHas('account', fn ($q) => $q->where('platform', 'like', "%{$search}%"));
-                    })
-                    ->formatStateUsing(fn ($state) => $state ? static::getPlatformName($state) : 'N/A')
-                    ->visible(false),
+                // 1. TRANSACTION DATE
+                Tables\Columns\TextColumn::make('transaction_date')
+                    ->label(__('system.labels.transaction_date'))
+                    ->placeholder(__('system.n/a'))
+                    ->date('d/m/Y')
+                    ->alignment(Alignment::Center),
 
-                // 1. STORE (Đẩy lùi vào để phân cấp)
+                // 2. STORE NAME
                 Tables\Columns\TextColumn::make('store_name')
                     ->label(__('system.labels.store_name'))
+                    ->alignment(Alignment::Center)
                     ->weight('medium')
-                    ->icon('heroicon-m-shopping-bag')
-                    ->iconColor('gray')
-                    ->alignment(Alignment::Center)
                     ->searchable(),
 
-                // 1b. ORDER ID
-                Tables\Columns\TextColumn::make('order_id')
-                    ->label(__('system.labels.order_id'))
-                    ->alignment(Alignment::Center)
-                    ->placeholder(__('system.n/a'))
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->searchable(),
-
-                // 2. ORDER VALUE
-                Tables\Columns\TextColumn::make('order_value')
-                    ->label(__('system.labels.order_value'))
-                    ->money('USD')
-                    ->alignment(Alignment::Right),
-
-                // 3. CASHBACK PERCENT
-                Tables\Columns\TextColumn::make('cashback_percent')
-                    ->label(__('system.labels.cashback_percent'))
-                    ->numeric(2)
-                    ->suffix('%')
-                    ->alignment(Alignment::Right),
-
-                // 4. CASHBACK ($) - ĐÂY LÀ CHÌA KHÓA
-                Tables\Columns\TextColumn::make('rebate_amount')
-                    ->label(__('system.labels.rebate_amount'))
-                    ->money('USD')
-                    ->color('success')
-                    ->weight('bold')
-                    ->alignment(Alignment::Right),
-
-                // 5. STATUS
+                // 3. STATUS
                 Tables\Columns\TextColumn::make('status')
                     ->label(__('system.labels.status'))
                     ->alignment(Alignment::Center)
@@ -690,12 +666,35 @@ trait HasTrackerSchema
 
                     ),
 
-                // 6. TIMELINE
-                Tables\Columns\TextColumn::make('transaction_date')
-                    ->label(__('system.labels.transaction_date'))
+                // 5. REBATE AMOUNT ($)
+                Tables\Columns\TextColumn::make('rebate_amount')
+                    ->label(__('system.labels.rebate_amount'))
+                    ->money('USD')
+                    ->color('success')
+                    ->weight('bold')
+                    ->alignment(Alignment::Right),
+
+                // --- TOGGLEABLE: ẩn mặc định ---
+
+                Tables\Columns\TextColumn::make('order_value')
+                    ->label(__('system.labels.order_value'))
+                    ->money('USD')
+                    ->alignment(Alignment::Right)
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('cashback_percent')
+                    ->label(__('system.labels.cashback_percent'))
+                    ->numeric(2)
+                    ->suffix('%')
+                    ->alignment(Alignment::Right)
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('order_id')
+                    ->label(__('system.labels.order_id'))
+                    ->alignment(Alignment::Center)
                     ->placeholder(__('system.n/a'))
-                    ->date('d/m/Y')
-                    ->alignment(Alignment::Center),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->searchable(),
 
                 Tables\Columns\TextColumn::make('payout_date')
                     ->label(__('system.labels.payout_date'))
@@ -754,6 +753,7 @@ trait HasTrackerSchema
                     ),
             ])
             ->striped()
+            ->defaultSort('transaction_date', 'desc')
 
             ->filters([
                 // Lọc theo Tài khoản (Email)
@@ -988,6 +988,34 @@ trait HasTrackerSchema
                     // Tự động bỏ tick sau khi xuất xong
 
                     // Nút đổi nhanh sang Pending
+                    Tables\Actions\BulkAction::make('assign_batch')
+                        ->label(__('system.actions.assign_batch'))
+                        ->icon('heroicon-o-rectangle-group')
+                        ->form([
+                            \Filament\Forms\Components\TextInput::make('batch_id')
+                                ->label(__('system.labels.batch_id_placeholder'))
+                                ->required(),
+                        ])
+                        ->action(function (Collection $records, array $data) {
+                            foreach ($records as $record) {
+                                $record->update(['batch_id' => $data['batch_id']]);
+                            }
+                            Notification::make()->title(__('system.actions.assign_batch_success', ['count' => $records->count(), 'batch' => $data['batch_id']]))->success()->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
+                    Tables\Actions\BulkAction::make('remove_batch')
+                        ->label(__('system.actions.remove_batch'))
+                        ->icon('heroicon-o-rectangle-stack')
+                        ->requiresConfirmation()
+                        ->action(function (Collection $records) {
+                            foreach ($records as $record) {
+                                $record->update(['batch_id' => null]);
+                            }
+                            Notification::make()->title(__('system.actions.remove_batch_success', ['count' => $records->count()]))->success()->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
                     static::makeBulkStatusAction('pending', __('system.actions.mark_as_pending') ?: 'Mark as Pending', 'heroicon-o-clock', 'info'),
                     // Nút đổi nhanh sang Confirme
                     static::makeBulkStatusAction('confirmed', __('system.actions.mark_as_confirmed') ?: 'Mark as Confirmed', 'heroicon-o-check-badge', 'success'),
