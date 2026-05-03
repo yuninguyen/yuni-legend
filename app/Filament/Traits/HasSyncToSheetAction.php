@@ -31,10 +31,11 @@ trait HasSyncToSheetAction
             // 🟢 CHỈ HIỆN CHO ADMIN
             ->visible(fn() => auth()->user()?->isAdmin())
             ->action(function () use ($serviceMethod, $modelLabel) {
+                abort_unless(auth()->user()?->isAdmin(), 403);
                 try {
                     // 1. Lấy dữ liệu thực tế đang hiển thị (quan trọng: tôn trọng Filter)
                     $query = $this->getFilteredTableQuery();
-                    
+
                     // 2. Gọi Service xử lý
                     $syncService = app(GoogleSyncService::class);
                     // Giữ nguyên xi như cũ: Không truyền ID/SheetName vào đây để nó dùng mặc định của Service
@@ -75,6 +76,7 @@ trait HasSyncToSheetAction
             ->modalSubmitActionLabel(__('system.account_claim.submit')) // Dùng chung nút confirm
             ->visible(fn() => auth()->user()?->isAdmin())
             ->action(function () use ($serviceMethod, $modelLabel) {
+                abort_unless(auth()->user()?->isAdmin(), 403);
                 try {
                     $spreadsheetId = config('services.google.import_spreadsheet_id') ?: config('services.google.spreadsheet_id');
                     $sheetName = $modelLabel === 'Emails' ? 'Email_Import' : 'Sheet1';
@@ -120,6 +122,7 @@ trait HasSyncToSheetAction
             ->modalSubmitActionLabel(__('system.account_claim.submit'))
             ->visible(fn() => auth()->user()?->isAdmin())
             ->action(function () {
+                abort_unless(auth()->user()?->isAdmin(), 403);
                 try {
                     $syncService = app(GoogleSyncService::class);
                     $result = $syncService->importTrackers();
@@ -162,6 +165,7 @@ trait HasSyncToSheetAction
             ->modalSubmitActionLabel(__('system.account_claim.submit'))
             ->visible(fn() => auth()->user()?->isAdmin())
             ->action(function () {
+                abort_unless(auth()->user()?->isAdmin(), 403);
                 try {
                     $syncService = app(GoogleSyncService::class);
                     // Dùng Spreadsheet ID người dùng cung cấp
@@ -205,6 +209,7 @@ trait HasSyncToSheetAction
             ->modalSubmitActionLabel(__('system.account_claim.submit'))
             ->visible(fn() => auth()->user()?->isAdmin())
             ->action(function () {
+                abort_unless(auth()->user()?->isAdmin(), 403);
                 try {
                     $syncService = app(GoogleSyncService::class);
                     $result = $syncService->importBrands();
@@ -247,6 +252,7 @@ trait HasSyncToSheetAction
             ->modalSubmitActionLabel(__('system.account_claim.submit'))
             ->visible(fn() => auth()->user()?->isAdmin())
             ->action(function () {
+                abort_unless(auth()->user()?->isAdmin(), 403);
                 try {
                     $syncService = app(GoogleSyncService::class);
                     $result = $syncService->importPlatforms();
@@ -289,6 +295,7 @@ trait HasSyncToSheetAction
             ->modalSubmitActionLabel(__('system.account_claim.submit'))
             ->visible(fn() => auth()->user()?->isAdmin())
             ->action(function () {
+                abort_unless(auth()->user()?->isAdmin(), 403);
                 try {
                     $syncService = app(GoogleSyncService::class);
                     $result = $syncService->importUsers();

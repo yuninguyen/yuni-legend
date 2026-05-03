@@ -20,30 +20,33 @@ class PayoutLogObserver implements ShouldHandleEventsAfterCommit
      */
     public function saved(PayoutLog $payoutLog): void
     {
-        // Logic "auto-complete parent" đã được CHUYỂN VÀO ĐÂY
-        // từ PayoutLog::booted() để tránh double-fire.
         if ($payoutLog->transaction_type === 'liquidation' && $payoutLog->parent_id) {
-            $parent = $payoutLog->parent;
-            if ($parent && $parent->status !== 'completed') {
-                // updateQuietly để không trigger Observer của parent lần nữa
-                $parent->updateQuietly(['status' => 'completed']);
+            DB::transaction(function () use ($payoutLog) {
+                $parent = PayoutLog::lockForUpdate()->find($payoutLog->parent_id);
 
-                // ĐỒNG BỘ PARENT LÊN GOOGLE SHEETS
-                // Vì dùng updateQuietly nên Observer của Parent không tự chạy, ta phải gọi thủ công
-                \App\Jobs\SyncGoogleSheetJob::dispatch($parent->id, get_class($parent));
-            }
+                if (!$parent) {
+                    return;
+                }
 
-            // Nếu có thay đổi tỷ giá, cập nhật luôn vào parent record
-            if ($payoutLog->wasChanged(['exchange_rate', 'total_vnd']) || $payoutLog->wasRecentlyCreated) {
-                $parent?->updateQuietly([
-                    'exchange_rate' => $payoutLog->exchange_rate,
-                    'total_vnd' => $payoutLog->total_vnd,
-                ]);
-            }
+                if ($parent->status !== 'completed') {
+                    $parent->updateQuietly(['status' => 'completed']);
+
+                    // Only dispatch parent sync when NOT already syncing from sheet
+                    if (!PayoutLog::$syncingFromSheet) {
+                        \App\Jobs\SyncGoogleSheetJob::dispatch($parent->id, get_class($parent));
+                    }
+                }
+
+                if ($payoutLog->wasChanged(['exchange_rate', 'total_vnd']) || $payoutLog->wasRecentlyCreated) {
+                    $parent->updateQuietly([
+                        'exchange_rate' => $payoutLog->exchange_rate,
+                        'total_vnd' => $payoutLog->total_vnd,
+                    ]);
+                }
+            });
         }
 
-        // Nếu đang sync từ Google Sheet thì DỪNG, không đẩy lên Sheet lần nữa
-        // (tránh vòng lặp vô tận: Sheet → Web → Sheet → Web → ...)
+        // Stop here when syncing from Google Sheet to avoid infinite loop
         if (PayoutLog::$syncingFromSheet) {
             return;
         }

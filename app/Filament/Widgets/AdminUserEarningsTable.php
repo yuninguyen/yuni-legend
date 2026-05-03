@@ -14,6 +14,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Grouping\Group;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 
 class AdminUserEarningsTable extends BaseWidget
 {
@@ -39,7 +40,22 @@ class AdminUserEarningsTable extends BaseWidget
 
     public function table(Table $table): Table
     {
-        $data = $this->tableFilters['table_filter'] ?? [];
+        $raw = $this->tableFilters['table_filter'] ?? [];
+
+        // Sanitize filter inputs before use in queries
+        $userId    = isset($raw['user_id']) && is_numeric($raw['user_id']) ? (int) $raw['user_id'] : null;
+        $fromDate  = null;
+        $toDate    = null;
+        try {
+            $fromDate = isset($raw['from_date']) && $raw['from_date'] !== ''
+                ? Carbon::parse($raw['from_date'])->startOfDay()->toDateTimeString()
+                : null;
+            $toDate = isset($raw['to_date']) && $raw['to_date'] !== ''
+                ? Carbon::parse($raw['to_date'])->endOfDay()->toDateTimeString()
+                : null;
+        } catch (\Exception) {
+            // Invalid date input — ignore filter
+        }
 
         // 1. Query cho Operator: Gộp theo Nhóm tài sản (Gift Card vs PayPal)
         $operatorQuery = UserPayment::query()
@@ -51,9 +67,9 @@ class AdminUserEarningsTable extends BaseWidget
             ->groupBy('user_id', 'asset_group', 'user_role')
             // Scope cho Operator: Chỉ thấy của chính mình
             ->when(!auth()->user()?->isAdmin() && !auth()->user()?->isFinance(), fn($query) => $query->where('user_payments.user_id', auth()->id()))
-            ->when($data['user_id'] ?? null, fn($query, $userId) => $query->where('user_payments.user_id', $userId))
-            ->when($data['from_date'] ?? null, fn($query, $date) => $query->whereDate('user_payments.created_at', '>=', $date))
-            ->when($data['to_date'] ?? null, fn($query, $date) => $query->whereDate('user_payments.created_at', '<=', $date));
+            ->when($userId, fn($query, $id) => $query->where('user_payments.user_id', $id))
+            ->when($fromDate, fn($query, $date) => $query->where('user_payments.created_at', '>=', $date))
+            ->when($toDate, fn($query, $date) => $query->where('user_payments.created_at', '<=', $date));
 
         // 2. Query cho Finance: Chỉ hiện 1 dòng "Lợi nhuận hệ thống"
         $financeQuery = User::query()
@@ -61,33 +77,34 @@ class AdminUserEarningsTable extends BaseWidget
             ->select('users.id as user_id', 'users.role as user_role', 'users.name as user_name')
             ->selectRaw("'system_profit' as asset_group")
             ->selectRaw("
-                (SELECT SUM(total_usd) 
-                 FROM user_payments 
+                (SELECT SUM(total_usd)
+                 FROM user_payments
                  WHERE status = 'paid'
                  AND deleted_at IS NULL
                  AND (? IS NULL OR created_at >= ?)
                  AND (? IS NULL OR created_at <= ?)
                 ) as amount_usd
             ", [
-                $data['from_date'] ?? null,
-                $data['from_date'] ?? null,
-                $data['to_date'] ?? null,
-                $data['to_date'] ?? null
+                $fromDate,
+                $fromDate,
+                $toDate,
+                $toDate,
             ])
             ->selectRaw("
-                (SELECT SUM((exchange_rate - payout_rate) * total_usd * (payout_percentage / 100)) 
-                 FROM user_payments                  WHERE status = 'paid'
+                (SELECT SUM((exchange_rate - payout_rate) * total_usd * (payout_percentage / 100))
+                 FROM user_payments
+                 WHERE status = 'paid'
                   AND deleted_at IS NULL
                   AND (? IS NULL OR created_at >= ?)
                   AND (? IS NULL OR created_at <= ?)
                 ) as amount_paid
             ", [
-                $data['from_date'] ?? null,
-                $data['from_date'] ?? null,
-                $data['to_date'] ?? null,
-                $data['to_date'] ?? null
+                $fromDate,
+                $fromDate,
+                $toDate,
+                $toDate,
             ])
-            ->when($data['user_id'] ?? null, fn($query, $userId) => $query->where('id', $userId));
+            ->when($userId, fn($query, $id) => $query->where('id', $id));
 
         return $table
             ->query(function () use ($operatorQuery, $financeQuery) {
