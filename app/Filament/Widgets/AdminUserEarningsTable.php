@@ -4,16 +4,14 @@ namespace App\Filament\Widgets;
 
 use App\Models\User;
 use App\Models\UserPayment;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Support\Enums\Alignment;
 use Filament\Tables;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
-use Illuminate\Database\Eloquent\Builder;
-use Filament\Support\Enums\Alignment;
-use Filament\Tables\Filters\Filter;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\DatePicker;
-use Filament\Tables\Grouping\Group;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 
 class AdminUserEarningsTable extends BaseWidget
@@ -43,9 +41,9 @@ class AdminUserEarningsTable extends BaseWidget
         $raw = $this->tableFilters['table_filter'] ?? [];
 
         // Sanitize filter inputs before use in queries
-        $userId    = isset($raw['user_id']) && is_numeric($raw['user_id']) ? (int) $raw['user_id'] : null;
-        $fromDate  = null;
-        $toDate    = null;
+        $userId = isset($raw['user_id']) && is_numeric($raw['user_id']) ? (int) $raw['user_id'] : null;
+        $fromDate = null;
+        $toDate = null;
         try {
             $fromDate = isset($raw['from_date']) && $raw['from_date'] !== ''
                 ? Carbon::parse($raw['from_date'])->startOfDay()->toDateTimeString()
@@ -66,10 +64,10 @@ class AdminUserEarningsTable extends BaseWidget
             ->selectRaw('SUM(CASE WHEN status = "paid" THEN total_vnd ELSE 0 END) as amount_paid')
             ->groupBy('user_id', 'asset_group', 'user_role')
             // Scope cho Operator: Chỉ thấy của chính mình
-            ->when(!auth()->user()?->isAdmin() && !auth()->user()?->isFinance(), fn($query) => $query->where('user_payments.user_id', auth()->id()))
-            ->when($userId, fn($query, $id) => $query->where('user_payments.user_id', $id))
-            ->when($fromDate, fn($query, $date) => $query->where('user_payments.created_at', '>=', $date))
-            ->when($toDate, fn($query, $date) => $query->where('user_payments.created_at', '<=', $date));
+            ->when(! auth()->user()?->isAdmin() && ! auth()->user()?->isFinance(), fn ($query) => $query->where('user_payments.user_id', auth()->id()))
+            ->when($userId, fn ($query, $id) => $query->where('user_payments.user_id', $id))
+            ->when($fromDate, fn ($query, $date) => $query->where('user_payments.created_at', '>=', $date))
+            ->when($toDate, fn ($query, $date) => $query->where('user_payments.created_at', '<=', $date));
 
         // 2. Query cho Finance: Chỉ hiện 1 dòng "Lợi nhuận hệ thống"
         $financeQuery = User::query()
@@ -104,12 +102,12 @@ class AdminUserEarningsTable extends BaseWidget
                 $toDate,
                 $toDate,
             ])
-            ->when($userId, fn($query, $id) => $query->where('id', $id));
+            ->when($userId, fn ($query, $id) => $query->where('id', $id));
 
         return $table
             ->query(function () use ($operatorQuery, $financeQuery) {
                 // Nếu là Operator -> Không union financeQuery (không xem lợi nhuận hệ thống)
-                if (!auth()->user()?->isAdmin() && !auth()->user()?->isFinance()) {
+                if (! auth()->user()?->isAdmin() && ! auth()->user()?->isFinance()) {
                     return UserPayment::query()->withTrashed()->fromSub($operatorQuery, 'consolidated_payroll');
                 }
 
@@ -117,25 +115,25 @@ class AdminUserEarningsTable extends BaseWidget
             })
             ->columns([
                 Tables\Columns\TextColumn::make('asset_group')
-                    ->label(__('system.labels.platform'))
+                    ->label(__('system.labels.asset_type'))
                     ->alignment(Alignment::Center)
                     ->formatStateUsing(function ($state) {
                         return match ($state) {
-                            'gift_card' => '🎁 ' . __('system.payroll.total_gift_card'),
-                            'paypal' => '💰 ' . __('system.payroll.total_paypal'),
-                            'system_profit' => '📈 ' . __('system.payroll.system_profit'),
+                            'gift_card' => '🎁 '.__('system.payroll.total_gift_card'),
+                            'paypal' => '💰 '.__('system.payroll.total_paypal'),
+                            'system_profit' => '📈 '.__('system.payroll.system_profit'),
                             default => $state,
                         };
                     })
-                    ->color(fn($state) => $state === 'system_profit' ? 'primary' : 'gray')
+                    ->color(fn ($state) => $state === 'system_profit' ? 'primary' : 'gray')
                     ->weight('bold'),
 
                 Tables\Columns\TextColumn::make('user_role')
                     ->label(__('system.labels.role'))
                     ->alignment(Alignment::Center)
-                    ->formatStateUsing(fn($state) => $state ? __('system.roles.' . $state) : '-')
+                    ->formatStateUsing(fn ($state) => $state ? __('system.roles.'.$state) : '-')
                     ->badge()
-                    ->color(fn($state): string => match ($state) {
+                    ->color(fn ($state): string => match ($state) {
                         'finance' => 'info',
                         'operator' => 'success',
                         default => 'gray',
@@ -151,10 +149,11 @@ class AdminUserEarningsTable extends BaseWidget
                         Tables\Columns\Summarizers\Sum::make()
                             ->label('')
                             ->money('USD')
+                            ->extraAttributes(['class' => 'flex w-full justify-center'])
                     ),
 
                 Tables\Columns\TextColumn::make('amount_paid')
-                    ->label(__('system.status.completed') . ' (VND)')
+                    ->label(__('system.status.completed').' (VND)')
                     ->money('VND', locale: 'vi_VN')
                     ->color('success')
                     ->weight('bold')
@@ -163,17 +162,18 @@ class AdminUserEarningsTable extends BaseWidget
                         Tables\Columns\Summarizers\Sum::make()
                             ->label('')
                             ->money('VND', locale: 'vi_VN')
+                            ->extraAttributes(['class' => 'flex w-full justify-center'])
                     ),
             ])
             ->groups([
                 Group::make('user_id')
                     ->label(__('system.labels.user'))
-                    ->getTitleFromRecordUsing(fn($record) => $record->user_name ?? 'Unknown')
+                    ->getTitleFromRecordUsing(fn ($record) => $record->user_name ?? 'Unknown')
                     ->collapsible(),
             ])
             ->defaultGroup('user_id')
             ->defaultSort('user_id')
-            ->recordTitle(fn($record) => $record->user?->name)
+            ->recordTitle(fn ($record) => $record->user?->name)
             ->paginated(false)
             ->filters([
                 Filter::make('table_filter')
@@ -182,7 +182,7 @@ class AdminUserEarningsTable extends BaseWidget
                             ->label(__('system.labels.user'))
                             ->options(User::whereIn('role', ['admin', 'staff', 'operator', 'finance'])->pluck('name', 'id'))
                             ->searchable()
-                            ->visible(fn() => auth()->user()?->isAdmin() || auth()->user()?->isFinance())
+                            ->visible(fn () => auth()->user()?->isAdmin() || auth()->user()?->isFinance())
                             ->live(),
                         DatePicker::make('from_date')
                             ->label(__('system.labels.from'))
