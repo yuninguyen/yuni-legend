@@ -14,6 +14,9 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Form;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\Tabs;
+use Filament\Infolists\Components\Tabs\Tab;
+use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\Alignment;
@@ -364,183 +367,187 @@ trait HasTrackerSchema
     {
         return $infolist
             ->schema([
-                // PHẦN 1: EMAIL INFORMATION
-                Section::make(__('system.account_claim.section_title'))
-                    ->schema([
-                        TextEntry::make('account.email.email')
-                            ->label(__('system.labels.email_address'))
-                            ->placeholder('N/A')
-                            ->copyable(), // Cho phép click để copy nhanh
-                        // Password (Lấy từ quan hệ: account -> password)
-                        TextEntry::make('account.password')
-                            ->label(__('system.labels.password'))
-                            ->placeholder('N/A'),
-                        // Platform (Lấy từ quan hệ: account -> platform)
-                        TextEntry::make('account.platform')
-                            ->label(__('system.labels.platform'))
-                            ->placeholder('N/A')
-                            ->formatStateUsing(fn ($state) => $state ? static::getPlatformName($state) : 'N/A'),
-                        // User (Để hiện tên thay vì ID số 1)
-                        TextEntry::make('user.name')
-                            ->label(__('system.labels.user'))
-                            ->placeholder('N/A'),
-                        // Status (Đảm bảo đúng tên cột trong DB
-                        TextEntry::make('account.status')
-                            ->label(__('system.labels.account_status_tracking'))
-                            ->html() // Bắt buộc phải có để Filament render thẻ <span> và <div>
-                            ->placeholder('No status history found.')
-                            ->formatStateUsing(function ($state, $record) {
-                                // Lấy account từ record hiện tại của Infolist
-                                $account = $record->account;
-                                if (! $account || ! $account->status) {
-                                    return null;
-                                }
+                Tabs::make('Tabs')
+                    ->tabs([
+                        Tab::make(__('system.account_claim.section_title'))
+                            ->icon('heroicon-m-envelope')
+                            ->schema([
+                                Grid::make(2)->schema([
+                                    TextEntry::make('account.email.email')
+                                        ->label(__('system.labels.email_address'))
+                                        ->placeholder('N/A')
+                                        ->copyable(),
+                                    TextEntry::make('account.password')
+                                        ->label(__('system.labels.password'))
+                                        ->placeholder('N/A')
+                                        ->copyable(),
+                                    TextEntry::make('account.platform')
+                                        ->label(__('system.labels.platform'))
+                                        ->placeholder('N/A')
+                                        ->formatStateUsing(fn ($state) => $state ? static::getPlatformName($state) : 'N/A'),
+                                    TextEntry::make('user.name')
+                                        ->label(__('system.labels.user'))
+                                        ->placeholder('N/A'),
+                                    TextEntry::make('account.status')
+                                        ->label(__('system.labels.account_status_tracking'))
+                                        ->html()
+                                        ->placeholder('No status history found.')
+                                        ->formatStateUsing(function ($state, $record) {
+                                            $account = $record->account;
+                                            if (! $account || ! $account->status) {
+                                                return null;
+                                            }
 
-                                // Đảm bảo dữ liệu là mảng để chạy vòng lặp map
-                                $statusHistory = is_array($account->status)
-                                    ? $account->status
-                                    : json_decode($account->status, true) ?? [$account->status];
+                                            $statusHistory = is_array($account->status)
+                                                ? $account->status
+                                                : json_decode($account->status, true) ?? [$account->status];
 
-                                $htmlResult = collect($statusHistory)->map(function ($status, $index) use ($statusHistory) {
-                                    $s_lower = strtolower($status);
-                                    $color = match ($s_lower) {
-                                        'active', 'live' => '#6b7280',
-                                        'used', 'in_use' => '#3b82f6',
-                                        'no_paypal_needed', 'no_paypal_required' => '#1e3a8a',
-                                        'not_linked', 'not_linked_paypal' => '#f59e0b',
-                                        'unlinked', 'unlinked_paypal' => '#f59e0b',
-                                        'linked', 'linked_paypal' => '#22c55e',
-                                        'limited', 'paypal_limited' => '#ef4444',
-                                        'banned' => '#ef4444',
-                                        default => '#6b7280'
-                                    };
+                                            $htmlResult = collect($statusHistory)->map(function ($status, $index) use ($statusHistory) {
+                                                $s_lower = strtolower($status);
+                                                $color = match ($s_lower) {
+                                                    'active', 'live' => '#6b7280',
+                                                    'used', 'in_use' => '#3b82f6',
+                                                    'no_paypal_needed', 'no_paypal_required' => '#1e3a8a',
+                                                    'not_linked', 'not_linked_paypal' => '#f59e0b',
+                                                    'unlinked', 'unlinked_paypal' => '#f59e0b',
+                                                    'linked', 'linked_paypal' => '#22c55e',
+                                                    'limited', 'paypal_limited' => '#ef4444',
+                                                    'banned' => '#ef4444',
+                                                    default => '#6b7280'
+                                                };
 
-                                    $label = match ($s_lower) {
-                                        'used', 'in_use' => __('system.status.used'),
-                                        'limited', 'paypal_limited' => __('system.status.paypal_limited'),
-                                        'linked', 'linked_paypal' => __('system.status.linked_paypal'),
-                                        'unlinked', 'unlinked_paypal' => __('system.status.unlinked_paypal'),
-                                        'not_linked', 'not_linked_paypal' => __('system.status.not_linked_paypal'),
-                                        'no_paypal_needed', 'no_paypal_required' => __('system.status.no_paypal_required'),
-                                        'banned' => __('system.status.banned'),
-                                        'active', 'live' => __('system.status.active'),
-                                        default => __('system.status.'.$s_lower)
-                                    };
+                                                $label = match ($s_lower) {
+                                                    'used', 'in_use' => __('system.status.used'),
+                                                    'limited', 'paypal_limited' => __('system.status.paypal_limited'),
+                                                    'linked', 'linked_paypal' => __('system.status.linked_paypal'),
+                                                    'unlinked', 'unlinked_paypal' => __('system.status.unlinked_paypal'),
+                                                    'not_linked', 'not_linked_paypal' => __('system.status.not_linked_paypal'),
+                                                    'no_paypal_needed', 'no_paypal_required' => __('system.status.no_paypal_required'),
+                                                    'banned' => __('system.status.banned'),
+                                                    'active', 'live' => __('system.status.active'),
+                                                    default => __('system.status.'.$s_lower)
+                                                };
 
-                                    $isLast = $index === count($statusHistory) - 1;
-                                    $arrow = ! $isLast ? " <span style='color: #9ca3af; margin: 0 10px;'>→</span> " : '';
+                                                $isLast = $index === count($statusHistory) - 1;
+                                                $arrow = ! $isLast ? " <span style='color: #9ca3af; margin: 0 10px;'>→</span> " : '';
 
-                                    return "<span style='color: {$color}; font-weight: 800; font-size: 0.9rem;'>{$label}</span>{$arrow}";
-                                })->implode('');
+                                                return "<span style='color: {$color}; font-weight: 800; font-size: 0.9rem;'>{$label}</span>{$arrow}";
+                                            })->implode('');
 
-                                return new HtmlString("
-                                    <div style='padding: 10px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; display: inline-block;'>
-                                        {$htmlResult}
-                                    </div>
-                                ");
-                            })
-                            ->columnSpanFull(),
-                    ])->columns(2),
+                                            return new HtmlString("
+                                                <div style='padding: 10px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; display: inline-block;'>
+                                                    {$htmlResult}
+                                                </div>
+                                            ");
+                                        })
+                                        ->columnSpanFull(),
+                                ]),
+                            ]),
 
-                // PHẦN 2: PLATFORM & SOURCE INFORMATION
-                Section::make(__('system.rebate_tracker.order_detail'))
-                    ->schema([
-                        TextEntry::make('transaction_date')
-                            ->label(__('system.labels.transaction_date'))
-                            ->dateTime('d/m/Y')
-                            ->placeholder('N/A'),
-                        TextEntry::make('payout_date')
-                            ->label(__('system.labels.payout_date'))
-                            ->dateTime('d/m/Y')
-                            ->placeholder('N/A'),
-                        TextEntry::make('status')
-                            ->label(__('system.labels.status'))
-                            ->placeholder('N/A')
-                            ->badge()
-                            ->icon(fn (string $state): string => match ($state) {
-                                'clicked' => 'heroicon-m-cursor-arrow-rays',
-                                'pending' => 'heroicon-m-clock',
-                                'confirmed' => 'heroicon-m-check-badge',
-                                'missing' => 'heroicon-m-magnifying-glass', // Hình kính lúp tìm kiếm
-                                'ineligible' => 'heroicon-m-x-circle',        // Hình dấu X tròn
-                                default => 'heroicon-m-question-mark-circle',
-                            })
-                            ->formatStateUsing(fn (string $state): string => match ($state) {
-                                'clicked' => __('system.status.clicked'),
-                                'pending' => __('system.status.pending'),
-                                'confirmed' => __('system.status.confirmed'),
-                                'missing' => __('system.status.missing'),
-                                'ineligible' => __('system.status.ineligible'),
-                                default => ucfirst($state), // Các nhãn khác chỉ viết hoa chữ cái đầu
-                            })
-                            ->color(fn (string $state): string => match ($state) {
-                                'clicked' => 'gray',
-                                'pending' => 'info',
-                                'confirmed' => 'success',
-                                'missing' => 'warning',
-                                'ineligible' => 'danger',
-                                default => 'gray',
-                            }),
-                        TextEntry::make('store_name')
-                            ->label(__('system.labels.store_name'))
-                            ->placeholder(__('system.n/a')),
+                        Tab::make(__('system.rebate_tracker.order_detail'))
+                            ->icon('heroicon-m-shopping-bag')
+                            ->schema([
+                                Grid::make(3)->schema([
+                                    TextEntry::make('transaction_date')
+                                        ->label(__('system.labels.transaction_date'))
+                                        ->dateTime('d/m/Y')
+                                        ->placeholder('N/A'),
+                                    TextEntry::make('payout_date')
+                                        ->label(__('system.labels.payout_date'))
+                                        ->dateTime('d/m/Y')
+                                        ->placeholder('N/A'),
+                                    TextEntry::make('status')
+                                        ->label(__('system.labels.status'))
+                                        ->placeholder('N/A')
+                                        ->badge()
+                                        ->icon(fn (string $state): string => match ($state) {
+                                            'clicked' => 'heroicon-m-cursor-arrow-rays',
+                                            'pending' => 'heroicon-m-clock',
+                                            'confirmed' => 'heroicon-m-check-badge',
+                                            'missing' => 'heroicon-m-magnifying-glass',
+                                            'ineligible' => 'heroicon-m-x-circle',
+                                            default => 'heroicon-m-question-mark-circle',
+                                        })
+                                        ->formatStateUsing(fn (string $state): string => match ($state) {
+                                            'clicked' => __('system.status.clicked'),
+                                            'pending' => __('system.status.pending'),
+                                            'confirmed' => __('system.status.confirmed'),
+                                            'missing' => __('system.status.missing'),
+                                            'ineligible' => __('system.status.ineligible'),
+                                            default => ucfirst($state),
+                                        })
+                                        ->color(fn (string $state): string => match ($state) {
+                                            'clicked' => 'gray',
+                                            'pending' => 'info',
+                                            'confirmed' => 'success',
+                                            'missing' => 'warning',
+                                            'ineligible' => 'danger',
+                                            default => 'gray',
+                                        }),
+                                    TextEntry::make('store_name')
+                                        ->label(__('system.labels.store_name'))
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('order_id')
+                                        ->label(__('system.labels.order_id'))
+                                        ->placeholder(__('system.n/a'))
+                                        ->copyable(),
+                                    TextEntry::make('order_value')
+                                        ->label(__('system.labels.order_value'))
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('cashback_percent')
+                                        ->label(__('system.labels.cashback_percent'))
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('rebate_amount')
+                                        ->label(__('system.labels.rebate_amount'))
+                                        ->money('USD')
+                                        ->weight(FontWeight::Bold)
+                                        ->color('success'),
+                                ]),
+                            ]),
 
-                        TextEntry::make('order_id')
-                            ->label(__('system.labels.order_id'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('order_value')
-                            ->label(__('system.labels.order_value'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('cashback_percent')
-                            ->label(__('system.labels.cashback_percent'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('rebate_amount')
-                            ->label(__('system.labels.rebate_amount'))
-                            ->money('USD')
-                            ->weight(FontWeight::Bold)
-                            ->color('success'),
-                    ])->columns(3),
-
-                // PHẦN 3: Logistics & Note
-                Section::make(__('system.labels.note'))
-                    ->schema([
-                        TextEntry::make('device')
-                            ->label(__('system.labels.device'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('state')
-                            ->label(__('system.labels.state_us'))
-                            ->placeholder(__('system.n/a'))
-                            ->formatStateUsing(fn ($state) => $state ? "{$state} - ".(self::$usStates[$state] ?? '') : 'N/A'),
-                        TextEntry::make('note')
-                            ->label(__('system.labels.note'))
-                            ->placeholder(__('system.n/a'))
-                            ->columnSpanFull()
-                            ->html() // Cho phép tự định nghĩa HTML để ép khoảng cách
-                            ->formatStateUsing(fn ($state) => $state ? '
-                                <div style="
-                                    white-space: pre-wrap;
-                                    line-height: 1.6; /* Thu hẹp tối đa khoảng cách giữa các dòng */
-                                    margin: 0;
-                                    padding: 0;
-                                ">'.e(trim($state)).'</pre>' : 'N/A'),
-                        TextEntry::make('detail_transaction')
-                            ->label(__('system.labels.transaction_details'))
-                            ->columnSpanFull()
-                            ->html() // Cho phép tự định nghĩa HTML để ép khoảng cách
-                            ->formatStateUsing(fn ($state) => $state ? '
-                                <div style="
-                                    white-space: pre-wrap;
-                                    line-height: 1.6; /* Thu hẹp tối đa khoảng cách giữa các dòng */
-                                    margin: 0;
-                                    padding: 0;
-                                ">'.e(trim($state)).'</pre>' : 'N/A')
-                            ->extraAttributes([
-                                'class' => 'bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm transition',
-                                'style' => 'max-height: 300px; overflow-y: auto; line-height: 1.6;',
-                            ])
-                            ->placeholder('No details available'),
-
-                    ])->columns(2),
+                        Tab::make(__('system.labels.note'))
+                            ->icon('heroicon-m-document-text')
+                            ->schema([
+                                Grid::make(2)->schema([
+                                    TextEntry::make('device')
+                                        ->label(__('system.labels.device'))
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('state')
+                                        ->label(__('system.labels.state_us'))
+                                        ->placeholder(__('system.n/a'))
+                                        ->formatStateUsing(fn ($state) => $state ? "{$state} - ".(self::$usStates[$state] ?? '') : 'N/A'),
+                                    TextEntry::make('note')
+                                        ->label(__('system.labels.note'))
+                                        ->placeholder(__('system.n/a'))
+                                        ->columnSpanFull()
+                                        ->html()
+                                        ->formatStateUsing(fn ($state) => $state ? '
+                                            <div style="
+                                                white-space: pre-wrap;
+                                                line-height: 1.6;
+                                                margin: 0;
+                                                padding: 0;
+                                            ">'.e(trim($state)).'</div>' : 'N/A'),
+                                    TextEntry::make('detail_transaction')
+                                        ->label(__('system.labels.transaction_details'))
+                                        ->columnSpanFull()
+                                        ->html()
+                                        ->formatStateUsing(fn ($state) => $state ? '
+                                            <div style="
+                                                white-space: pre-wrap;
+                                                line-height: 1.6;
+                                                margin: 0;
+                                                padding: 0;
+                                            ">'.e(trim($state)).'</div>' : 'N/A')
+                                        ->extraAttributes([
+                                            'class' => 'bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm transition',
+                                            'style' => 'max-height: 300px; overflow-y: auto; line-height: 1.6;',
+                                        ])
+                                        ->placeholder('No details available'),
+                                ]),
+                            ]),
+                    ])
+                    ->columnSpanFull(),
             ]);
     }
 

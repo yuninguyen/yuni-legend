@@ -17,6 +17,7 @@ RebateOps is a professional, high-performance internal tool built with **Laravel
 - **High-Density UX**: Optimized 90% scaling for tables, robust text-wrapping, and zero horizontal scroll on data-heavy resources.
 - **Native Multi-Language**: Seamless toggle between **English** and **Vietnamese** with consistent label mapping.
 - **UX Excellence**: Integrated "Back to Top" functionality, optimized mobile navigation, and blur-filtered overlays.
+- **Infolist Standardization**: High-density, tab-based UI with grid layouts for complex resources (Account, Tracker), improving visual consistency and providing quick-copy utilities for sensitive data.
 
 ### 🛡️ Financial Integrity & Security
 - **Smart Record Locking**: Automated locking of Payout Logs once they are generated into a Disbursement. Parents are intelligently locked only when their child transactions are fully settled.
@@ -36,6 +37,7 @@ RebateOps is a professional, high-performance internal tool built with **Laravel
 - **Queue-Powered Sync**: Real-time synchronization with Google Sheets (3x retry, 60s backoff).
 - **Full-Spec Wallet Sync**: Direct import/export for Payout Methods supporting 23 data points including authentication, security questions, and personal identification (PII) info.
 - **Administrative Sync Tools**: Integrated UI actions for bulk importing Users and Platforms from Google Sheets with automated role mapping and badge color persistence.
+- **Brand Sync Intelligence**: Flawless bidirectional synchronization of "No Limit" textual parameters to nullable database fields to ensure absolute parity between Sheets and Web UI.
 - **Smart Formatting**: Automatic sheet tab creation, frozen headers, and status-based conditional coloring.
 - **Language-Independent Nav**: Strict sidebar hierarchy (Dashboard → Resource → Work → Wallet → Settings → Logs) enforced regardless of active locale.
 - **Activity Logging**: Full audit trail for Admin oversight on every data mutation.

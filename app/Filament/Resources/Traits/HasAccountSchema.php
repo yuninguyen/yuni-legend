@@ -14,6 +14,9 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Form;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\Tabs;
+use Filament\Infolists\Components\Tabs\Tab;
+use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\Alignment;
@@ -194,137 +197,155 @@ trait HasAccountSchema
     {
         return $infolist
             ->schema([
-                Section::make(__('system.heading_infolist.email_information'))
-                    ->schema([
-                        TextEntry::make('email.email')
-                            ->label(__('system.labels.email_address'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('email.email_password')
-                            ->label(__('system.labels.password'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('email.recovery_email')
-                            ->label(__('system.labels.account_email'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('email.two_factor_code')
-                            ->label(__('system.labels.two_factor_code'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('email.note')
-                            ->label(__('system.labels.note'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('email.status')
-                            ->label(__('system.labels.status'))
-                            ->placeholder(__('system.n/a'))
-                            ->formatStateUsing(fn (string $state): string => match ($state) {
-                                'active', 'Live' => __('system.email_status.active'),
-                                'disabled', 'Disabled' => __('system.email_status.disabled'),
-                                'locked', 'Locked' => __('system.email_status.locked'),
-                                default => __('system.email_status.'.$state),
-                            })
-                            ->color(fn (string $state): string => match ($state) {
-                                'active', 'Live' => 'success',
-                                'disabled', 'Disabled' => 'warning',
-                                'locked', 'Locked' => 'danger',
-                                default => 'gray',
-                            }),
-                    ])->columns(2),
+                Tabs::make('Tabs')
+                    ->tabs([
+                        Tab::make(__('system.heading_infolist.email_information'))
+                            ->icon('heroicon-m-envelope')
+                            ->schema([
+                                Grid::make(2)->schema([
+                                    TextEntry::make('email.email')
+                                        ->label(__('system.labels.email_address'))
+                                        ->copyable()
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('email.email_password')
+                                        ->label(__('system.labels.password'))
+                                        ->copyable()
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('email.recovery_email')
+                                        ->label(__('system.labels.account_email'))
+                                        ->copyable()
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('email.two_factor_code')
+                                        ->label(__('system.labels.two_factor_code'))
+                                        ->copyable()
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('email.status')
+                                        ->label(__('system.labels.status'))
+                                        ->placeholder(__('system.n/a'))
+                                        ->formatStateUsing(fn (string $state): string => match ($state) {
+                                            'active', 'Live' => __('system.email_status.active'),
+                                            'disabled', 'Disabled' => __('system.email_status.disabled'),
+                                            'locked', 'Locked' => __('system.email_status.locked'),
+                                            default => __('system.email_status.'.$state),
+                                        })
+                                        ->color(fn (string $state): string => match ($state) {
+                                            'active', 'Live' => 'success',
+                                            'disabled', 'Disabled' => 'warning',
+                                            'locked', 'Locked' => 'danger',
+                                            default => 'gray',
+                                        }),
+                                ]),
+                                TextEntry::make('email.note')
+                                    ->label(__('system.labels.note'))
+                                    ->placeholder(__('system.n/a'))
+                                    ->columnSpanFull(),
+                            ]),
 
-                Section::make(__('system.heading_infolist.account_information'))
-                    ->schema([
-                        TextEntry::make('platform')
-                            ->label(__('system.labels.platform'))
-                            ->placeholder(__('system.n/a'))
-                            ->formatStateUsing(fn ($state) => $state ? static::getPlatformName($state) : 'N/A'),
-                        TextEntry::make('password')
-                            ->label(__('system.labels.password'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('state')
-                            ->label(__('system.labels.state_us'))
-                            ->placeholder(__('system.n/a'))
-                            ->formatStateUsing(fn ($state) => $state ? "{$state} - ".(self::$usStates[$state] ?? '') : 'N/A'),
-                        TextEntry::make('device')
-                            ->label(__('system.labels.device'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('account_created_at')
-                            ->label(__('system.labels.date_create'))
-                            ->dateTime('d/m/Y')
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('user.name')
-                            ->label(__('system.labels.holder'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('status')
-                            ->label(__('system.labels.status'))
-                            ->html()
-                            ->placeholder(__('system.n/a'))
-                            ->columnSpanFull()
-                            ->formatStateUsing(function ($state): ?string {
-                                if (blank($state)) {
-                                    return null;
-                                }
+                        Tab::make(__('system.heading_infolist.account_information'))
+                            ->icon('heroicon-m-identification')
+                            ->schema([
+                                Grid::make(3)->schema([
+                                    TextEntry::make('platform')
+                                        ->label(__('system.labels.platform'))
+                                        ->placeholder(__('system.n/a'))
+                                        ->formatStateUsing(fn ($state) => $state ? static::getPlatformName($state) : 'N/A'),
+                                    TextEntry::make('password')
+                                        ->label(__('system.labels.password'))
+                                        ->copyable()
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('state')
+                                        ->label(__('system.labels.state_us'))
+                                        ->placeholder(__('system.n/a'))
+                                        ->formatStateUsing(fn ($state) => $state ? "{$state} - ".(self::$usStates[$state] ?? '') : 'N/A'),
+                                    TextEntry::make('device')
+                                        ->label(__('system.labels.device'))
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('account_created_at')
+                                        ->label(__('system.labels.date_create'))
+                                        ->dateTime('d/m/Y')
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('user.name')
+                                        ->label(__('system.labels.holder'))
+                                        ->placeholder(__('system.n/a')),
+                                ]),
+                                TextEntry::make('status')
+                                    ->label(__('system.labels.status'))
+                                    ->html()
+                                    ->placeholder(__('system.n/a'))
+                                    ->columnSpanFull()
+                                    ->formatStateUsing(function ($state): ?string {
+                                        if (blank($state)) {
+                                            return null;
+                                        }
 
-                                // Nếu là chuỗi (có thể có dấu phẩy), tách ra thành mảng. Nếu đã là mảng thì giữ nguyên.
-                                $statuses = is_array($state)
-                                    ? $state
-                                    : array_map('trim', explode(',', (string) $state));
+                                        $statuses = is_array($state)
+                                            ? $state
+                                            : array_map('trim', explode(',', (string) $state));
 
-                                $html = collect($statuses)->filter()->map(function ($s) {
-                                    $s_lower = strtolower($s);
-                                    $label = match ($s_lower) {
-                                        'used', 'in_use' => __('system.status.used'),
-                                        'limited', 'paypal_limited' => __('system.status.paypal_limited'),
-                                        'linked', 'linked_paypal' => __('system.status.linked_paypal'),
-                                        'unlinked', 'unlinked_paypal' => __('system.status.unlinked_paypal'),
-                                        'not_linked', 'not_linked_paypal' => __('system.status.not_linked_paypal'),
-                                        'no_paypal_needed', 'no_paypal_required' => __('system.status.no_paypal_required'),
-                                        'banned' => __('system.status.banned'),
-                                        'active', 'live' => __('system.status.active'),
-                                        default => __('system.status.'.$s_lower),
-                                    };
+                                        $html = collect($statuses)->filter()->map(function ($s) {
+                                            $s_lower = strtolower($s);
+                                            $label = match ($s_lower) {
+                                                'used', 'in_use' => __('system.status.used'),
+                                                'limited', 'paypal_limited' => __('system.status.paypal_limited'),
+                                                'linked', 'linked_paypal' => __('system.status.linked_paypal'),
+                                                'unlinked', 'unlinked_paypal' => __('system.status.unlinked_paypal'),
+                                                'not_linked', 'not_linked_paypal' => __('system.status.not_linked_paypal'),
+                                                'no_paypal_needed', 'no_paypal_required' => __('system.status.no_paypal_required'),
+                                                'banned' => __('system.status.banned'),
+                                                'active', 'live' => __('system.status.active'),
+                                                default => __('system.status.'.$s_lower),
+                                            };
 
-                                    $color = match ($s_lower) {
-                                        'active', 'live' => '#6b7280',
-                                        'used', 'in_use' => '#3b82f6',
-                                        'no_paypal_needed', 'no_paypal_required' => '#f59e0b',
-                                        'not_linked', 'not_linked_paypal' => '#f59e0b',
-                                        'linked', 'linked_paypal' => '#22c55e',
-                                        'limited', 'paypal_limited' => '#ef4444',
-                                        'unlinked', 'unlinked_paypal' => '#f59e0b',
-                                        'banned' => '#ef4444',
-                                        default => '#6b7280',
-                                    };
+                                            $color = match ($s_lower) {
+                                                'active', 'live' => '#6b7280',
+                                                'used', 'in_use' => '#3b82f6',
+                                                'no_paypal_needed', 'no_paypal_required' => '#f59e0b',
+                                                'not_linked', 'not_linked_paypal' => '#f59e0b',
+                                                'linked', 'linked_paypal' => '#22c55e',
+                                                'limited', 'paypal_limited' => '#ef4444',
+                                                'unlinked', 'unlinked_paypal' => '#f59e0b',
+                                                'banned' => '#ef4444',
+                                                default => '#6b7280',
+                                            };
 
-                                    return "<span style='color: {$color}; font-weight: 600; padding: 2px 8px; border-radius: 4px;'>{$label}</span>";
-                                })->implode("<span style='margin: 0 6px; color: #94a3b8; font-weight: bold;'>→</span>");
+                                            return "<span style='color: {$color}; font-weight: 600; padding: 2px 8px; border-radius: 4px;'>{$label}</span>";
+                                        })->implode("<span style='margin: 0 6px; color: #94a3b8; font-weight: bold;'>→</span>");
 
-                                return $html;
-                            }),
-                        TextEntry::make('note')
-                            ->label(__('system.labels.note'))
-                            ->placeholder(__('system.n/a'))
-                            ->columnSpanFull()
-                            ->html()
-                            ->formatStateUsing(fn ($state) => $state ? '
-                                <div style="
-                                    white-space: pre-wrap;
-                                    line-height: 1.6;
-                                    margin: 0;
-                                    padding: 0;
-                                ">'.e(trim($state)).'</pre>' : 'N/A'),
-                    ])->columns(3),
+                                        return $html;
+                                    }),
+                                TextEntry::make('note')
+                                    ->label(__('system.labels.note'))
+                                    ->placeholder(__('system.n/a'))
+                                    ->columnSpanFull()
+                                    ->html()
+                                    ->formatStateUsing(fn ($state) => $state ? '
+                                        <div style="
+                                            white-space: pre-wrap;
+                                            line-height: 1.6;
+                                            margin: 0;
+                                            padding: 0;
+                                        ">'.e(trim($state)).'</div>' : 'N/A'),
+                            ]),
 
-                Section::make(__('system.heading_infolist.paypal_information'))
-                    ->schema([
-                        TextEntry::make('device_linked_paypal')
-                            ->label(__('system.labels.device'))
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('paypal_linked_at')
-                            ->label(__('system.labels.linked_paypal_date'))
-                            ->dateTime('d/m/Y')
-                            ->placeholder(__('system.n/a')),
-                        TextEntry::make('paypal_info')
-                            ->label(__('system.labels.address'))
-                            ->placeholder(__('system.n/a'))
-                            ->columnSpanFull(),
-                    ])->columns(2),
+                        Tab::make(__('system.heading_infolist.paypal_information'))
+                            ->icon('heroicon-m-currency-dollar')
+                            ->schema([
+                                Grid::make(2)->schema([
+                                    TextEntry::make('device_linked_paypal')
+                                        ->label(__('system.labels.device'))
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('paypal_linked_at')
+                                        ->label(__('system.labels.linked_paypal_date'))
+                                        ->dateTime('d/m/Y')
+                                        ->placeholder(__('system.n/a')),
+                                    TextEntry::make('paypal_info')
+                                        ->label(__('system.labels.address'))
+                                        ->placeholder(__('system.n/a'))
+                                        ->columnSpanFull(),
+                                ]),
+                            ]),
+                    ])
+                    ->columnSpanFull(),
             ]);
     }
 

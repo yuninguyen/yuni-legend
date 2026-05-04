@@ -675,7 +675,7 @@ class GoogleSyncService
             $record->name,
             $platformName,
             ($record->boost_percentage ?? 0) . '%',
-            $record->maximum_limit ?? 0,
+            (is_null($record->maximum_limit) || $record->maximum_limit == 0) ? 'No Limit' : $record->maximum_limit,
             $record->gc_rate ?? 0,
         ];
     }
@@ -762,7 +762,10 @@ class GoogleSyncService
 
                 // Cập nhật các trường khác
                 if (isset($row[2])) $brand->boost_percentage = $this->parseNumeric($row[2]);
-                if (isset($row[3])) $brand->maximum_limit = $this->parseNumeric($row[3]);
+                if (isset($row[3])) {
+                    $limitVal = trim($row[3]);
+                    $brand->maximum_limit = (strtolower($limitVal) === 'no limit' || empty($limitVal)) ? null : $this->parseNumeric($limitVal);
+                }
                 if (isset($row[4])) $brand->gc_rate = $this->parseNumeric($row[4]);
 
                 $brand->save();
