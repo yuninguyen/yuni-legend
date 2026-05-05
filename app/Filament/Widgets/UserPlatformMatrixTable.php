@@ -2,29 +2,30 @@
 
 namespace App\Filament\Widgets;
 
+use App\Models\Platform;
 use App\Models\RebateTracker;
 use App\Models\User;
-use Filament\Tables;
-use Filament\Tables\Table;
-use Filament\Widgets\TableWidget as BaseWidget;
-use Illuminate\Support\Facades\DB;
-use Filament\Support\Enums\Alignment;
-// Import thêm các class phục vụ Filter
-use Filament\Tables\Filters\Filter;
-use Filament\Forms\Components\Select;
+use Carbon\Carbon;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Get;
-use Illuminate\Database\Eloquent\Builder;
+// Import thêm các class phục vụ Filter
+use Filament\Support\Enums\Alignment;
+use Filament\Tables;
 use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Table;
+use Filament\Widgets\TableWidget as BaseWidget;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class UserPlatformMatrixTable extends BaseWidget
 {
     public static function canView(): bool
     {
-        return !auth()->user()?->isFinance();
+        return ! auth()->user()?->isFinance();
     }
-
 
     protected int|string|array $columnSpan = 'full';
 
@@ -56,7 +57,7 @@ class UserPlatformMatrixTable extends BaseWidget
                     ->join('accounts', 'rebate_trackers.account_id', '=', 'accounts.id')
                     ->join('users', 'rebate_trackers.user_id', '=', 'users.id')
                     ->leftJoin('platforms', 'accounts.platform', '=', 'platforms.slug')
-                    ->when(!auth()->user()?->isAdmin(), function ($query) {
+                    ->when(! auth()->user()?->isAdmin(), function ($query) {
                         return $query->where('rebate_trackers.user_id', auth()->id());
                     })
                     ->where('users.role', '!=', 'finance')
@@ -79,7 +80,7 @@ class UserPlatformMatrixTable extends BaseWidget
                             ->label(__('system.labels.user'))
                             ->options(User::whereNot('role', 'finance')->pluck('name', 'id'))
                             ->searchable()
-                            ->visible(fn() => auth()->user()?->isAdmin())
+                            ->visible(fn () => auth()->user()?->isAdmin())
                             ->live(),
                         Select::make('platform')
                             ->label(__('system.labels.platform'))
@@ -88,11 +89,11 @@ class UserPlatformMatrixTable extends BaseWidget
 
                                 $usedPlatforms = RebateTracker::query()
                                     ->join('accounts', 'rebate_trackers.account_id', '=', 'accounts.id')
-                                    ->when($userId, fn($q) => $q->where('rebate_trackers.user_id', $userId))
+                                    ->when($userId, fn ($q) => $q->where('rebate_trackers.user_id', $userId))
                                     ->distinct()
                                     ->pluck('accounts.platform');
 
-                                return \App\Models\Platform::query()
+                                return Platform::query()
                                     ->whereIn('slug', $usedPlatforms)
                                     ->orderBy('sort_order')
                                     ->pluck('name', 'slug');
@@ -112,11 +113,12 @@ class UserPlatformMatrixTable extends BaseWidget
 
                                 // Tìm năm của RebateTracker cũ nhất trong hệ thống
                                 $oldestRecord = RebateTracker::min('created_at');
-                                $oldestYear = $oldestRecord ? \Carbon\Carbon::parse($oldestRecord)->year : $currentYear;
+                                $oldestYear = $oldestRecord ? Carbon::parse($oldestRecord)->year : $currentYear;
 
                                 for ($y = $currentYear - 1; $y >= $oldestYear; $y--) {
-                                    $options['year_' . $y] = __('system.revenue_report.year_n', ['year' => $y]);
+                                    $options['year_'.$y] = __('system.revenue_report.year_n', ['year' => $y]);
                                 }
+
                                 return $options;
                             })
                             ->live(),
@@ -129,11 +131,11 @@ class UserPlatformMatrixTable extends BaseWidget
                         return $query
                             ->when(
                                 $data['user_id'] ?? null,
-                                fn(Builder $query, $userId): Builder => $query->where('rebate_trackers.user_id', $userId)
+                                fn (Builder $query, $userId): Builder => $query->where('rebate_trackers.user_id', $userId)
                             )
                             ->when(
                                 $data['platform'] ?? null,
-                                fn(Builder $query, $platform): Builder => $query->where('accounts.platform', $platform)
+                                fn (Builder $query, $platform): Builder => $query->where('accounts.platform', $platform)
                             )
                             ->when(
                                 $data['date_preset'] ?? null,
@@ -141,6 +143,7 @@ class UserPlatformMatrixTable extends BaseWidget
                                     if (str_starts_with($preset, 'year_')) {
                                         return $query->whereYear('rebate_trackers.created_at', (int) str_replace('year_', '', $preset));
                                     }
+
                                     return match ($preset) {
                                         'today' => $query->whereDate('rebate_trackers.created_at', now()->toDateString()),
                                         'this_month' => $query->whereMonth('rebate_trackers.created_at', now()->month)
@@ -153,11 +156,11 @@ class UserPlatformMatrixTable extends BaseWidget
                             )
                             ->when(
                                 $data['from_date'] ?? null,
-                                fn(Builder $query, $date): Builder => $query->whereDate('rebate_trackers.created_at', '>=', $date)
+                                fn (Builder $query, $date): Builder => $query->whereDate('rebate_trackers.created_at', '>=', $date)
                             )
                             ->when(
                                 $data['to_date'] ?? null,
-                                fn(Builder $query, $date): Builder => $query->whereDate('rebate_trackers.created_at', '<=', $date)
+                                fn (Builder $query, $date): Builder => $query->whereDate('rebate_trackers.created_at', '<=', $date)
                             );
                     })
                     ->columns(2)
@@ -167,74 +170,78 @@ class UserPlatformMatrixTable extends BaseWidget
             ->defaultSort('user_name', 'asc')
             ->paginated(false)
             ->columns([
-                Tables\Columns\TextColumn::make('user_name')
+                TextColumn::make('user_name')
                     ->label(__('system.labels.user'))
                     ->weight('bold')
                     ->alignment(Alignment::Center)
                     ->summarize(
-                        Tables\Columns\Summarizers\Sum::make()
+                        Sum::make()
                             ->label('')
-                            ->formatStateUsing(fn() => __('system.revenue_report.grand_total'))
+                            ->formatStateUsing(fn () => __('system.revenue_report.grand_total'))
                     ),
 
-                Tables\Columns\TextColumn::make('platform_name')
+                TextColumn::make('platform_name')
                     ->label(__('system.labels.platform'))
                     ->alignment(Alignment::Center),
 
-                Tables\Columns\TextColumn::make('total_clicked')
+                TextColumn::make('total_clicked')
                     ->label(__('system.revenue_report.total_clicked'))
                     ->money('usd')
-                    ->alignment(Alignment::Right),
+                    ->alignment(Alignment::Center),
 
-                Tables\Columns\TextColumn::make('total_missing')
+                TextColumn::make('total_missing')
                     ->label(__('system.revenue_report.total_missing'))
                     ->money('usd')
-                    ->alignment(Alignment::Right)
-                    ->description(fn($record) => $record->grand_total > 0
-                        ? number_format(($record->total_missing / $record->grand_total) * 100, 1) . '%'
+                    ->alignment(Alignment::Center)
+                    ->description(fn ($record) => $record->grand_total > 0
+                        ? number_format(($record->total_missing / $record->grand_total) * 100, 1).'%'
                         : null)
                     ->color('danger')
                     ->summarize(
-                        Tables\Columns\Summarizers\Sum::make()
+                        Sum::make()
                             ->label('')
                             ->money('usd')
+                            ->extraAttributes(['class' => 'flex w-full justify-center'])
                     ),
 
-                Tables\Columns\TextColumn::make('total_pending')
+                TextColumn::make('total_pending')
                     ->label(__('system.revenue_report.total_pending'))
                     ->money('usd')
-                    ->alignment(Alignment::Right)
+                    ->alignment(Alignment::Center)
                     ->summarize(
-                        Tables\Columns\Summarizers\Sum::make()
+                        Sum::make()
                             ->label('')
                             ->money('usd')
+                            ->extraAttributes(['class' => 'flex w-full justify-center'])
                     ),
 
-                Tables\Columns\TextColumn::make('total_confirmed')
+                TextColumn::make('total_confirmed')
                     ->label(__('system.revenue_report.total_confirmed'))
                     ->money('usd')
-                    ->alignment(Alignment::Right)
-                    ->description(fn($record) => $record->grand_total > 0
-                        ? number_format(($record->total_confirmed / $record->grand_total) * 100, 1) . '%'
+                    ->alignment(Alignment::Center)
+                    ->description(fn ($record) => $record->grand_total > 0
+                        ? number_format(($record->total_confirmed / $record->grand_total) * 100, 1).'%'
                         : null)
                     ->color('success')
                     ->summarize(
-                        Tables\Columns\Summarizers\Sum::make()
+                        Sum::make()
                             ->label('')
                             ->money('usd')
+                            ->extraAttributes(['class' => 'flex w-full justify-center'])
                     ),
 
-                Tables\Columns\TextColumn::make('grand_total')
+                TextColumn::make('grand_total')
                     ->label(__('system.revenue_report.total_rebate'))
-                    ->alignment(Alignment::Right)
+                    ->alignment(Alignment::Center)
                     ->money('usd')
                     ->weight('bold')
                     ->color('primary')
                     // Cột tổng quan trọng nhất
                     ->summarize(
-                        Tables\Columns\Summarizers\Sum::make()
+                        Sum::make()
                             ->label('')
                             ->money('usd')
+                            ->extraAttributes(['class' => 'flex w-full justify-center'])
 
                     ),
             ]);

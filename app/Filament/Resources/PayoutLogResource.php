@@ -985,9 +985,9 @@ class PayoutLogResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('status')
                     ->label(__('system.labels.status'))
-                    ->toggleable()
                     ->badge()
                     ->alignment(Alignment::Center)
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->color(fn (string $state): string => match ($state) {
                         'pending' => 'warning',
                         'completed' => 'success',
