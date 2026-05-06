@@ -9,6 +9,8 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use App\Models\InvestorExpense;
+use App\Models\UserPayment;
 use Spatie\Activitylog\Traits\LogsActivity; // Bật tính năng Log
 use Spatie\Activitylog\LogOptions;          // Tùy chọn Log
 
@@ -35,6 +37,11 @@ class User extends Authenticatable implements FilamentUser
     public function payoutLogs(): HasMany
     {
         return $this->hasMany(PayoutLog::class, 'user_id');
+    }
+
+    public function investorExpenses(): HasMany
+    {
+        return $this->hasMany(InvestorExpense::class);
     }
 
     public function userPayments(): HasMany

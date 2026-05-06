@@ -106,6 +106,31 @@ class UserPaymentResource extends Resource
     {
         return $form
             ->schema([
+                Forms\Components\Section::make(__('system.payout_logs.label.financials'))
+                    ->schema([
+                        Forms\Components\TextInput::make('total_usd')
+                            ->label(__('system.labels.rebate_amount_usd'))
+                            ->prefix('$')
+                            ->readOnly(),
+                        Forms\Components\TextInput::make('total_deductions')
+                            ->label(__('system.labels.total_deductions'))
+                            ->prefix('₫')
+                            ->readOnly(),
+                        Forms\Components\TextInput::make('total_deductions_usd')
+                            ->label(__('system.labels.total_deductions_usd'))
+                            ->prefix('$')
+                            ->readOnly(),
+                        Forms\Components\TextInput::make('total_deductions_usdt')
+                            ->label(__('system.labels.total_deductions_usdt'))
+                            ->prefix('₮')
+                            ->readOnly(),
+                        Forms\Components\TextInput::make('total_vnd')
+                            ->label(__('system.labels.total_vnd'))
+                            ->prefix('₫')
+                            ->readOnly()
+                            ->extraInputAttributes(['class' => 'font-bold text-primary-600']),
+                    ])->columns(3),
+
                 Forms\Components\Section::make(__('system.labels.transaction_details'))
                     ->schema([
                         Forms\Components\Select::make('status')
@@ -183,6 +208,42 @@ class UserPaymentResource extends Resource
                         ->label('')
                         ->money('USD')
                         ->extraAttributes(['class' => 'flex w-full justify-center'])),
+
+                Tables\Columns\TextColumn::make('total_deductions')
+                    ->label(__('system.labels.total_deductions'))
+                    ->money('VND', locale: 'vi_VN')
+                    ->color('danger')
+                    ->alignment(Alignment::Center)
+                    ->copyable()
+                    ->summarize(
+                        Tables\Columns\Summarizers\Sum::make()
+                            ->label('')
+                            ->money('VND', locale: 'vi_VN')
+                            ->extraAttributes(['class' => 'flex w-full justify-center'])),
+
+                Tables\Columns\TextColumn::make('total_deductions_usd')
+                    ->label(__('system.labels.total_deductions_usd'))
+                    ->money('USD')
+                    ->color('danger')
+                    ->alignment(Alignment::Center)
+                    ->copyable()
+                    ->summarize(
+                        Tables\Columns\Summarizers\Sum::make()
+                            ->label('')
+                            ->money('USD')
+                            ->extraAttributes(['class' => 'flex w-full justify-center'])),
+
+                Tables\Columns\TextColumn::make('total_deductions_usdt')
+                    ->label(__('system.labels.total_deductions_usdt'))
+                    ->money('USDT')
+                    ->color('danger')
+                    ->alignment(Alignment::Center)
+                    ->copyable()
+                    ->summarize(
+                        Tables\Columns\Summarizers\Sum::make()
+                            ->label('')
+                            ->money('USDT')
+                            ->extraAttributes(['class' => 'flex w-full justify-center'])),
 
                 Tables\Columns\TextColumn::make('total_vnd')
                     ->label(__('system.labels.total_vnd'))

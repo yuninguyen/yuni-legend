@@ -62,6 +62,8 @@ return [
         'rejected' => 'Từ chối',
         'payout_ready' => 'Sẵn sàng trả tiền',
         'state' => 'Trạng thái',
+        'deducted' => 'Đã khấu trừ',
+        'cancelled' => 'Đã hủy',
     ],
 
     'payment_status' => [
@@ -175,8 +177,21 @@ return [
         'wallet_name' => 'Tên Ví',
         'current_balance' => 'Số dư hiện tại',
         'type' => 'Loại',
-        'recipient_email' => 'Email người nhận',
         'payment_description' => 'Mô tả thanh toán',
+        'investor_expenses' => 'Chi phí thanh toán hộ',
+        'investor_expense' => 'Khoản chi thanh toán hộ',
+        'amount' => 'Số tiền',
+        'amount_vnd' => 'Số tiền (VND)',
+        'amount_usd' => 'Số tiền (USD)',
+        'amount_usdt' => 'Số tiền (USDT)',
+        'reason' => 'Lý do / Mô tả',
+        'deductions' => 'Khấu trừ',
+        'total_deductions' => 'Tổng khấu trừ (VND)',
+        'total_deductions_usd' => 'Tổng khấu trừ (USD)',
+        'total_deductions_usdt' => 'Tổng khấu trừ (USDT)',
+        'total_deductions_label' => 'Tổng khấu trừ',
+        'total_deductions' => 'Tổng khấu trừ',
+        'created_at' => 'Ngày tạo',
     ],
 
     'actions' => [

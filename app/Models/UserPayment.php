@@ -47,6 +47,9 @@ class UserPayment extends Model
         'asset_group',
         'payment_date',
         'payment_proof',
+        'total_deductions',
+        'total_deductions_usd',
+        'total_deductions_usdt',
         'note',
     ];
 
@@ -76,6 +79,11 @@ class UserPayment extends Model
     public function payoutLogs(): HasMany
     {
         return $this->hasMany(PayoutLog::class);
+    }
+
+    public function investorExpenses(): HasMany
+    {
+        return $this->hasMany(InvestorExpense::class);
     }
 
     // 🟢 ACCESSOR: Tính tổng tiền của cả Batch để hiện trên tiêu đề Group

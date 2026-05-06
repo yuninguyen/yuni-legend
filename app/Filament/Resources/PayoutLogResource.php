@@ -8,6 +8,7 @@ use App\Filament\Resources\Traits\HasPlatformCache;
 use App\Jobs\SyncGoogleSheetJob;
 use App\Models\Account;
 use App\Models\Brand;
+use App\Models\InvestorExpense;
 use App\Models\PayoutLog;
 use App\Models\PayoutMethod;
 use App\Models\Platform;
@@ -1562,6 +1563,31 @@ class PayoutLogResource extends Resource
                                                 ->numeric()
                                                 ->default(65),
                                         ]),
+
+                                    Forms\Components\Section::make(__('system.labels.investor_expenses'))
+                                        ->columnSpanFull()
+                                        ->visible(function (Collection $records) {
+                                            $userIds = $records->pluck('user_id')->unique();
+                                            return InvestorExpense::whereIn('user_id', $userIds)
+                                                ->where('status', 'pending')
+                                                ->exists();
+                                        })
+                                        ->schema([
+                                            Forms\Components\CheckboxList::make('expense_ids')
+                                                ->label(__('system.labels.investor_expenses'))
+                                                ->options(function (Collection $records) {
+                                                    $userIds = $records->pluck('user_id')->unique();
+                                                    return InvestorExpense::whereIn('user_id', $userIds)
+                                                        ->where('status', 'pending')
+                                                        ->get()
+                                                        ->mapWithKeys(fn ($e) => [
+                                                            $e->id => $e->user->name . ": " . number_format($e->amount_vnd) . " ₫ - " . ($e->reason ?: 'No reason')
+                                                        ]);
+                                                })
+                                                ->columns(2)
+                                                ->bulkToggleable()
+                                                ->searchable(),
+                                        ]),
                                 ]),
                         ])
                         ->action(function (Collection $records, array $data) {
@@ -1673,8 +1699,53 @@ class PayoutLogResource extends Resource
                                     // 🟢 TÍNH TOÁN CHO NHÂN VIÊN (STAFF)
                                     $payoutRate = (float) ($data['manual_payout_rate'] ?? $averageMarketRate);
                                     $payoutPercentage = (float) ($data['payout_percentage'] ?? 100);
-                                    $totalVndPayout = floor(($totalUsd * $payoutRate) * ($payoutPercentage / 100));
-                                    $profitVnd = floor(($averageMarketRate - $payoutRate) * $totalUsd * ($payoutPercentage / 100));
+                                    $baseVndPayout = floor(($totalUsd * $payoutRate) * ($payoutPercentage / 100));
+
+                                    // 🚀 NEW: DEDUCT INVESTOR EXPENSES (Selected manually)
+                                    $selectedExpenseIds = $data['expense_ids'] ?? [];
+                                    $pendingExpenses = InvestorExpense::where('user_id', $firstLog->user_id)
+                                        ->whereIn('id', $selectedExpenseIds)
+                                        ->where('status', 'pending')
+                                        ->lockForUpdate()
+                                        ->get();
+
+                                    $vndExpenses = $pendingExpenses->where('currency', 'VND');
+                                    $usdExpenses = $pendingExpenses->where('currency', 'USD');
+                                    $usdtExpenses = $pendingExpenses->where('currency', 'USDT');
+
+                                    $currentBatchDeductionsVnd = $vndExpenses->sum('amount_vnd');
+                                    $currentBatchDeductionsUsd = $usdExpenses->sum('amount_usd');
+                                    $currentBatchDeductionsUsdt = $usdtExpenses->sum('amount_usdt');
+
+                                    // Deduct USD and USDT from totalUsd before calculation
+                                    $totalUsdAfterDeduction = max(0, $totalUsd - $currentBatchDeductionsUsd - $currentBatchDeductionsUsdt);
+
+                                    $payoutRate = (float) ($data['manual_payout_rate'] ?? $averageMarketRate);
+                                    $payoutPercentage = (float) ($data['payout_percentage'] ?? 100);
+                                    
+                                    // Calculate VND payout based on the remaining USD
+                                    $baseVndPayout = floor(($totalUsdAfterDeduction * $payoutRate) * ($payoutPercentage / 100));
+                                    
+                                    // Deduct VND expenses from the final VND payout
+                                    $totalVndPayout = $baseVndPayout - $currentBatchDeductionsVnd;
+
+                                    $profitVnd = floor(($averageMarketRate - $payoutRate) * $totalUsdAfterDeduction * ($payoutPercentage / 100));
+
+                                    $paymentNote = '';
+                                    if ($currentBatchDeductionsVnd > 0 || $currentBatchDeductionsUsd > 0 || $currentBatchDeductionsUsdt > 0) {
+                                        $details = [];
+                                        if ($currentBatchDeductionsUsd > 0) {
+                                            $details[] = "USD: $" . number_format($currentBatchDeductionsUsd, 2);
+                                        }
+                                        if ($currentBatchDeductionsUsdt > 0) {
+                                            $details[] = "USDT: " . number_format($currentBatchDeductionsUsdt, 2) . " ₮";
+                                        }
+                                        if ($currentBatchDeductionsVnd > 0) {
+                                            $details[] = "VND: " . number_format($currentBatchDeductionsVnd) . " ₫";
+                                        }
+                                        $expenseReasons = $pendingExpenses->pluck('reason')->filter()->join('; ');
+                                        $paymentNote = "Khấu trừ chi phí: " . implode(' | ', $details) . ". Lý do: " . ($expenseReasons ?: 'Không có lý do');
+                                    }
 
                                     $staffPayment = UserPayment::create([
                                         'user_id' => $firstLog->user_id,
@@ -1682,22 +1753,38 @@ class PayoutLogResource extends Resource
                                         'platform' => $platformName,
                                         'asset_group' => $firstLog->asset_type === 'gift_card' ? 'gift_card' : 'paypal',
                                         'transaction_type' => "{$assetPrefix} - {$sourceName}",
-                                        'total_usd' => $totalUsd,
+                                        'total_usd' => $totalUsd, // We keep the original total_usd for record? Or show net?
+                                        // Actually, UserPayment total_usd usually represents the amount before split.
+                                        // If we deduct USD, the 'rebate amount' we are settling is effectively lower.
+                                        // But for reporting, showing the full amount and then deductions is better.
                                         'exchange_rate' => $averageMarketRate,
                                         'payout_rate' => $payoutRate,
                                         'payout_percentage' => $payoutPercentage,
                                         'total_vnd' => $totalVndPayout,
+                                        'total_deductions' => $currentBatchDeductionsVnd,
+                                        'total_deductions_usd' => $currentBatchDeductionsUsd,
+                                        'total_deductions_usdt' => $currentBatchDeductionsUsdt,
                                         'profit_vnd' => $profitVnd,
                                         'status' => 'pending',
+                                        'note' => $paymentNote,
                                     ]);
+
+                                    // Link expenses to this payment
+                                    if ($pendingExpenses->isNotEmpty()) {
+                                        InvestorExpense::whereIn('id', $pendingExpenses->pluck('id'))
+                                            ->update([
+                                                'status' => 'deducted',
+                                                'user_payment_id' => $staffPayment->id
+                                            ]);
+                                    }
 
                                     // 🟢 TÍNH TOÁN CHO QUẢN LÝ (LEADER) - NẾU CÓ CHỌN
                                     if (! empty($data['leader_id'])) {
                                         $leaderName = User::find($data['leader_id'])?->name ?? 'Leader';
                                         $leaderRate = (float) ($data['leader_payout_rate'] ?? $payoutRate);
                                         $leaderPercentage = (float) ($data['leader_percentage'] ?? 0);
-                                        $leaderVndPayout = floor(($totalUsd * $leaderRate) * ($leaderPercentage / 100));
-                                        $leaderProfitVnd = floor(($averageMarketRate - $leaderRate) * $totalUsd * ($leaderPercentage / 100));
+                                        $leaderVndPayout = floor(($totalUsdAfterDeduction * $leaderRate) * ($leaderPercentage / 100));
+                                        $leaderProfitVnd = floor(($averageMarketRate - $leaderRate) * $totalUsdAfterDeduction * ($leaderPercentage / 100));
 
                                         UserPayment::create([
                                             'user_id' => $data['leader_id'],

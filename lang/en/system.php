@@ -62,6 +62,8 @@ return [
         'rejected' => 'Rejected',
         'payout_ready' => 'Payout Ready',
         'state' => 'Status',
+        'deducted' => 'Deducted',
+        'cancelled' => 'Cancelled',
     ],
 
     'payment_status' => [
@@ -175,8 +177,20 @@ return [
         'wallet_name' => 'Wallet Name',
         'current_balance' => 'Current Balance',
         'type' => 'Type',
-        'recipient_email' => 'Recipient Email',
         'payment_description' => 'Payment Description',
+        'investor_expenses' => 'Investor Expenses',
+        'investor_expense' => 'Investor Expense',
+        'amount' => 'Amount',
+        'amount_vnd' => 'Amount (VND)',
+        'amount_usd' => 'Amount (USD)',
+        'amount_usdt' => 'Amount (USDT)',
+        'reason' => 'Reason',
+        'deductions' => 'Deductions',
+        'total_deductions' => 'Total Deductions (VND)',
+        'total_deductions_usd' => 'Total Deductions (USD)',
+        'total_deductions_usdt' => 'Total Deductions (USDT)',
+        'total_deductions' => 'Total Deductions',
+        'created_at' => 'Created At',
     ],
 
     'actions' => [
