@@ -17,7 +17,8 @@ RebateOps is a professional, high-performance internal tool built with **Laravel
 - **High-Density UX**: Optimized 90% scaling for tables, robust text-wrapping, and zero horizontal scroll on data-heavy resources.
 - **Native Multi-Language**: Seamless toggle between **English** and **Vietnamese** with consistent label mapping.
 - **UX Excellence**: Integrated "Back to Top" functionality, optimized mobile navigation, and blur-filtered overlays.
-- **Infolist Standardization**: High-density, tab-based UI with grid layouts for complex resources (Account, Tracker), improving visual consistency and providing quick-copy utilities for sensitive data.
+- **Infolist Standardization**: High-density, tab-based UI with grid layouts for complex resources (Account, Tracker, Investor Expense, Payout Methods, Payout Logs), improving visual consistency and providing quick-copy utilities for sensitive data.
+- **Modal-First Interaction**: Transitioned core resources (Investor Expense, Payout Methods) to modal-based View, Edit, and Create actions, reducing page transitions and maintaining context during high-speed data entry.
 
 ### 🛡️ Financial Integrity & Security
 - **Smart Record Locking**: Automated locking of Payout Logs once they are generated into a Disbursement. Parents are intelligently locked only when their child transactions are fully settled.
@@ -45,6 +46,8 @@ RebateOps is a professional, high-performance internal tool built with **Laravel
 - **Intelligent Tracker Sync**: Bidirectional synchronization for order trackers across 6 major platforms with automated status mapping and Payout Date resolution.
 - **Leader Split Customization**: Advanced transaction labeling for multi-tier profit sharing (`[Asset] - [Wallet Name] [[Staff Name]]`) with automated dynamic account retrieval.
 - **Optimized Disbursement UI**: High-efficiency payroll management featuring copyable financial data, disabled row-click redirects, and toggleable status columns for maximum information density.
+- **Multi-Currency Expense Management**: Integrated tracking for **VND, USD, and USDT (Crypto)** expenses. USDT expenses are intelligently deducted from Gross USD before revenue splitting, ensuring accurate profit margin calculations.
+- **Automated Deduction Auditing**: Dynamic generation of multi-currency deduction notes in disbursement records for transparent financial reconciliation.
 
 ---
 
@@ -105,8 +108,9 @@ REBATEOPS
 ├── WORKING SPACE         # Operations (Hidden from Finance)
 │   ├── Rebate Trackers   # Order tracking
 ├── WALLET & PAYOUTS      # Financial Layer
-│   ├── Payout Logs       # Withdrawals & Liquidations
+│   ├── Investor Expenses # Multi-currency Expense Management
 │   ├── Payout Methods    # Virtual Wallets
+│   ├── Payout Logs       # Withdrawals & Liquidations
 │   └── Disbursement      # Disbursement (User Payments) Payroll
 └── SETTINGS              # System Core (Admin only)
     ├── Users             # User Management
@@ -167,15 +171,16 @@ REBATEOPS
 - [x] v5.6.1: Core UI/UX Stabilization — Global systematic debugging of Filament 3 Floating UI; resolving modal z-index overlap issues by safely injecting state-driven CSS across all Admin panels.
 - [x] v5.6.2: Disbursement Refinement & Google Sync — Streamlined UserPayment UI with removal of file uploads, copyable data columns, dynamic PayPal region detection,and bulk Google Sheets sync for Users/Platforms/Logs.
 - [x] v5.6.3: Advanced Tracker Grouping — Transitioned Rebate Tracker to a batch-oriented grouping structure (Account + Batch ID) with manual bulk assignment actions for granular workflow management.
+- [x] v5.7.0: Multi-Currency Expense Tracking — Full integration of VND, USD, and USDT (Crypto) investor expenses into the payout settlement workflow. Refined UI/UX with modal-based actions and standardized Tabbed Infolists across the expense management layer.
 ---
 
 ## 🔐 Security & Access Control
 
-| Role | Emails | Accounts | Trackers | Payout Logs | Payout Methods | Disbursement |
-|------|--------|----------|----------|-------------|----------------|--------------|
-| **Admin** | Full | Full | Full | Full | Full | Full |
-| **Finance** | View | View | Hidden | Full | Full | Full |
-| **Staff** | Own only | Own only | Own only | Own only | Hidden | View own |
+| Role | Emails | Accounts | Trackers | Payout Logs | Payout Methods | Expenses | Disbursement |
+|------|--------|----------|----------|-------------|----------------|----------|--------------|
+| **Admin** | Full | Full | Full | Full | Full | Full | Full |
+| **Finance** | View | View | Hidden | Full | Full | Full | Full |
+| **Staff** | Own only | Own only | Own only | Own only | Hidden | Hidden | View own |
 
 ---
 <p align="center">Built for Excellence. Optimized for Profit.</p>
