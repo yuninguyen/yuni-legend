@@ -72,6 +72,7 @@ class UserResource extends Resource
                                 'admin' => __('system.roles.admin'),
                                 'finance' => __('system.roles.finance'),
                                 'operator' => __('system.roles.operator'),
+                                'partner' => __('system.roles.partner'),
                             ])
                             ->default('operator')
                             ->required()
@@ -112,6 +113,7 @@ class UserResource extends Resource
                         'admin' => __('system.roles.admin'),
                         'finance' => __('system.roles.finance'),
                         'operator' => __('system.roles.operator'),
+                        'partner' => __('system.roles.partner'),
                         default => $state,
                     })
                     ->badge()

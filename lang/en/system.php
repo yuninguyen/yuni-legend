@@ -19,6 +19,7 @@ return [
         'admin' => 'Admin Specialist',
         'finance' => 'Financial Officer',
         'operator' => 'System Operator',
+        'partner' => 'Partner',
     ],
     'users' => [
         'description' => 'Manage user accounts and system access permissions.',
@@ -36,6 +37,50 @@ return [
         'wallet_payouts' => 'Wallet & Payouts',
         'settings' => 'Settings',
         'logs' => 'Logs',
+    ],
+
+    'partner_withdrawals' => [
+        'nav_label' => 'Partner Withdrawals',
+        'model_label' => 'Partner Withdrawal',
+        'plural_model_label' => 'Partner Withdrawals',
+
+        // Sections
+        'section_partner' => 'Partner Information',
+        'section_request' => 'Request Details',
+        'section_processing' => 'Processing Information',
+        'section_platform' => 'Platform Information',
+        'section_email' => 'Email Information',
+        'section_financial' => 'Financial & Status',
+
+        // Fields
+        'partner' => 'Partner',
+        'assigned_to' => 'Assigned To (Finance)',
+        'platform' => 'Platform',
+        'platform_placeholder' => 'e.g. Rakuten, TopCashback',
+        'platform_password' => 'Platform Password',
+        'email' => 'Email',
+        'email_password' => 'Email Password',
+        'recovery_email' => 'Recovery Email',
+        'two_factor_auth' => '2FA Secret / Backup Code',
+        'amount_usd' => 'Amount (USD)',
+        'status' => 'Status',
+        'note' => 'Note',
+        'created_at' => 'Created',
+
+        // Status options
+        'status_new' => 'New',
+        'status_pending' => 'Pending',
+        'status_processing' => 'Processing',
+        'status_completed' => 'Completed',
+        'status_wrong_pass' => 'Wrong Password',
+        'status_banned' => 'Banned',
+
+        // Actions
+        'action_generate_payout' => 'Generate Payout',
+        'action_generate_payout_modal' => 'Generate Payout Log',
+        'action_generate_payout_desc' => 'Create a PayoutLog for :partner — $:amount?',
+        'action_generate_payout_done' => 'Payout log created successfully.',
+        'action_generate_payout_exist' => 'Payout log already exists for this withdrawal.',
     ],
 
     // STATUS LABELS
@@ -191,6 +236,7 @@ return [
         'total_deductions_usdt' => 'Total Deductions (USDT)',
         'total_deductions' => 'Total Deductions',
         'created_at' => 'Created At',
+        'last_update' => 'Last Update',
     ],
 
     'actions' => [

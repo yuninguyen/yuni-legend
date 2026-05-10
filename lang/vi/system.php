@@ -18,7 +18,8 @@ return [
     'roles' => [
         'admin' => 'Quản trị viên',
         'finance' => 'Kế toán',
-        'operator' => 'Nhân viên vận hành',
+        'operator' => 'Vận hành',
+        'partner' => 'Partner',
     ],
     'users' => [
         'description' => 'Quản lý tài khoản người dùng và quyền truy cập hệ thống.',
@@ -36,6 +37,50 @@ return [
         'wallet_payouts' => 'Ví & Thanh toán',
         'settings' => 'Cài đặt',
         'logs' => 'Nhật ký hệ thống',
+    ],
+
+    'partner_withdrawals' => [
+        'nav_label' => 'Rút tiền Partner',
+        'model_label' => 'Yêu cầu rút tiền',
+        'plural_model_label' => 'Rút tiền',
+
+        // Sections
+        'section_partner' => 'Thông tin Đối tác',
+        'section_request' => 'Chi tiết Yêu cầu',
+        'section_processing' => 'Thông tin Xử lý',
+        'section_platform' => 'Thông tin nền tảng',
+        'section_email' => 'Thông tin Email',
+        'section_financial' => 'Tài chính & Trạng thái',
+
+        // Fields
+        'partner' => 'Partner',
+        'assigned_to' => 'Người phụ trách',
+        'platform' => 'Platform',
+        'platform_placeholder' => 'VD: Rakuten, RetailMeNot',
+        'platform_password' => 'Mật khẩu Platform',
+        'email' => 'Email',
+        'email_password' => 'Mật khẩu Email',
+        'recovery_email' => 'Email khôi phục',
+        'two_factor_auth' => 'Mã 2FA / Mã dự phòng',
+        'amount_usd' => 'Số tiền (USD)',
+        'status' => 'Trạng thái',
+        'note' => 'Ghi chú',
+        'created_at' => 'Ngày tạo',
+
+        // Status options
+        'status_new' => 'Mới',
+        'status_pending' => 'Chờ xử lý',
+        'status_processing' => 'Đang xử lý',
+        'status_completed' => 'Hoàn thành',
+        'status_wrong_pass' => 'Sai mật khẩu',
+        'status_banned' => 'Bị khóa',
+
+        // Actions
+        'action_generate_payout' => 'Tạo phiếu thanh toán',
+        'action_generate_payout_modal' => 'Tạo Payout Log',
+        'action_generate_payout_desc' => 'Tạo Payout Log cho :partner — $:amount?',
+        'action_generate_payout_done' => 'Đã tạo payout log thành công.',
+        'action_generate_payout_exist' => 'Payout log cho yêu cầu này đã tồn tại.',
     ],
 
     // TRẠNG THÁI (STATUS)
@@ -125,9 +170,9 @@ return [
         'asset_info' => 'Thông tin Asset',
         'payout_log' => 'Lịch sử rút tiền',
         'payout_log_list' => 'Lịch sử rút tiền',
-        'disbursement_status' => 'Trạng thái giải ngân',
-        'revenue_split' => 'Giải ngân',
-        'revenue_split_list' => 'Giải ngân',
+        'disbursement_status' => 'Trạng thái thanh toán',
+        'revenue_split' => 'Thanh toán',
+        'revenue_split_list' => 'Thanh toán',
         'status' => 'Trạng thái',
         'email_status' => 'Trạng thái Email',
         'total_vnd' => 'Tổng cộng (VND)',
@@ -151,8 +196,8 @@ return [
         'username' => 'Tên đăng nhập',
         'role' => 'Vai trò',
         'id' => 'ID',
-        'brand' => 'Brand',
-        'brand_name' => 'Tên Brand',
+        'brand' => 'Thương hiệu',
+        'brand_name' => 'Tên thương hiệu',
         'wallet' => 'Ví',
         'my_accounts' => 'Tài khoản của tôi',
         'detail' => 'Chi tiết',
@@ -178,8 +223,8 @@ return [
         'current_balance' => 'Số dư hiện tại',
         'type' => 'Loại',
         'payment_description' => 'Mô tả thanh toán',
-        'investor_expenses' => 'Chi phí thanh toán hộ',
-        'investor_expense' => 'Khoản chi thanh toán hộ',
+        'investor_expenses' => 'Chi phí',
+        'investor_expense' => 'Khoản chi',
         'amount' => 'Số tiền',
         'amount_vnd' => 'Số tiền (VND)',
         'amount_usd' => 'Số tiền (USD)',
@@ -192,6 +237,7 @@ return [
         'total_deductions_label' => 'Tổng khấu trừ',
         'total_deductions' => 'Tổng khấu trừ',
         'created_at' => 'Ngày tạo',
+        'last_update' => 'Cập nhật lần cuối',
     ],
 
     'actions' => [

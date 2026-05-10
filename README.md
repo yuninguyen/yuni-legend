@@ -73,6 +73,12 @@ RebateOps is designed for team collaboration with strictly scoped access.
     - **Payouts**: Execute withdrawals. Redeem Gift Cards directly in the app or provide notes for Admin-led PayPal processing.
 - **Visibility**: View only their own data to ensure focused productivity and data privacy.
 
+### 🤝 Partner (The Outsourcing Agent)
+- **Withdrawal Requests**: Submit withdrawal requests by providing platform credentials (email, password, 2FA) and the target amount.
+- **Credential Security**: All sensitive credentials are AES-encrypted at rest using Laravel's native encryption.
+- **Self-Service**: Partners can only view and edit their own `pending` records — no access to any other system resource.
+- **Status Visibility**: Real-time status tracking (`Pending → Processing → Completed / Wrong Password / Banned`) updated by Finance or Admin.
+
 ---
 
 ## 💰 Financial Operations & Workflows
@@ -111,9 +117,10 @@ REBATEOPS
 │   ├── Investor Expenses # Multi-currency Expense Management
 │   ├── Payout Methods    # Virtual Wallets
 │   ├── Payout Logs       # Withdrawals & Liquidations
+│   ├── Partner Withdrawals # Outsourced withdrawal requests from Partners
 │   └── Disbursement      # Disbursement (User Payments) Payroll
 └── SETTINGS              # System Core (Admin only)
-    ├── Users             # User Management
+    ├── Users             # User Management (now includes Partner role)
     ├── Platforms         # Platform Configuration
     ├── Brands            # Brand Management
     └── Activity Logs     # System audit
@@ -172,15 +179,18 @@ REBATEOPS
 - [x] v5.6.2: Disbursement Refinement & Google Sync — Streamlined UserPayment UI with removal of file uploads, copyable data columns, dynamic PayPal region detection,and bulk Google Sheets sync for Users/Platforms/Logs.
 - [x] v5.6.3: Advanced Tracker Grouping — Transitioned Rebate Tracker to a batch-oriented grouping structure (Account + Batch ID) with manual bulk assignment actions for granular workflow management.
 - [x] v5.7.0: Multi-Currency Expense Tracking — Full integration of VND, USD, and USDT (Crypto) investor expenses into the payout settlement workflow. Refined UI/UX with modal-based actions and standardized Tabbed Infolists across the expense management layer.
+- [x] v5.8.0: Partner Withdrawal Management — Introduced a dedicated outsourcing workflow for external partners. New `partner` role with scoped panel access; `PartnerWithdrawal` resource with AES-encrypted credential storage (email password, platform password, 2FA), Finance-controlled status pipeline, and one-click `Generate Payout Log` action for Admin settlement. Full VI/EN localization (27 keys) across all labels, sections, status options, and action notifications.
+- [x] v5.8.1: Partner UI & Workflow Optimization — Refined Partner withdrawal form with automated ID binding and read-only identity protection. Implemented role-based status control: Partners see status as non-editable badges (Pending → Processing → Completed), while Admin/Finance retain quick-edit capabilities. Standardized tabular alignment (Center) across the resource for enhanced information density.
 ---
 
 ## 🔐 Security & Access Control
 
-| Role | Emails | Accounts | Trackers | Payout Logs | Payout Methods | Expenses | Disbursement |
-|------|--------|----------|----------|-------------|----------------|----------|--------------|
-| **Admin** | Full | Full | Full | Full | Full | Full | Full |
-| **Finance** | View | View | Hidden | Full | Full | Full | Full |
-| **Staff** | Own only | Own only | Own only | Own only | Hidden | Hidden | View own |
+| Role | Emails | Accounts | Trackers | Payout Logs | Payout Methods | Expenses | Disbursement | Partner Withdrawals |
+|------|--------|----------|----------|-------------|----------------|----------|--------------|---------------------|
+| **Admin** | Full | Full | Full | Full | Full | Full | Full | Full + Generate Payout |
+| **Finance** | View | View | Hidden | Full | Full | Full | Full | Full (status control) |
+| **Staff** | Own only | Own only | Own only | Own only | Hidden | Hidden | View own | Hidden |
+| **Partner** | Hidden | Hidden | Hidden | Hidden | Hidden | Hidden | Hidden | Own only (pending edit) |
 
 ---
 <p align="center">Built for Excellence. Optimized for Profit.</p>

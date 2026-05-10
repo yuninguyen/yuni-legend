@@ -32,8 +32,8 @@ return new class extends Migration {
                     $table->index($column);
                 });
             } catch (\Exception $e) {
-                // Fallback for other drivers or if check failed
-                if (!str_contains($e->getMessage(), 'already exists')) {
+                $msg = $e->getMessage();
+                if (!str_contains($msg, 'already exists') && !str_contains($msg, 'Duplicate key name')) {
                     throw $e;
                 }
             }

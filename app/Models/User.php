@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use App\Models\InvestorExpense;
+use App\Models\PartnerWithdrawal;
 use App\Models\UserPayment;
 use Spatie\Activitylog\Traits\LogsActivity; // Bật tính năng Log
 use Spatie\Activitylog\LogOptions;          // Tùy chọn Log
@@ -49,6 +50,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(UserPayment::class, 'user_id');
     }
 
+    public function partnerWithdrawals(): HasMany
+    {
+        return $this->hasMany(PartnerWithdrawal::class, 'partner_id');
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
@@ -64,11 +70,15 @@ class User extends Authenticatable implements FilamentUser
         return $this->role === 'staff' || $this->role === 'operator';
     }
 
+    public function isPartner(): bool
+    {
+        return $this->role === 'partner';
+    }
+
     // Thêm hàm này để khóa cổng Admin Panel
     public function canAccessPanel(\Filament\Panel $panel): bool
     {
-        // Cho phép Admin, Finance và Staff đăng nhập vào Panel
-        return in_array($this->role, ['admin', 'staff', 'operator', 'finance']);
+        return in_array($this->role, ['admin', 'staff', 'operator', 'finance', 'partner']);
     }
 
     /**
@@ -80,8 +90,8 @@ class User extends Authenticatable implements FilamentUser
         'name',
         'email',
         'password',
-        'username', // Thêm dòng này
-        'role', // Thêm dòng này
+        'username',
+        'role',
     ];
 
     /**

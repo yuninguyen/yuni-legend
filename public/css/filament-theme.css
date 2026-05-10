@@ -514,15 +514,23 @@ span.fi-ta-text-item-label {
 }
 
 /* 4. COMPACT SUMMARIES — Ultra Slim Height */
-.fi-ta-summary-row td {
-    padding-top: 0.2rem !important;
-    padding-bottom: 0.2rem !important;
+.fi-ta-group-footer td,
+.fi-ta-summary-row td,
+.fi-ta-group-footer td>div,
+.fi-ta-summary-row td>div,
+.fi-ta-summary-cell,
+.fi-ta-summary-cell>div {
+    padding-top: 0px !important;
+    padding-bottom: 0.0px !important;
+    min-height: unset !important;
+    height: auto !important;
 }
 
-.fi-ta-summary-row-heading {
-    padding-top: 0.2rem !important;
-    padding-bottom: 0.2rem !important;
-    font-size: 14px !important;
+.fi-ta-summary-row-heading,
+.fi-ta-group-footer-heading {
+    padding-top: 15px !important;
+    padding-bottom: 15px !important;
+    font-size: 13px !important;
     font-weight: 700 !important;
     line-height: 1 !important;
 }
