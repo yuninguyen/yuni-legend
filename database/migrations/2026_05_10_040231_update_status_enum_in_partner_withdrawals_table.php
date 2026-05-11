@@ -12,8 +12,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Sử dụng Raw SQL để cập nhật enum an toàn trong MySQL
-        DB::statement("ALTER TABLE partner_withdrawals MODIFY COLUMN status ENUM('new', 'pending', 'processing', 'completed', 'wrong_pass', 'banned') DEFAULT 'new'");
+        Schema::table('partner_withdrawals', function (Blueprint $table) {
+            $table->enum('status', ['new', 'pending', 'processing', 'completed', 'wrong_pass', 'banned'])
+                ->default('new')
+                ->change();
+        });
     }
 
     /**
@@ -21,6 +24,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement("ALTER TABLE partner_withdrawals MODIFY COLUMN status ENUM('pending', 'processing', 'completed', 'wrong_pass', 'banned') DEFAULT 'pending'");
+        Schema::table('partner_withdrawals', function (Blueprint $table) {
+            $table->enum('status', ['pending', 'processing', 'completed', 'wrong_pass', 'banned'])
+                ->default('pending')
+                ->change();
+        });
     }
 };
