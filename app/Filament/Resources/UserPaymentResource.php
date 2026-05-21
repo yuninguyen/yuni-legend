@@ -73,7 +73,7 @@ class UserPaymentResource extends Resource
             })
             ->selectRaw("COALESCE(user_payments.batch_id, 'no_batch') as batch_label")
             ->reorder()
-            ->orderByRaw('user_payments.status = "pending" DESC')
+            ->orderByRaw("user_payments.status = 'pending' DESC")
             ->orderBy('user_payments.batch_id', 'desc')
             ->orderBy('user_payments.created_at', 'desc');
 

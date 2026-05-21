@@ -603,6 +603,7 @@ trait HasAccountSchema
                                 return Account::query()
                                     ->selectRaw(match (DB::getDriverName()) {
                                         'sqlite' => "strftime('%Y', account_created_at) as year",
+                                        'pgsql' => "to_char(account_created_at, 'YYYY') as year",
                                         default => 'YEAR(account_created_at) as year',
                                     })
                                     ->whereNotNull('account_created_at')

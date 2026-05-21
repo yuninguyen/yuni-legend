@@ -314,6 +314,7 @@ class EmailResource extends Resource
                             ->whereNotNull('email_created_at')
                             ->selectRaw(match (\Illuminate\Support\Facades\DB::getDriverName()) {
                                 'sqlite' => "strftime('%Y', email_created_at) as year",
+                                'pgsql' => "to_char(email_created_at, 'YYYY') as year",
                                 default => "YEAR(email_created_at) as year",
                             })
                             ->distinct()
