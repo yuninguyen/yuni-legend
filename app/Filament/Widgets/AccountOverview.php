@@ -125,12 +125,16 @@ class AccountOverview extends BaseWidget
         };
 
         // Truy vấn dữ liệu chi tiết: Tính số account mỗi user nắm, trên từng platform
-        $rawLive = "SUM(CASE WHEN JSON_CONTAINS(accounts.status, '\"active\"') OR JSON_CONTAINS(accounts.status, '\"used\"') THEN 1 ELSE 0 END) as live_count";
-        $rawBanned = "SUM(CASE WHEN JSON_CONTAINS(accounts.status, '\"banned\"') THEN 1 ELSE 0 END) as banned_count";
-
-        if (DB::getDriverName() === 'sqlite') {
+        $driver = DB::getDriverName();
+        if ($driver === 'sqlite') {
             $rawLive = "SUM(CASE WHEN accounts.status LIKE '%\"active\"%' OR accounts.status LIKE '%\"used\"%' THEN 1 ELSE 0 END) as live_count";
             $rawBanned = "SUM(CASE WHEN accounts.status LIKE '%\"banned\"%' THEN 1 ELSE 0 END) as banned_count";
+        } elseif ($driver === 'pgsql') {
+            $rawLive = "SUM(CASE WHEN accounts.status::text LIKE '%\"active\"%' OR accounts.status::text LIKE '%\"used\"%' THEN 1 ELSE 0 END) as live_count";
+            $rawBanned = "SUM(CASE WHEN accounts.status::text LIKE '%\"banned\"%' THEN 1 ELSE 0 END) as banned_count";
+        } else {
+            $rawLive = "SUM(CASE WHEN JSON_CONTAINS(accounts.status, '\"active\"') OR JSON_CONTAINS(accounts.status, '\"used\"') THEN 1 ELSE 0 END) as live_count";
+            $rawBanned = "SUM(CASE WHEN JSON_CONTAINS(accounts.status, '\"banned\"') THEN 1 ELSE 0 END) as banned_count";
         }
 
         $userPlatformData = Account::query()
@@ -164,12 +168,16 @@ class AccountOverview extends BaseWidget
             // Admin: hiển thị tổng GLOBAL
             [$globalLive, $globalBanned, $globalUnassigned] = $countGlobalStats(Account::query());
 
-            $rawLive = "SUM(CASE WHEN JSON_CONTAINS(status, '\"active\"') OR JSON_CONTAINS(status, '\"used\"') THEN 1 ELSE 0 END) as live_count";
-            $rawBanned = "SUM(CASE WHEN JSON_CONTAINS(status, '\"banned\"') THEN 1 ELSE 0 END) as banned_count";
-
-            if (DB::getDriverName() === 'sqlite') {
+            $driver = DB::getDriverName();
+            if ($driver === 'sqlite') {
                 $rawLive = "SUM(CASE WHEN status LIKE '%\"active\"%' OR status LIKE '%\"used\"%' THEN 1 ELSE 0 END) as live_count";
                 $rawBanned = "SUM(CASE WHEN status LIKE '%\"banned\"%' THEN 1 ELSE 0 END) as banned_count";
+            } elseif ($driver === 'pgsql') {
+                $rawLive = "SUM(CASE WHEN status::text LIKE '%\"active\"%' OR status::text LIKE '%\"used\"%' THEN 1 ELSE 0 END) as live_count";
+                $rawBanned = "SUM(CASE WHEN status::text LIKE '%\"banned\"%' THEN 1 ELSE 0 END) as banned_count";
+            } else {
+                $rawLive = "SUM(CASE WHEN JSON_CONTAINS(status, '\"active\"') OR JSON_CONTAINS(status, '\"used\"') THEN 1 ELSE 0 END) as live_count";
+                $rawBanned = "SUM(CASE WHEN JSON_CONTAINS(status, '\"banned\"') THEN 1 ELSE 0 END) as banned_count";
             }
 
             $allUsersGlobalData = Account::query()

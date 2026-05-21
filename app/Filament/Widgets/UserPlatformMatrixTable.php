@@ -63,14 +63,14 @@ class UserPlatformMatrixTable extends BaseWidget
                     ->where('users.role', '!=', 'finance')
                     ->select(
                         'users.name as user_name',
-                        DB::raw('COALESCE(NULLIF(platforms.name, ""), accounts.platform) as platform_name'),
-                        DB::raw('SUM(CASE WHEN rebate_trackers.status = "Clicked" THEN rebate_amount ELSE 0 END) as total_clicked'),
-                        DB::raw('SUM(CASE WHEN rebate_trackers.status = "Missing" THEN rebate_amount ELSE 0 END) as total_missing'),
-                        DB::raw('SUM(CASE WHEN rebate_trackers.status = "Pending" THEN rebate_amount ELSE 0 END) as total_pending'),
-                        DB::raw('SUM(CASE WHEN rebate_trackers.status = "Confirmed" THEN rebate_amount ELSE 0 END) as total_confirmed'),
+                        DB::raw("COALESCE(NULLIF(platforms.name, ''), accounts.platform) as platform_name"),
+                        DB::raw("SUM(CASE WHEN rebate_trackers.status = 'Clicked' THEN rebate_amount ELSE 0 END) as total_clicked"),
+                        DB::raw("SUM(CASE WHEN rebate_trackers.status = 'Missing' THEN rebate_amount ELSE 0 END) as total_missing"),
+                        DB::raw("SUM(CASE WHEN rebate_trackers.status = 'Pending' THEN rebate_amount ELSE 0 END) as total_pending"),
+                        DB::raw("SUM(CASE WHEN rebate_trackers.status = 'Confirmed' THEN rebate_amount ELSE 0 END) as total_confirmed"),
                         DB::raw('SUM(rebate_amount) as grand_total')
                     )
-                    ->groupBy('users.name', DB::raw('COALESCE(NULLIF(platforms.name, ""), accounts.platform)'))
+                    ->groupBy('users.name', DB::raw("COALESCE(NULLIF(platforms.name, ''), accounts.platform)"))
             )
             // CẤU HÌNH BỘ LỌC NẰM NGANG
             ->filters([

@@ -167,12 +167,16 @@ class AccountPlatformChart extends ChartWidget
             : collect([$currentUser]);
 
         if (true) {
-            $rawLive = "SUM(CASE WHEN JSON_CONTAINS(status, '\"active\"') OR JSON_CONTAINS(status, '\"used\"') THEN 1 ELSE 0 END) as live_count";
-            $rawBanned = "SUM(CASE WHEN JSON_CONTAINS(status, '\"banned\"') THEN 1 ELSE 0 END) as banned_count";
-
-            if (DB::getDriverName() === 'sqlite') {
+            $driver = DB::getDriverName();
+            if ($driver === 'sqlite') {
                 $rawLive = "SUM(CASE WHEN status LIKE '%\"active\"%' OR status LIKE '%\"used\"%' THEN 1 ELSE 0 END) as live_count";
                 $rawBanned = "SUM(CASE WHEN status LIKE '%\"banned\"%' THEN 1 ELSE 0 END) as banned_count";
+            } elseif ($driver === 'pgsql') {
+                $rawLive = "SUM(CASE WHEN status::text LIKE '%\"active\"%' OR status::text LIKE '%\"used\"%' THEN 1 ELSE 0 END) as live_count";
+                $rawBanned = "SUM(CASE WHEN status::text LIKE '%\"banned\"%' THEN 1 ELSE 0 END) as banned_count";
+            } else {
+                $rawLive = "SUM(CASE WHEN JSON_CONTAINS(status, '\"active\"') OR JSON_CONTAINS(status, '\"used\"') THEN 1 ELSE 0 END) as live_count";
+                $rawBanned = "SUM(CASE WHEN JSON_CONTAINS(status, '\"banned\"') THEN 1 ELSE 0 END) as banned_count";
             }
 
             $accountCounts = Account::query()
