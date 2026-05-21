@@ -14,6 +14,7 @@ return [
     'auth' => [
         'login_title' => 'Sign in to your account',
         'login_subtitle' => 'Enter your credentials to access the dashboard',
+        'login_label' => 'Username or Email address',
     ],
     'roles' => [
         'admin' => 'Admin Specialist',

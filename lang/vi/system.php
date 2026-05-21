@@ -14,6 +14,7 @@ return [
     'auth' => [
         'login_title' => 'Đăng nhập',
         'login_subtitle' => 'Nhập thông tin tài khoản để truy cập hệ thống',
+        'login_label' => 'Tên đăng nhập hoặc Email',
     ],
     'roles' => [
         'admin' => 'Quản trị viên',
