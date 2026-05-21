@@ -62,7 +62,7 @@ class AdminUserEarningsTable extends BaseWidget
             ->select('user_payments.user_id as user_id', 'users.role as user_role', 'users.name as user_name', 'user_payments.asset_group as asset_group')
             ->selectRaw('SUM(total_usd) as amount_usd')
             ->selectRaw("SUM(CASE WHEN status = 'paid' THEN total_vnd ELSE 0 END) as amount_paid")
-            ->groupBy('user_id', 'asset_group', 'user_role')
+            ->groupBy('user_payments.user_id', 'user_payments.asset_group', 'users.role', 'users.name')
             // Scope cho Operator: Chỉ thấy của chính mình
             ->when(! auth()->user()?->isAdmin() && ! auth()->user()?->isFinance(), fn ($query) => $query->where('user_payments.user_id', auth()->id()))
             ->when($userId, fn ($query, $id) => $query->where('user_payments.user_id', $id))
