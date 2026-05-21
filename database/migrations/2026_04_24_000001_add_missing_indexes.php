@@ -18,13 +18,25 @@ return new class extends Migration {
 
         foreach ($columns as $column) {
             $indexName = "{$tableName}_{$column}_index";
+            $exists = false;
 
             if ($drv === 'sqlite') {
                 $exists = collect($connection->select("PRAGMA index_list('{$tableName}')"))
                     ->contains('name', $indexName);
+            } elseif ($drv === 'pgsql') {
+                $exists = collect($connection->select(
+                    "select 1 from pg_indexes where tablename = ? and indexname = ?",
+                    [$tableName, $indexName]
+                ))->isNotEmpty();
+            } elseif ($drv === 'mysql') {
+                $exists = collect($connection->select(
+                    "select 1 from information_schema.statistics where table_schema = database() and table_name = ? and index_name = ?",
+                    [$tableName, $indexName]
+                ))->isNotEmpty();
+            }
 
-                if ($exists)
-                    continue;
+            if ($exists) {
+                continue;
             }
 
             try {
