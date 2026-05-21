@@ -69,39 +69,35 @@ class AdminUserEarningsTable extends BaseWidget
             ->when($fromDate, fn ($query, $date) => $query->where('user_payments.created_at', '>=', $date))
             ->when($toDate, fn ($query, $date) => $query->where('user_payments.created_at', '<=', $date));
 
+        $usdSql = "SELECT SUM(total_usd) FROM user_payments WHERE status = 'paid' AND deleted_at IS NULL";
+        $usdBindings = [];
+        if ($fromDate) {
+            $usdSql .= " AND created_at >= ?";
+            $usdBindings[] = $fromDate;
+        }
+        if ($toDate) {
+            $usdSql .= " AND created_at <= ?";
+            $usdBindings[] = $toDate;
+        }
+
+        $paidSql = "SELECT SUM((exchange_rate - payout_rate) * total_usd * (payout_percentage / 100)) FROM user_payments WHERE status = 'paid' AND deleted_at IS NULL";
+        $paidBindings = [];
+        if ($fromDate) {
+            $paidSql .= " AND created_at >= ?";
+            $paidBindings[] = $fromDate;
+        }
+        if ($toDate) {
+            $paidSql .= " AND created_at <= ?";
+            $paidBindings[] = $toDate;
+        }
+
         // 2. Query cho Finance: Chỉ hiện 1 dòng "Lợi nhuận hệ thống"
         $financeQuery = User::query()
             ->where('role', 'finance')
             ->select('users.id as user_id', 'users.role as user_role', 'users.name as user_name')
             ->selectRaw("'system_profit' as asset_group")
-            ->selectRaw("
-                (SELECT SUM(total_usd)
-                 FROM user_payments
-                 WHERE status = 'paid'
-                 AND deleted_at IS NULL
-                 AND (? IS NULL OR created_at >= ?)
-                 AND (? IS NULL OR created_at <= ?)
-                ) as amount_usd
-            ", [
-                $fromDate,
-                $fromDate,
-                $toDate,
-                $toDate,
-            ])
-            ->selectRaw("
-                (SELECT SUM((exchange_rate - payout_rate) * total_usd * (payout_percentage / 100))
-                 FROM user_payments
-                 WHERE status = 'paid'
-                  AND deleted_at IS NULL
-                  AND (? IS NULL OR created_at >= ?)
-                  AND (? IS NULL OR created_at <= ?)
-                ) as amount_paid
-            ", [
-                $fromDate,
-                $fromDate,
-                $toDate,
-                $toDate,
-            ])
+            ->selectRaw("({$usdSql}) as amount_usd", $usdBindings)
+            ->selectRaw("({$paidSql}) as amount_paid", $paidBindings)
             ->when($userId, fn ($query, $id) => $query->where('id', $id));
 
         return $table
