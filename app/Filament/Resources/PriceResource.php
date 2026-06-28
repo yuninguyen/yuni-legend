@@ -40,6 +40,11 @@ class PriceResource extends Resource
         return __('system.all_platforms');
     }
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return self::isPlatformActive(['Price', 'price', 'Price.com']);
+    }
+
     // Thêm dòng này để thu gọn menu bên trái, nhường chỗ cho bảng
     protected static bool $isScopedToTenant = false;
     // THÊM DÒNG NÀY: Đổi đường dẫn URL từ /Price thành /price
@@ -48,7 +53,7 @@ class PriceResource extends Resource
     // HÀM LỌC DỮ LIỆU: Chỉ lấy tài khoản của Active Junky
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->whereIn('platform', ['Price', 'price', 'Price.com']);
+        $query = parent::getEloquentQuery()->whereIn('platform', ['Price', 'price', 'Price.com', 'pricecom', 'price-com']);
 
         if (auth()->user()?->isAdmin()) {
             return $query;

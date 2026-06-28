@@ -42,7 +42,7 @@ class JoinHoneyTrackerResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return !auth()->user()?->isFinance();
+        return !auth()->user()?->isFinance() && self::isPlatformActive(['JoinHoney', 'joinhoney', 'Join Honey']);
     }
 
     public static function canAccess(): bool
@@ -65,7 +65,7 @@ class JoinHoneyTrackerResource extends Resource
     {
         // 1. Lớp lọc mặc định: LUÔN LUÔN chỉ lấy dữ liệu của JoinHoney
         $query = parent::getEloquentQuery()->whereHas('account', function ($query) {
-            $query->whereIn('platform', ['JoinHoney', 'joinhoney', 'Join Honey']);
+            $query->whereIn('platform', ['JoinHoney', 'joinhoney', 'Join Honey', 'join-honey']);
         });
 
         $user = auth()->user();

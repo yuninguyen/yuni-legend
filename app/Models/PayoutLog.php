@@ -44,6 +44,7 @@ class PayoutLog extends Model
         // --- Các trường định danh ---
         'user_id',              // 🟢 MỚI: Người thực hiện giao dịch
         'account_id',           // Tài khoản nguồn
+        'partner_withdrawal_id', // 🟢 MỚI: Liên kết với yêu cầu rút tiền của Partner (khi không có Account thật)
         'payout_method_id',     // Ví nhận tiền/Ví bán tiền
         'parent_id',            // 🟢 MỚI: Liên kết dòng Liquidation với Withdrawal gốc
         'user_payment_id',      // 🟢 MỚI: Liên kết dòng Withdrawal với Phiếu lương
@@ -67,6 +68,7 @@ class PayoutLog extends Model
 
         // --- Thông tin thêm ---
         'note',
+        'created_at',
     ];
 
     protected $casts = [
@@ -126,5 +128,10 @@ class PayoutLog extends Model
     {
         // Giả sử Model của bạn là Account (Platform account)
         return $this->belongsTo(Account::class, 'account_id');
+    }
+
+    public function partnerWithdrawal(): BelongsTo
+    {
+        return $this->belongsTo(PartnerWithdrawal::class);
     }
 }

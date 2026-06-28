@@ -42,7 +42,7 @@ class ActiveJunkyTrackerResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return !auth()->user()?->isFinance();
+        return !auth()->user()?->isFinance() && self::isPlatformActive(['ActiveJunky', 'activejunky', 'Active Junky']);
     }
 
     public static function canAccess(): bool
@@ -65,7 +65,7 @@ class ActiveJunkyTrackerResource extends Resource
     {
         // 1. Lớp lọc mặc định: LUÔN LUÔN chỉ lấy dữ liệu của Active Junky
         $query = parent::getEloquentQuery()->whereHas('account', function ($query) {
-            $query->whereIn('platform', ['ActiveJunky', 'activejunky', 'Active Junky']);
+            $query->whereIn('platform', ['ActiveJunky', 'activejunky', 'Active Junky', 'active-junky']);
         });
 
         $user = auth()->user();

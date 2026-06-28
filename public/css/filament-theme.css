@@ -658,6 +658,18 @@ textarea.fi-input {
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
 }
 
+/* Fix: nested modals (e.g. "Create" Email Address from within an existing
+   Create/Edit modal) were rendering behind the parent modal. Both modals'
+   fixed overlay/container divs share Filament's default "z-40" utility
+   class, so with equal z-index the later (nested) modal can end up
+   visually mixed with the earlier one. Bump the LAST .fi-modal's fixed
+   layers (overlay + container) above the earlier modal(s).
+   ".fi-modal:not(:has(~ .fi-modal))" = the last .fi-modal among its
+   siblings (i.e. the most recently opened modal). */
+.fi-modal:not(:has(~ .fi-modal)) > div > .fixed.inset-0.z-40 {
+    z-index: 60 !important;
+}
+
 .fi-modal-header {
     border-bottom: none !important;
     padding: 1.5rem 1.5rem 0.5rem !important;
@@ -965,6 +977,7 @@ textarea.fi-input {
 .es-holders-container {
     margin-top: 4px;
     padding-top: 2px;
+    min-height: 172px;
 }
 
 .es-holder-label {
@@ -1093,3 +1106,23 @@ textarea.fi-input {
     width: 20px;
     height: 20px;
 }
+
+/* Equalize chart widget heights in same row */
+.fi-wi {
+    align-items: stretch !important;
+}
+.fi-wi-widget.fi-wi-chart {
+    height: 100%;
+}
+.fi-wi-widget.fi-wi-chart .fi-section {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.fi-wi-widget.fi-wi-chart .fi-section-content-ctn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+

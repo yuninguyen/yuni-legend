@@ -41,6 +41,11 @@ class JoinHoneyResource extends Resource
         return __('system.all_platforms');
     }
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return self::isPlatformActive(['JoinHoney', 'joinhoney', 'Join Honey']);
+    }
+
     // Thêm dòng này để thu gọn menu bên trái, nhường chỗ cho bảng
     protected static bool $isScopedToTenant = false;
     // THÊM DÒNG NÀY: Đổi đường dẫn URL từ /JoinHoney thành /JoinHoney
@@ -49,7 +54,7 @@ class JoinHoneyResource extends Resource
     // HÀM LỌC DỮ LIỆU: Chỉ lấy tài khoản của Join Honey
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->whereIn('platform', ['JoinHoney', 'joinhoney', 'Join Honey']);
+        $query = parent::getEloquentQuery()->whereIn('platform', ['JoinHoney', 'joinhoney', 'Join Honey', 'join-honey']);
 
         if (auth()->user()?->isAdmin()) {
             return $query;

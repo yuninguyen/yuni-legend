@@ -44,6 +44,7 @@ class UserPayment extends Model
         'profit_vnd',
         'status', // pending, paid
         'batch_id',
+        'settlement_group_id',
         'asset_group',
         'payment_date',
         'payment_proof',

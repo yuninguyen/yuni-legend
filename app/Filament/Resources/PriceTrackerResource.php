@@ -42,7 +42,7 @@ class PriceTrackerResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return !auth()->user()?->isFinance();
+        return !auth()->user()?->isFinance() && self::isPlatformActive(['Price', 'price', 'Price.com']);
     }
 
     public static function canAccess(): bool
@@ -65,7 +65,7 @@ class PriceTrackerResource extends Resource
     {
         // 1. Lớp lọc mặc định: LUÔN LUÔN chỉ lấy dữ liệu của Price
         $query = parent::getEloquentQuery()->whereHas('account', function ($query) {
-            $query->whereIn('platform', ['Price', 'price', 'Price.com']);
+            $query->whereIn('platform', ['Price', 'price', 'Price.com', 'pricecom', 'price-com']);
         });
 
         $user = auth()->user();

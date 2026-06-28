@@ -64,7 +64,13 @@ trait HasAccountSchema
                             ->required()
                             ->disabled(fn () => ! auth()->user()?->isAdmin())
                             ->createOptionForm([
-                                Forms\Components\TextInput::make('email')->email()->required(),
+                                Forms\Components\TextInput::make('email')
+                                    ->email()
+                                    ->required()
+                                    ->unique(table: 'emails', column: 'email')
+                                    ->validationMessages([
+                                        'unique' => __('system.email_already_exists'),
+                                    ]),
                                 Forms\Components\TextInput::make('email_password')
                                     ->label(__('system.labels.password'))
                                     ->required(),
@@ -84,6 +90,23 @@ trait HasAccountSchema
                                     ->default('active')
                                     ->required()
                                     ->native(false),
+
+                                Forms\Components\TextInput::make('email_created_at')
+                                    ->label(__('system.labels.date_create'))
+                                    ->placeholder('dd/mm/yyyy')
+                                    ->mask('99/99/9999')
+                                    ->rules(['nullable', 'date_format:d/m/Y'])
+                                    ->dehydrateStateUsing(function ($state) {
+                                        if (blank($state)) {
+                                            return null;
+                                        }
+
+                                        if (! preg_match('#^(\d{2})/(\d{2})/(\d{4})$#', $state, $m)) {
+                                            return null;
+                                        }
+
+                                        return "{$m[3]}-{$m[2]}-{$m[1]}";
+                                    }),
 
                                 Forms\Components\Textarea::make('email_note')
                                     ->label(__('system.labels.note'))
@@ -116,6 +139,16 @@ trait HasAccountSchema
                             ->mask('99/99/9999')
                             ->rules(['date_format:d/m/Y'])
                             ->disabled(fn () => ! auth()->user()?->isAdmin())
+                            ->afterStateHydrated(function ($component, $state) {
+                                if (blank($state)) {
+                                    return;
+                                }
+                                try {
+                                    $component->state(Carbon::parse($state)->format('d/m/Y'));
+                                } catch (\Exception $e) {
+                                    // leave as-is
+                                }
+                            })
                             ->dehydrateStateUsing(function ($state) {
                                 if (blank($state)) {
                                     return null;
@@ -145,6 +178,16 @@ trait HasAccountSchema
                             ->mask('99/99/9999')
                             ->rules(['date_format:d/m/Y'])
                             ->disabled(fn () => ! auth()->user()?->isAdmin())
+                            ->afterStateHydrated(function ($component, $state) {
+                                if (blank($state)) {
+                                    return;
+                                }
+                                try {
+                                    $component->state(Carbon::parse($state)->format('d/m/Y'));
+                                } catch (\Exception $e) {
+                                    // leave as-is
+                                }
+                            })
                             ->dehydrateStateUsing(function ($state) {
                                 if (blank($state)) {
                                     return null;
@@ -212,7 +255,7 @@ trait HasAccountSchema
                                         ->copyable()
                                         ->placeholder(__('system.n/a')),
                                     TextEntry::make('email.recovery_email')
-                                        ->label(__('system.labels.account_email'))
+                                        ->label(__('system.labels.recovery_email'))
                                         ->copyable()
                                         ->placeholder(__('system.n/a')),
                                     TextEntry::make('email.two_factor_code')
@@ -222,11 +265,11 @@ trait HasAccountSchema
                                     TextEntry::make('email.status')
                                         ->label(__('system.labels.status'))
                                         ->placeholder(__('system.n/a'))
-                                        ->formatStateUsing(fn (string $state): string => match ($state) {
-                                            'active', 'Live' => __('system.email_status.active'),
-                                            'disabled', 'Disabled' => __('system.email_status.disabled'),
-                                            'locked', 'Locked' => __('system.email_status.locked'),
-                                            default => __('system.email_status.'.$state),
+                                        ->formatStateUsing(fn (string $state): string => match (strtolower($state)) {
+                                            'active', 'live' => __('system.email_status.active'),
+                                            'disabled' => __('system.email_status.disabled'),
+                                            'locked' => __('system.email_status.locked'),
+                                            default => __('system.email_status.'.strtolower($state)),
                                         })
                                         ->color(fn (string $state): string => match ($state) {
                                             'active', 'Live' => 'success',
@@ -577,21 +620,7 @@ trait HasAccountSchema
                 SelectFilter::make('platform')
                     ->label(__('system.labels.platform'))
                     ->multiple()
-                    ->options(function () {
-                        $platforms = Account::query()
-                            ->distinct()
-                            ->whereNotNull('platform')
-                            ->pluck('platform', 'platform')
-                            ->map(fn ($label) => (string) $label)
-                            ->toArray();
-                        $platforms_map = Platform::pluck('name', 'slug')->toArray();
-                        $formattedOptions = [];
-                        foreach ($platforms as $p) {
-                            $formattedOptions[$p] = $platforms_map[$p] ?? $p;
-                        }
-
-                        return $formattedOptions;
-                    })
+                    ->options(fn () => self::getPlatforms())
                     ->searchable(),
 
                 Filter::make('year_created')

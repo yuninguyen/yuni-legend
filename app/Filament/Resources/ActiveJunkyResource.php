@@ -40,7 +40,12 @@ class ActiveJunkyResource extends Resource
     {
         return __('system.all_platforms');
     }
-    
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return self::isPlatformActive(['ActiveJunky', 'activejunky', 'Active Junky']);
+    }
+
     // Thêm dòng này để thu gọn menu bên trái, nhường chỗ cho bảng
     protected static bool $isScopedToTenant = false;
     // THÊM DÒNG NÀY: Đổi đường dẫn URL từ /Active Junky thành /Active Junky
@@ -49,7 +54,7 @@ class ActiveJunkyResource extends Resource
     // HÀM LỌC DỮ LIỆU: Chỉ lấy tài khoản của Active Junky
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->whereIn('platform', ['ActiveJunky', 'activejunky', 'Active Junky']);
+        $query = parent::getEloquentQuery()->whereIn('platform', ['ActiveJunky', 'activejunky', 'Active Junky', 'active-junky']);
 
         if (auth()->user()?->isAdmin()) {
             return $query;

@@ -9,6 +9,7 @@ use App\Jobs\SyncGoogleSheetJob;
 use App\Models\Account;
 use App\Models\Brand;
 use App\Models\InvestorExpense;
+use App\Models\PartnerWithdrawal;
 use App\Models\PayoutLog;
 use App\Models\PayoutMethod;
 use App\Models\Platform;
@@ -72,16 +73,20 @@ class PayoutLogResource extends Resource
         $query = parent::getEloquentQuery()
             ->select('payout_logs.*')
             ->selectRaw(match (DB::getDriverName()) {
-                'sqlite' => "account_id || '_' || COALESCE(gc_brand, 'none') || '_' || COALESCE(parent_id, id) as group_key",
-                default => "CONCAT(account_id, '_', COALESCE(gc_brand, 'none'), '_', COALESCE(parent_id, id)) as group_key",
+                'sqlite' => "COALESCE(account_id, 'pw' || partner_withdrawal_id) || '_' || COALESCE(gc_brand, 'none') || '_' || COALESCE(parent_id, id) as group_key",
+                default => "CONCAT(COALESCE(account_id, CONCAT('pw', partner_withdrawal_id)), '_', COALESCE(gc_brand, 'none'), '_', COALESCE(parent_id, id)) as group_key",
             })
+            // 🟢 Ngày của bản ghi gốc (cha) - dùng để xếp cả group (cha + con) cạnh nhau theo ngày
+            ->selectRaw('(SELECT pl2.created_at FROM payout_logs pl2 WHERE pl2.id = COALESCE(payout_logs.parent_id, payout_logs.id)) as group_date')
             ->withCount('children')
             ->withSum(['children as children_sum' => fn ($q) => $q->whereNull('deleted_at')], 'amount_usd')
             ->withSum(['children as settled_children_sum' => fn ($q) => $q->whereNotNull('user_payment_id')], 'amount_usd')
             ->with(['user', 'payoutMethod', 'account.email']); // 🟢 TỐI ƯU: Tránh N+1
 
         // 2. Khóa chặt thứ tự sắp xếp Cha - Con (Đã fix lỗi SQL Sum cho Sếp)
-        $query->orderByRaw('COALESCE(parent_id, id) DESC')->orderBy('id', 'ASC');
+        $query->orderBy('group_date', 'desc')
+            ->orderByRaw('COALESCE(parent_id, id) DESC')
+            ->orderBy('id', 'ASC');
 
         $user = auth()->user();
 
@@ -340,7 +345,7 @@ class PayoutLogResource extends Resource
                             ->color('warning'),
                         Infolists\Components\TextEntry::make('exchange_rate')
                             ->label(__('system.labels.exchange_rate'))
-                            ->numeric(0, ',', '.')
+                            ->numeric(3, ',', '.')
                             ->visible(fn ($record) => $record->transaction_type === 'liquidation'),
 
                         Infolists\Components\TextEntry::make('total_vnd')
@@ -358,12 +363,17 @@ class PayoutLogResource extends Resource
                             ->label(__('system.labels.note'))
                             ->placeholder(__('system.labels.n/a'))
                             ->formatStateUsing(function ($state) {
+                                $state = trim($state);
+
                                 if (str_contains($state, 'Liquidity from ID')) {
                                     return str_replace('Liquidity from ID', __('system.labels.liquidity_from_id'), $state);
                                 }
 
                                 return $state;
-                            }),
+                            })
+                            ->extraAttributes([
+                                'style' => 'word-break: break-all; overflow-wrap: anywhere; display: block;',
+                            ]),
                     ]),
             ]);
     }
@@ -378,7 +388,13 @@ class PayoutLogResource extends Resource
                         Forms\Components\Select::make('user_id')
                             ->label(__('system.labels.user'))
                             ->placeholder(__('system.payout_logs.fields.select_user_first'))
-                            ->options(User::whereHas('rebateTrackers')->pluck('name', 'id'))
+                            ->options(User::where(function ($q) {
+                                $q->whereHas('rebateTrackers')
+                                    ->orWhere('id', auth()->id())
+                                    ->orWhereHas('partnerWithdrawals', function ($q2) {
+                                        $q2->whereIn('status', ['new', 'pending']);
+                                    });
+                            })->pluck('name', 'id'))
                             ->searchable()
                             // 🟢 THIẾU DÒNG NÀY: Tự động gán ID của người đang đăng nhập
                             ->default(fn () => auth()->id())
@@ -388,7 +404,36 @@ class PayoutLogResource extends Resource
                             ->dehydrated(true)
                             ->required()
                             ->live() // Kích hoạt việc load lại ô Account bên dưới
-                            ->afterStateUpdated(fn ($set) => $set('account_id', null)), // Reset ô Account khi đổi User
+                            ->afterStateUpdated(function ($set) {
+                                $set('account_id', null);
+                                $set('partner_withdrawal_id', null);
+                            }), // Reset ô Account/Partner Request khi đổi User
+
+                        // NGÀY TẠO - cho phép chỉnh sửa
+                        Forms\Components\TextInput::make('created_at')
+                            ->label(__('system.labels.date'))
+                            ->placeholder('dd/mm/yyyy')
+                            ->mask('99/99/9999')
+                            ->rules(['nullable', 'date_format:d/m/Y'])
+                            ->afterStateHydrated(function ($component, $state) {
+                                if (blank($state)) {
+                                    return;
+                                }
+                                $component->state(
+                                    \Carbon\Carbon::parse($state)->setTimezone(config('app.timezone'))->format('d/m/Y')
+                                );
+                            })
+                            ->dehydrateStateUsing(function ($state) {
+                                if (blank($state)) {
+                                    return now();
+                                }
+                                if (! preg_match('#^(\d{2})/(\d{2})/(\d{4})$#', $state, $m)) {
+                                    return now();
+                                }
+
+                                return \Carbon\Carbon::createFromDate((int) $m[3], (int) $m[2], (int) $m[1])
+                                    ->setTimeFromTimeString(now()->format('H:i:s'));
+                            }),
 
                         // CHỌN ACCOUNT (Phụ thuộc vào User ở trên)
                         Forms\Components\Select::make('account_id')
@@ -426,7 +471,8 @@ class PayoutLogResource extends Resource
                             })
                             ->searchable()
                             ->preload()
-                            ->required()
+                            ->visible(fn (Get $get) => ! static::isPartnerUser($get('user_id')))
+                            ->required(fn (Get $get) => ! static::isPartnerUser($get('user_id')))
                             ->live()
                             ->disabled(fn (Get $get) => ! $get('user_id'))
                             ->placeholder(fn (Get $get) => ! $get('user_id') ? __('system.payout_logs.fields.select_user_first') : __('system.payout_logs.fields.select_account'))
@@ -438,6 +484,69 @@ class PayoutLogResource extends Resource
                                     return;
                                 }
                                 $set('amount_usd', round(self::getAvailableBalance($state), 2));
+                                static::calculateNet($set, $get);
+                            }),
+
+                        // 🟢 MỚI: Khi User là Partner, hiện danh sách Yêu cầu rút tiền (new/pending) thay cho Source Account
+                        Forms\Components\Select::make('partner_withdrawal_id')
+                            ->label(__('system.partner_withdrawals.nav_label'))
+                            ->options(function (Get $get, ?PayoutLog $record) {
+                                $userId = $get('user_id');
+                                if (! $userId) {
+                                    return [];
+                                }
+
+                                return PartnerWithdrawal::query()
+                                    ->where('partner_id', $userId)
+                                    ->where(function ($q) use ($record) {
+                                        $q->whereIn('status', ['new', 'pending']);
+                                        if ($record && $record->partner_withdrawal_id) {
+                                            $q->orWhere('id', $record->partner_withdrawal_id);
+                                        }
+                                    })
+                                    ->get()
+                                    ->mapWithKeys(function ($w) use ($record) {
+                                        // 🟢 Trừ đi phần đã redeem trước đó để hiển thị đúng số dư còn lại trong dropdown
+                                        $alreadyUsed = PayoutLog::where('partner_withdrawal_id', $w->id)
+                                            ->whereNull('parent_id') // 🟢 Bỏ bản ghi con (liquidation) để tránh tính trùng với bản ghi cha
+                                            ->when($record, fn ($q) => $q->where('id', '!=', $record->id))
+                                            ->sum('amount_usd');
+                                        $remaining = max(0, (float) $w->amount_usd - (float) $alreadyUsed);
+
+                                        return [
+                                            $w->id => "{$w->platform} - {$w->email} - $".number_format($remaining, 2)." (".__('system.partner_withdrawals.status_'.$w->status).")",
+                                        ];
+                                    })
+                                    ->toArray();
+                            })
+                            ->searchable()
+                            ->visible(fn (Get $get) => static::isPartnerUser($get('user_id')))
+                            ->required(fn (Get $get) => static::isPartnerUser($get('user_id')))
+                            ->live()
+                            ->disabled(fn (Get $get) => ! $get('user_id'))
+                            ->placeholder(fn (Get $get) => ! $get('user_id') ? __('system.payout_logs.fields.select_user_first') : null)
+                            ->afterStateUpdated(function ($state, $set, $get, ?PayoutLog $record) {
+                                if (! $state) {
+                                    $set('amount_usd', 0);
+
+                                    return;
+                                }
+                                $withdrawal = PartnerWithdrawal::find($state);
+                                if (! $withdrawal) {
+                                    $set('amount_usd', 0);
+
+                                    return;
+                                }
+
+                                // 🟢 Trừ đi phần đã redeem trước đó từ CÙNG yêu cầu withdrawal này
+                                // (vd: đã redeem 1 Gift Card $50 rồi -> chỉ còn lại số dư để redeem tiếp).
+                                $alreadyUsed = PayoutLog::where('partner_withdrawal_id', $state)
+                                    ->whereNull('parent_id')
+                                    ->when($record, fn ($q) => $q->where('id', '!=', $record->id))
+                                    ->sum('amount_usd');
+
+                                $remaining = max(0, (float) $withdrawal->amount_usd - (float) $alreadyUsed);
+                                $set('amount_usd', round($remaining, 2));
                                 static::calculateNet($set, $get);
                             }),
 
@@ -469,7 +578,15 @@ class PayoutLogResource extends Resource
 
                         Forms\Components\Select::make('payout_method_id')
                             ->label(__('system.labels.wallet')) // Đã đổi theo yêu cầu
-                            ->options(PayoutMethod::pluck('name', 'id')) // Chỉ cần 1 dòng này
+                            ->options(PayoutMethod::query()->get()->mapWithKeys(function ($method) {
+                                $typeLabel = match ($method->type) {
+                                    'paypal_us' => 'PAYPAL US',
+                                    'paypal_vn' => 'PAYPAL VN',
+                                    default => strtoupper(str_replace('_', ' ', $method->type)),
+                                };
+
+                                return [$method->id => "{$typeLabel} - {$method->name}"];
+                            }))
                             // 🟢 Ẩn Ví mục tiêu đối với Staff khi chọn PayPal (Gift Card vốn dĩ đã ẩn sẵn)
                             ->hidden(
                                 fn (Get $get) => $get('asset_type') === 'gift_card' ||
@@ -492,20 +609,33 @@ class PayoutLogResource extends Resource
                             ->searchable()
                             ->visible(fn ($get) => $get('asset_type') === 'gift_card')
                             ->required(fn ($get) => $get('asset_type') === 'gift_card')
+                            ->live()
                             ->dehydrateStateUsing(fn ($state) => str_replace('\\', '', $state))
                             // 1. HIỂN THỊ NHÃN ĐẦY ĐỦ THÔNG TIN
                             ->options(function (Get $get) {
                                 $accId = $get('account_id');
-                                if (! $accId) {
+                                $platform = null;
+
+                                if ($accId) {
+                                    $platform = Account::find($accId)?->platform;
+                                } else {
+                                    // 🟢 Partner không có account_id thật -> lấy platform từ PartnerWithdrawal đã chọn.
+                                    // PartnerWithdrawal.platform lưu TÊN hiển thị (vd "Join Honey"), còn Brand.platform
+                                    // lưu SLUG (vd "join-honey") -> phải tra qua bảng Platform để đổi tên -> slug.
+                                    $withdrawalId = $get('partner_withdrawal_id');
+                                    if ($withdrawalId) {
+                                        $platformName = PartnerWithdrawal::find($withdrawalId)?->platform;
+                                        $platform = $platformName
+                                            ? Platform::where('name', $platformName)->value('slug')
+                                            : null;
+                                    }
+                                }
+
+                                if (! $platform) {
                                     return [];
                                 }
 
-                                $account = Account::find($accId);
-                                if (! $account) {
-                                    return [];
-                                }
-
-                                return Brand::where('platform', $account->platform)
+                                return Brand::where('platform', $platform)
                                     ->get()
                                     ->mapWithKeys(function ($brand) {
                                         $boost = $brand->boost_percentage ?? 0;
@@ -518,18 +648,24 @@ class PayoutLogResource extends Resource
                                     })
                                     ->toArray();
                             })
-                            // 2. LÀM MỜ NẾU VƯỢT GIỚI HẠN
-                            ->disableOptionWhen(function (string $value, Get $get) {
-                                $accId = $get('account_id');
-                                if (! $accId) {
-                                    return false;
+                            // 2. CẢNH BÁO ĐỎ NẾU ORDER VALUE VƯỢT GIỚI HẠN BRAND
+                            ->helperText(function (Get $get) {
+                                $brandSlug = $get('gc_brand');
+                                if (! $brandSlug) {
+                                    return null;
                                 }
 
-                                // 🟢 FIX DRY
-                                $availableBalance = self::getAvailableBalance($accId);
-                                $brand = Brand::where('slug', $value)->first();
+                                $brand = Brand::where('slug', $brandSlug)->first();
+                                if (! $brand || $brand->maximum_limit <= 0) {
+                                    return null;
+                                }
 
-                                return $brand && $brand->maximum_limit > 0 && $availableBalance > $brand->maximum_limit;
+                                $amount = (float) $get('amount_usd');
+                                if ($amount > $brand->maximum_limit) {
+                                    return new HtmlString("<span style='color: #dc2626;'>Order value (\${$amount}) exceeds the maximum limit for {$brand->name} (\${$brand->maximum_limit}).</span>");
+                                }
+
+                                return null;
                             })
 
                             // 3. THÊM BOOST VÀ MAXIMUM VÀO MODAL TẠO NHANH (+)
@@ -587,11 +723,10 @@ class PayoutLogResource extends Resource
                                         return;
                                     }
 
-                                    // 🟢 FIX DRY
-                                    $balance = self::getAvailableBalance($get('account_id'));
+                                    $amount = (float) $get('amount_usd');
 
-                                    if ($balance > $brand->maximum_limit) {
-                                        $fail("This Brand cannot be selected because the balance (\$ {$balance}) exceeds the allowed limit (\$ {$brand->maximum_limit}).");
+                                    if ($amount > $brand->maximum_limit) {
+                                        $fail("Order value (\${$amount}) exceeds the maximum limit for {$brand->name} (\${$brand->maximum_limit}).");
                                     }
                                 },
                             ]),
@@ -655,10 +790,30 @@ class PayoutLogResource extends Resource
                             ->numeric()
                             ->prefix('$')
                             ->required()
-                            ->lazy() // Thay cho live(onBlur: true) để ổn định khi nhập số
+                            ->live(onBlur: true)
                             // Hiển thị số dư khả dụng dưới dạng chữ nhỏ màu xanh
-                            ->hint(function ($get) {
+                            ->hint(function ($get, ?PayoutLog $record) {
                                 $accountId = $get('account_id');
+                                $withdrawalId = $get('partner_withdrawal_id');
+
+                                if (! $accountId && $withdrawalId) {
+                                    $withdrawal = PartnerWithdrawal::find($withdrawalId);
+                                    if (! $withdrawal) {
+                                        return null;
+                                    }
+
+                                    $alreadyUsed = PayoutLog::where('partner_withdrawal_id', $withdrawalId)
+                                        ->whereNull('parent_id')
+                                        ->when($record, fn ($q) => $q->where('id', '!=', $record->id))
+                                        ->sum('amount_usd');
+
+                                    $totalStr = number_format((float) $withdrawal->amount_usd, 2);
+                                    $usedStr = number_format((float) $alreadyUsed, 2);
+                                    $remainingStr = number_format(max(0, (float) $withdrawal->amount_usd - (float) $alreadyUsed), 2);
+
+                                    return __('system.labels.total_requested').": \${$totalStr} | ".__('system.labels.already_used').": \${$usedStr} | ".__('system.labels.remaining_balance').": \${$remainingStr}";
+                                }
+
                                 if (! $accountId) {
                                     return null;
                                 }
@@ -689,6 +844,9 @@ class PayoutLogResource extends Resource
                             ->prefix('$')
                             ->default(0)
                             ->lazy() // Thay cho live(onBlur: true)
+                            // 🟢 Cột DB là NOT NULL DEFAULT 0 — nếu user xóa trắng ô này thì ép về 0
+                            // thay vì gửi null lên DB (gây lỗi SQLSTATE 23000).
+                            ->dehydrateStateUsing(fn ($state) => $state === null || $state === '' ? 0 : $state)
                             ->afterStateUpdated(fn ($set, $get) => self::calculateNet($set, $get)),
 
                         // Boost chỉ hiện khi là Gift Card
@@ -769,10 +927,30 @@ class PayoutLogResource extends Resource
                     ->copyMessage(__('system.payout_logs.messages.copied'))
                     ->wrap()
                     ->html() // Cho phép xuống dòng bằng thẻ <br>
+                    // 🟢 QUAN TRỌNG: Blade chỉ gọi formatStateUsing khi raw state không rỗng.
+                    // Khi account_id null (đơn từ Partner Withdrawal), ép state có giá trị để không bị bỏ qua.
+                    ->state(fn ($record) => $record->account_id ?? ('pw'.($record->partner_withdrawal_id ?? '0')))
                     ->formatStateUsing(function ($record) {
                         $account = $record->account;
                         if (! $account) {
-                            return __('system.labels.n/a');
+                            // 🟢 Fallback: Đơn từ Partner Withdrawal không có Account thật trong bảng accounts
+                            $withdrawal = $record->partnerWithdrawal;
+                            if (! $withdrawal) {
+                                return __('system.labels.n/a');
+                            }
+
+                            $safeEmail = e($withdrawal->email ?? __('system.labels.n/a'));
+                            $safeUserName = e($record->user?->name ?? __('system.labels.n/a'));
+
+                            return "
+                                <div style='line-height: 1.6; padding: 0;'>
+                                    <div style='font-size: 13px; font-weight: 500; color: #111827;'>$safeEmail</div>
+                                    <div style='font-size: 13px; color: #6b7280; display: flex; align-items: center; gap: 4px;'>
+                                        <span style='color: #9ca3af;'>".__('system.labels.user').":</span>
+                                        <span style='font-weight: 500; color: #4b5563;'>$safeUserName</span>
+                                    </div>
+                                </div>
+                            ";
                         }
 
                         // Lấy email từ bảng Email liên kết với Account
@@ -1170,6 +1348,7 @@ class PayoutLogResource extends Resource
                             'net_amount_usd' => round($initialAmount, 2),
                             'exchange_rate' => 20000, // Mặc định tỷ giá
                             'total_vnd' => $initialAmount * 20000,
+                            'transaction_date' => now()->format('d/m/Y'),
                         ]);
                     })
 
@@ -1201,6 +1380,13 @@ class PayoutLogResource extends Resource
                         return ($record->net_amount_usd - $liquidated) > 0.01;
                     })
                     ->form([
+                        Forms\Components\TextInput::make('transaction_date')
+                            ->label(__('system.labels.date'))
+                            ->placeholder('dd/mm/yyyy')
+                            ->mask('99/99/9999')
+                            ->rules(['nullable', 'date_format:d/m/Y'])
+                            ->columnSpanFull(),
+
                         // 🚀 NEW: Phân loại giao dịch (Chỉ dành cho PayPal US)
                         Forms\Components\Select::make('transaction_category')
                             ->label('Transaction Category')
@@ -1375,7 +1561,7 @@ class PayoutLogResource extends Resource
                             }
 
                             // 🟢 LÀM SẠCH DỮ LIỆU TRƯỚC KHI LƯU
-                            $cleanRate = (float) str_replace(['.', ','], '', $data['exchange_rate']);
+                            $cleanRate = (float) str_replace(',', '', $data['exchange_rate']);
                             $cleanVnd = (float) str_replace(['.', ','], '', $data['total_vnd']);
                             $usdAmount = (float) $data['net_amount_usd'];
 
@@ -1403,13 +1589,21 @@ class PayoutLogResource extends Resource
                                 }
                             }
 
+                            $transactionDate = now();
+                            if (! empty($data['transaction_date']) && preg_match('#^(\d{2})/(\d{2})/(\d{4})$#', $data['transaction_date'], $m)) {
+                                $transactionDate = \Carbon\Carbon::createFromDate((int) $m[3], (int) $m[2], (int) $m[1])
+                                    ->setTimeFromTimeString(now()->format('H:i:s'));
+                            }
+
                             PayoutLog::create([
                                 'parent_id' => $record->id,
                                 'user_id' => $record->user_id,
                                 'account_id' => $record->account_id,
+                                'partner_withdrawal_id' => $record->partner_withdrawal_id,
                                 'payout_method_id' => $record->payout_method_id,
                                 'transaction_type' => 'liquidation',
                                 'asset_type' => $record->asset_type,
+                                'created_at' => $transactionDate,
 
                                 // 🟢 THÊM: Copy thông tin Gift Card sang dòng con
                                 'gc_brand' => $record->gc_brand,
@@ -1446,6 +1640,7 @@ class PayoutLogResource extends Resource
                 Tables\Actions\ViewAction::make()
                     ->label('') // Để trống nhãn để chỉ hiện icon cho gọn
                     ->modalHeading(__('system.payout_logs.label.payout_log_details')) // TIÊU ĐỀ CỦA MODAL
+                    ->modalWidth('lg')
                     ->tooltip(__('system.labels.detail')) // Hiện ghi chú khi di chuột vào
                     ->icon('heroicon-o-eye')
                     ->color('gray'), // Màu xám nhẹ nhàng, không lấn át nút cam,
@@ -1524,44 +1719,112 @@ class PayoutLogResource extends Resource
                         ->color('warning')
                         ->visible(fn () => auth()->user()?->isAdmin() || auth()->user()?->isFinance()) // Admin & Finance
                         ->requiresConfirmation()
+                        ->modalWidth('4xl')
+                        ->mountUsing(function (Forms\ComponentContainer $form, Collection $records) {
+                            $isPartner = static::isPartnerSelection($records);
+                            $form->fill([
+                                'is_partner_selection' => $isPartner,
+                                'manual_payout_rate' => 21000,
+                                'payout_use_percentage' => true,
+                                'payout_percentage' => $isPartner ? 100 : 35,
+                                'leader_use_percentage' => true,
+                                'leader_percentage' => 65,
+                                'leader_payout_rate' => 21000,
+                                'handler_use_percentage' => true,
+                                'handler_percentage' => 35,
+                                'handler_payout_rate' => 21000,
+                            ]);
+                        })
                         ->form([
-                            Forms\Components\Grid::make(2)
+                            Forms\Components\Hidden::make('is_partner_selection')->dehydrated(false),
+
+                            Forms\Components\Grid::make(3)
                                 ->schema([
-                                    Forms\Components\Section::make('Staff Split')
+                                    Forms\Components\Section::make(fn (Get $get) => $get('is_partner_selection') ? __('system.labels.partner_split') : __('system.labels.staff_split'))
                                         ->columnSpan(1)
                                         ->schema([
                                             Forms\Components\TextInput::make('manual_payout_rate')
-                                                ->label('Staff Payout Rate')
-                                                ->placeholder('Eg: 21000')
+                                                ->label(fn (Get $get) => $get('is_partner_selection') ? __('system.labels.partner_payout_rate') : __('system.labels.staff_payout_rate'))
+                                                ->placeholder('Eg: 22498.126')
                                                 ->numeric()
+                                                ->step(0.001)
                                                 ->default(21000)
                                                 ->required(),
+                                            // 🟢 Bật: nhập % thủ công. Tắt: ẩn ô %, mặc định nhận 100%.
+                                            Forms\Components\Toggle::make('payout_use_percentage')
+                                                ->label(__('system.labels.split_by_margin_percentage'))
+                                                ->default(true)
+                                                ->live(),
                                             Forms\Components\TextInput::make('payout_percentage')
-                                                ->label('Staff Percentage (%)')
-                                                ->placeholder('Eg: 35')
+                                                ->label(fn (Get $get) => $get('is_partner_selection') ? __('system.labels.partner_percentage') : __('system.labels.staff_percentage'))
+                                                ->placeholder(fn (Get $get) => $get('is_partner_selection') ? 'Eg: 100' : 'Eg: 35')
                                                 ->numeric()
-                                                ->default(35)
-                                                ->required(),
+                                                ->default(fn (Get $get) => $get('is_partner_selection') ? 100 : 35)
+                                                ->visible(fn (Get $get) => $get('payout_use_percentage'))
+                                                ->required(fn (Get $get) => $get('payout_use_percentage')),
                                         ]),
 
-                                    Forms\Components\Section::make('Leader Split')
+                                    Forms\Components\Section::make(__('system.labels.leader_split'))
                                         ->columnSpan(1)
                                         ->schema([
                                             Forms\Components\Select::make('leader_id')
-                                                ->label('Leader')
+                                                ->label(__('system.labels.leader'))
                                                 ->options(User::whereIn('role', ['admin', 'finance', 'operator'])->pluck('name', 'id'))
                                                 ->searchable()
-                                                ->placeholder('Select...'),
-                                            Forms\Components\TextInput::make('leader_payout_rate')
-                                                ->label('Leader Payout Rate')
-                                                ->placeholder('Eg: 21000')
-                                                ->numeric()
-                                                ->default(21000),
+                                                ->placeholder(__('system.labels.select_placeholder'))
+                                                ->live(),
+                                            // 🟢 Luôn tính trên phần CHÊNH LỆCH tỷ giá (Market Rate − Partner/Staff Rate) × USD
+                                            // — không trùng với tiền của Partner/Staff. ON: nhận % phần đó. OFF: nhận TOÀN BỘ (100%) phần chênh lệch.
+                                            Forms\Components\Toggle::make('leader_use_percentage')
+                                                ->label(__('system.labels.split_by_margin_percentage'))
+                                                ->default(true)
+                                                ->live()
+                                                ->visible(fn (Get $get) => filled($get('leader_id'))),
                                             Forms\Components\TextInput::make('leader_percentage')
-                                                ->label('Leader Percentage (%)')
+                                                ->label(__('system.labels.leader_percentage'))
                                                 ->placeholder('Eg: 65')
                                                 ->numeric()
-                                                ->default(65),
+                                                ->default(65)
+                                                ->visible(fn (Get $get) => filled($get('leader_id')) && $get('leader_use_percentage')),
+                                            // 🟢 Chênh lệch để chia cho Leader = (Rate này − Partner/Staff Rate) × USD
+                                            Forms\Components\TextInput::make('leader_payout_rate')
+                                                ->label(__('system.labels.leader_payout_rate'))
+                                                ->placeholder('Eg: 22498.126')
+                                                ->numeric()
+                                                ->step(0.001)
+                                                ->default(21000)
+                                                ->visible(fn (Get $get) => filled($get('leader_id'))),
+                                        ]),
+
+                                    // 🟢 Người xử lý (Kế toán) — thường là người khác với Leader, đôi khi cùng
+                                    // nhận chia riêng trên cùng giao dịch nên có Rate/% độc lập, không liên quan đến Leader.
+                                    Forms\Components\Section::make(__('system.labels.handler_split'))
+                                        ->columnSpan(1)
+                                        ->schema([
+                                            Forms\Components\Select::make('handler_id')
+                                                ->label(__('system.labels.handler'))
+                                                ->options(User::whereIn('role', ['admin', 'finance', 'operator'])->pluck('name', 'id'))
+                                                ->searchable()
+                                                ->placeholder(__('system.labels.select_placeholder'))
+                                                ->live(),
+                                            Forms\Components\Toggle::make('handler_use_percentage')
+                                                ->label(__('system.labels.split_by_margin_percentage'))
+                                                ->default(true)
+                                                ->live()
+                                                ->visible(fn (Get $get) => filled($get('handler_id'))),
+                                            Forms\Components\TextInput::make('handler_percentage')
+                                                ->label(__('system.labels.handler_percentage'))
+                                                ->placeholder('Eg: 35')
+                                                ->numeric()
+                                                ->default(35)
+                                                ->visible(fn (Get $get) => filled($get('handler_id')) && $get('handler_use_percentage')),
+                                            Forms\Components\TextInput::make('handler_payout_rate')
+                                                ->label(__('system.labels.handler_payout_rate'))
+                                                ->placeholder('Eg: 22498.126')
+                                                ->numeric()
+                                                ->step(0.001)
+                                                ->default(21000)
+                                                ->visible(fn (Get $get) => filled($get('handler_id'))),
                                         ]),
 
                                     Forms\Components\Section::make(__('system.labels.investor_expenses'))
@@ -1616,13 +1879,13 @@ class PayoutLogResource extends Resource
 
                                 // Lấy lại danh sách các đơn Gốc (Parent) sạch sẽ từ Database
                                 $parentLogs = PayoutLog::whereIn('id', $parentIds)
-                                    ->with(['account', 'payoutMethod', 'user'])
+                                    ->with(['account', 'payoutMethod', 'user', 'partnerWithdrawal'])
                                     ->lockForUpdate()
                                     ->get();
 
                                 // 2. GOM NHÓM THÔNG MINH
                                 $groupedLogs = $parentLogs->groupBy(function ($log) {
-                                    $platform = $log->account?->platform ?? 'unknown';
+                                    $platform = $log->account?->platform ?? $log->partnerWithdrawal?->platform ?? 'unknown';
 
                                     return $log->user_id.'_'.
                                         $platform.'_'.
@@ -1635,8 +1898,8 @@ class PayoutLogResource extends Resource
                                 foreach ($groupedLogs as $groupKey => $logs) {
                                     $firstLog = $logs->first();
                                     $sourceName = '';
-                                    $platformRaw = $firstLog->account?->platform ?? 'unknown';
-                                    $platformName = static::getPlatformName($platformRaw);
+                                    $platformRaw = $firstLog->account?->platform ?? $firstLog->partnerWithdrawal?->platform ?? 'unknown';
+                                    $platformName = $firstLog->account ? static::getPlatformName($platformRaw) : $platformRaw;
 
                                     if ($firstLog->asset_type === 'gift_card') {
                                         $brandRecord = Brand::where('slug', $firstLog->gc_brand)->first();
@@ -1698,7 +1961,7 @@ class PayoutLogResource extends Resource
 
                                     // 🟢 TÍNH TOÁN CHO NHÂN VIÊN (STAFF)
                                     $payoutRate = (float) ($data['manual_payout_rate'] ?? $averageMarketRate);
-                                    $payoutPercentage = (float) ($data['payout_percentage'] ?? 100);
+                                    $payoutPercentage = ($data['payout_use_percentage'] ?? true) ? (float) ($data['payout_percentage'] ?? 100) : 100;
                                     $baseVndPayout = floor(($totalUsd * $payoutRate) * ($payoutPercentage / 100));
 
                                     // 🚀 NEW: DEDUCT INVESTOR EXPENSES (Selected manually)
@@ -1721,7 +1984,7 @@ class PayoutLogResource extends Resource
                                     $totalUsdAfterDeduction = max(0, $totalUsd - $currentBatchDeductionsUsd - $currentBatchDeductionsUsdt);
 
                                     $payoutRate = (float) ($data['manual_payout_rate'] ?? $averageMarketRate);
-                                    $payoutPercentage = (float) ($data['payout_percentage'] ?? 100);
+                                    $payoutPercentage = ($data['payout_use_percentage'] ?? true) ? (float) ($data['payout_percentage'] ?? 100) : 100;
                                     
                                     // Calculate VND payout based on the remaining USD
                                     $baseVndPayout = floor(($totalUsdAfterDeduction * $payoutRate) * ($payoutPercentage / 100));
@@ -1750,6 +2013,7 @@ class PayoutLogResource extends Resource
                                     $staffPayment = UserPayment::create([
                                         'user_id' => $firstLog->user_id,
                                         'batch_id' => $bulkBatchId,
+                                        'settlement_group_id' => $bulkBatchId,
                                         'platform' => $platformName,
                                         'asset_group' => $firstLog->asset_type === 'gift_card' ? 'gift_card' : 'paypal',
                                         'transaction_type' => "{$assetPrefix} - {$sourceName}",
@@ -1779,20 +2043,27 @@ class PayoutLogResource extends Resource
                                     }
 
                                     // 🟢 TÍNH TOÁN CHO QUẢN LÝ (LEADER) - NẾU CÓ CHỌN
+                                    // Luôn tính trên phần CHÊNH LỆCH tỷ giá (Market Rate − Partner/Staff Rate) × USD,
+                                    // không trùng với tiền của Partner/Staff. Bật % -> nhận theo %. Tắt % -> nhận TOÀN BỘ (100%) phần chênh lệch.
                                     if (! empty($data['leader_id'])) {
                                         $leaderName = User::find($data['leader_id'])?->name ?? 'Leader';
-                                        $leaderRate = (float) ($data['leader_payout_rate'] ?? $payoutRate);
-                                        $leaderPercentage = (float) ($data['leader_percentage'] ?? 0);
-                                        $leaderVndPayout = floor(($totalUsdAfterDeduction * $leaderRate) * ($leaderPercentage / 100));
-                                        $leaderProfitVnd = floor(($averageMarketRate - $leaderRate) * $totalUsdAfterDeduction * ($leaderPercentage / 100));
+                                        $leaderUsePercentage = $data['leader_use_percentage'] ?? true;
+                                        $leaderPercentage = $leaderUsePercentage ? (float) ($data['leader_percentage'] ?? 0) : 100;
+                                        $leaderRate = (float) ($data['leader_payout_rate'] ?? $averageMarketRate);
+
+                                        $marginVnd = floor(($leaderRate - $payoutRate) * $totalUsdAfterDeduction);
+                                        $leaderVndPayout = floor($marginVnd * $leaderPercentage / 100);
+                                        $leaderProfitVnd = $leaderVndPayout;
 
                                         UserPayment::create([
                                             'user_id' => $data['leader_id'],
                                             'batch_id' => $bulkBatchId,
+                                        'settlement_group_id' => $bulkBatchId,
                                             'platform' => $platformName,
                                             'asset_group' => $firstLog->asset_type === 'gift_card' ? 'gift_card' : 'paypal',
-                                            'transaction_type' => ($firstLog->asset_type === 'gift_card' ? "Gift Card - {$sourceName}" : "PayPal VN - {$sourceName}")." [{$leaderName}]",
-                                            'total_usd' => $totalUsd,
+                                            'transaction_type' => "{$assetPrefix} - {$sourceName} [{$leaderName}]",
+                                            // 🟢 Leader không có giao dịch USD riêng -> total_usd = 0 để tránh tính trùng $ trong báo cáo tổng
+                                            'total_usd' => 0,
                                             'exchange_rate' => $averageMarketRate,
                                             'payout_rate' => $leaderRate,
                                             'payout_percentage' => $leaderPercentage,
@@ -1800,6 +2071,35 @@ class PayoutLogResource extends Resource
                                             'profit_vnd' => $leaderProfitVnd,
                                             'status' => 'pending',
                                             'note' => 'Leader split from batch '.$bulkBatchId,
+                                        ]);
+                                    }
+
+                                    if (! empty($data['handler_id'])) {
+                                        $handlerName = User::find($data['handler_id'])?->name ?? 'Handler';
+                                        $handlerUsePercentage = $data['handler_use_percentage'] ?? true;
+                                        $handlerPercentage = $handlerUsePercentage ? (float) ($data['handler_percentage'] ?? 0) : 100;
+                                        $handlerRate = (float) ($data['handler_payout_rate'] ?? $averageMarketRate);
+
+                                        $marginVnd = floor(($handlerRate - $payoutRate) * $totalUsdAfterDeduction);
+                                        $handlerVndPayout = floor($marginVnd * $handlerPercentage / 100);
+                                        $handlerProfitVnd = $handlerVndPayout;
+
+                                        UserPayment::create([
+                                            'user_id' => $data['handler_id'],
+                                            'batch_id' => $bulkBatchId,
+                                        'settlement_group_id' => $bulkBatchId,
+                                            'platform' => $platformName,
+                                            'asset_group' => $firstLog->asset_type === 'gift_card' ? 'gift_card' : 'paypal',
+                                            'transaction_type' => "{$assetPrefix} - {$sourceName} [{$handlerName}]",
+                                            // 🟢 Giống Leader: không có giao dịch USD riêng -> total_usd = 0 để tránh tính trùng $
+                                            'total_usd' => 0,
+                                            'exchange_rate' => $averageMarketRate,
+                                            'payout_rate' => $handlerRate,
+                                            'payout_percentage' => $handlerPercentage,
+                                            'total_vnd' => $handlerVndPayout,
+                                            'profit_vnd' => $handlerProfitVnd,
+                                            'status' => 'pending',
+                                            'note' => 'Handler split from batch '.$bulkBatchId,
                                         ]);
                                     }
 
@@ -1884,8 +2184,10 @@ class PayoutLogResource extends Resource
                     ->label(__('system.labels.account'))
                     ->collapsible()
                     ->getTitleFromRecordUsing(function ($record) {
-                        $email = $record->account?->email?->email ?? __('system.labels.n/a');
-                        $platform = static::getPlatformName($record->account?->platform);
+                        $email = $record->account?->email?->email ?? $record->partnerWithdrawal?->email ?? __('system.labels.n/a');
+                        $platform = $record->account
+                            ? static::getPlatformName($record->account?->platform)
+                            : ($record->partnerWithdrawal?->platform ?? __('system.labels.n/a'));
 
                         // 🟢 TÍNH TỔNG CHO HEADER (Do phiên bản Filament này chưa hỗ trợ ->summary() trên Group)
                         $parts = explode('_', $record->group_key);
@@ -1894,7 +2196,11 @@ class PayoutLogResource extends Resource
                         $parentOrId = $parts[2] ?? null;
 
                         $baseQuery = PayoutLog::query()
-                            ->where('account_id', $accountId)
+                            ->when(
+                                str_starts_with((string) $accountId, 'pw'),
+                                fn ($q) => $q->where('partner_withdrawal_id', (int) substr($accountId, 2)),
+                                fn ($q) => $q->where('account_id', $accountId)
+                            )
                             ->where(function ($q) use ($parentOrId) {
                                 $q->where('id', $parentOrId)->orWhere('parent_id', $parentOrId);
                             })
@@ -1916,7 +2222,11 @@ class PayoutLogResource extends Resource
                         $brand = $parts[1] ?? 'none';
                         $withdrawalId = $parts[2] ?? null;
 
-                        return $query->where('payout_logs.account_id', $accountId)
+                        return $query->when(
+                                str_starts_with((string) $accountId, 'pw'),
+                                fn ($q) => $q->where('payout_logs.partner_withdrawal_id', (int) substr($accountId, 2)),
+                                fn ($q) => $q->where('payout_logs.account_id', $accountId)
+                            )
                             ->when(
                                 $brand !== 'none',
                                 fn ($sub) => $sub->where('payout_logs.gc_brand', $brand),
@@ -1930,6 +2240,27 @@ class PayoutLogResource extends Resource
                     }),
             ])
             ->defaultGroup('group_key');
+    }
+
+    // 🟢 HÀM HELPER: Kiểm tra User đang chọn có phải Partner không (để đổi UI Source Account)
+    public static function isPartnerUser(?int $userId): bool
+    {
+        if (! $userId) {
+            return false;
+        }
+
+        return User::where('id', $userId)->where('role', 'partner')->exists();
+    }
+
+    // 🟢 HÀM HELPER: Kiểm tra các PayoutLog đang chọn trong Settle & Generate Payment có phải của Partner không
+    public static function isPartnerSelection(Collection $records): bool
+    {
+        $userIds = $records->pluck('user_id')->unique()->filter();
+        if ($userIds->isEmpty()) {
+            return false;
+        }
+
+        return User::whereIn('id', $userIds)->where('role', 'partner')->exists();
     }
 
     // 🟢 HÀM HELPER: Tính số dư khả dụng duy nhất tại đây (DRY) + Cache per-request
@@ -1997,7 +2328,7 @@ class PayoutLogResource extends Resource
             }
         }
 
-        $set('total_vnd', floor($totalVnd)); // Chỉ set số thuần, format để TextColumn lo
+        $set('total_vnd', number_format(floor($totalVnd), 0, ',', '.'));
     }
 
     public static function getRelations(): array

@@ -13,7 +13,7 @@ class SyncAllToGoogleSheet extends Command
      * @var string
      */
     // Tên lệnh bạn sẽ gõ trên terminal
-    protected $signature = 'sync:all';
+    protected $signature = 'sync:all {spreadsheetId?}';
 
     /**
      * The console command description.
@@ -27,8 +27,15 @@ class SyncAllToGoogleSheet extends Command
     /**
      * Execute the console command.
      */
-    public function handle(\App\Services\GoogleSyncService $syncService)
+    public function handle()
     {
+        if ($spreadsheetId = $this->argument('spreadsheetId')) {
+            config(['services.google.spreadsheet_id' => $spreadsheetId]);
+            $this->comment("Target Spreadsheet ID: {$spreadsheetId}");
+        }
+
+        $syncService = app(\App\Services\GoogleSyncService::class);
+
         $this->info('🚀 Initiating the full-scale synchronization process...');
 
         $this->comment(' Syncing to Google Sheets: Emails...');

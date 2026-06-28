@@ -36,29 +36,16 @@ class AdminUserEarningsTable extends BaseWidget
         return __('system.payroll.heading');
     }
 
-    public function table(Table $table): Table
+    /**
+     * Build the consolidated payroll sub-query (operator + finance unions),
+     * applying the given user/date filters.
+     */
+    protected function buildConsolidatedQuery(?int $userId, ?string $fromDate, ?string $toDate)
     {
-        $raw = $this->tableFilters['table_filter'] ?? [];
-
-        // Sanitize filter inputs before use in queries
-        $userId = isset($raw['user_id']) && is_numeric($raw['user_id']) ? (int) $raw['user_id'] : null;
-        $fromDate = null;
-        $toDate = null;
-        try {
-            $fromDate = isset($raw['from_date']) && $raw['from_date'] !== ''
-                ? Carbon::parse($raw['from_date'])->startOfDay()->toDateTimeString()
-                : null;
-            $toDate = isset($raw['to_date']) && $raw['to_date'] !== ''
-                ? Carbon::parse($raw['to_date'])->endOfDay()->toDateTimeString()
-                : null;
-        } catch (\Exception) {
-            // Invalid date input — ignore filter
-        }
-
         // 1. Query cho Operator: Gộp theo Nhóm tài sản (Gift Card vs PayPal)
         $operatorQuery = UserPayment::query()
             ->join('users', 'user_payments.user_id', '=', 'users.id')
-            ->whereIn('users.role', ['admin', 'staff', 'operator'])
+            ->whereIn('users.role', ['admin', 'staff', 'operator', 'partner'])
             ->select('user_payments.user_id as user_id', 'users.role as user_role', 'users.name as user_name', 'user_payments.asset_group as asset_group')
             ->selectRaw('SUM(total_usd) as amount_usd')
             ->selectRaw("SUM(CASE WHEN status = 'paid' THEN total_vnd ELSE 0 END) as amount_paid")
@@ -100,15 +87,44 @@ class AdminUserEarningsTable extends BaseWidget
             ->selectRaw("({$paidSql}) as amount_paid", $paidBindings)
             ->when($userId, fn ($query, $id) => $query->where('id', $id));
 
-        return $table
-            ->query(function () use ($operatorQuery, $financeQuery) {
-                // Nếu là Operator -> Không union financeQuery (không xem lợi nhuận hệ thống)
-                if (! auth()->user()?->isAdmin() && ! auth()->user()?->isFinance()) {
-                    return UserPayment::query()->withTrashed()->fromSub($operatorQuery, 'consolidated_payroll');
-                }
+        // Nếu là Operator -> Không union financeQuery (không xem lợi nhuận hệ thống)
+        if (! auth()->user()?->isAdmin() && ! auth()->user()?->isFinance()) {
+            return UserPayment::query()->withTrashed()->fromSub($operatorQuery, 'consolidated_payroll');
+        }
 
-                return UserPayment::query()->withTrashed()->fromSub($operatorQuery->union($financeQuery), 'consolidated_payroll');
-            })
+        return UserPayment::query()->withTrashed()->fromSub($operatorQuery->union($financeQuery), 'consolidated_payroll');
+    }
+
+    /**
+     * Resolve filter values from raw filter form data.
+     *
+     * @return array{0: ?int, 1: ?string, 2: ?string}
+     */
+    protected function resolvePayrollFilters(array $raw): array
+    {
+        $userId = isset($raw['user_id']) && is_numeric($raw['user_id']) ? (int) $raw['user_id'] : null;
+        $fromDate = null;
+        $toDate = null;
+        try {
+            $fromDate = isset($raw['from_date']) && $raw['from_date'] !== ''
+                ? Carbon::parse($raw['from_date'])->startOfDay()->toDateTimeString()
+                : null;
+            $toDate = isset($raw['to_date']) && $raw['to_date'] !== ''
+                ? Carbon::parse($raw['to_date'])->endOfDay()->toDateTimeString()
+                : null;
+        } catch (\Exception) {
+            // Invalid date input — ignore filter
+        }
+
+        return [$userId, $fromDate, $toDate];
+    }
+
+    public function table(Table $table): Table
+    {
+        [$userId, $fromDate, $toDate] = $this->resolvePayrollFilters($this->tableFilters['table_filter'] ?? []);
+
+        return $table
+            ->query(fn () => $this->buildConsolidatedQuery($userId, $fromDate, $toDate))
             ->columns([
                 Tables\Columns\TextColumn::make('asset_group')
                     ->label(__('system.labels.asset_type'))
@@ -140,26 +156,17 @@ class AdminUserEarningsTable extends BaseWidget
                     ->label(__('system.payout_logs.fields.net_amount_usd'))
                     ->money('USD')
                     ->color('info')
-                    ->alignment(Alignment::Center)
-                    ->summarize(
-                        Tables\Columns\Summarizers\Sum::make()
-                            ->label('')
-                            ->money('USD')
-                            ->extraAttributes(['class' => 'flex w-full justify-center'])
-                    ),
+                    ->alignment(Alignment::Center),
+                // 🟢 Đã bỏ ->summarize(): Filament cộng dòng "Summary" tổng bằng cách cộng lại các
+                // "Total: X" theo nhóm đã hiển thị (không re-query theo filter), nên không thể loại
+                // riêng "System Profit" (số liệu công ty) khỏi tổng cá nhân một cách chính xác.
 
                 Tables\Columns\TextColumn::make('amount_paid')
                     ->label(__('system.status.completed').' (VND)')
                     ->money('VND', locale: 'vi_VN')
                     ->color('success')
                     ->weight('bold')
-                    ->alignment(Alignment::Center)
-                    ->summarize(
-                        Tables\Columns\Summarizers\Sum::make()
-                            ->label('')
-                            ->money('VND', locale: 'vi_VN')
-                            ->extraAttributes(['class' => 'flex w-full justify-center'])
-                    ),
+                    ->alignment(Alignment::Center),
             ])
             ->groups([
                 Group::make('user_id')
@@ -176,19 +183,28 @@ class AdminUserEarningsTable extends BaseWidget
                     ->form([
                         Select::make('user_id')
                             ->label(__('system.labels.user'))
-                            ->options(User::whereIn('role', ['admin', 'staff', 'operator', 'finance'])->pluck('name', 'id'))
+                            ->options(User::whereIn('role', ['admin', 'staff', 'operator', 'finance', 'partner'])->pluck('name', 'id'))
                             ->searchable()
                             ->visible(fn () => auth()->user()?->isAdmin() || auth()->user()?->isFinance())
                             ->live(),
                         DatePicker::make('from_date')
                             ->label(__('system.labels.from'))
+                            ->displayFormat('d/m/Y')
+                            ->native(false)
                             ->live(),
                         DatePicker::make('to_date')
                             ->label(__('system.labels.until'))
+                            ->displayFormat('d/m/Y')
+                            ->native(false)
                             ->live(),
                     ])
                     ->columns(in_array(auth()->user()?->role, ['admin', 'finance']) ? 3 : 2)
-                    ->columnSpanFull(),
+                    ->columnSpanFull()
+                    ->query(function ($query, array $data) {
+                        [$userId, $fromDate, $toDate] = $this->resolvePayrollFilters($data);
+
+                        return $query->fromSub($this->buildConsolidatedQuery($userId, $fromDate, $toDate)->getQuery(), 'consolidated_payroll');
+                    }),
             ], layout: Tables\Enums\FiltersLayout::AboveContent);
     }
 }

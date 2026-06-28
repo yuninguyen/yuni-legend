@@ -945,6 +945,9 @@ textarea.fi-input {
 .es-holders-container {
     margin-top: 4px;
     padding-top: 2px;
+    /* Đặt min-height cố định để 2 box (Email Status & Platform Distribution)
+       luôn có chiều cao bằng nhau dù số dòng Holder khác nhau */
+    min-height: 172px;
 }
 
 .es-holder-label {

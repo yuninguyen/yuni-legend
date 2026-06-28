@@ -59,7 +59,9 @@ trait HasTrackerSchema
                                 // 1. USER (Chỉ Admin thấy)
                                 Forms\Components\Select::make('user_id')
                                     ->label(__('system.labels.user'))
-                                    ->relationship('user', 'name', fn (Builder $query) => $query->whereHas('accounts'))
+                                    ->relationship('user', 'name', fn (Builder $query) => $query->where(function (Builder $q) {
+                                        $q->whereHas('accounts')->orWhere('id', auth()->id());
+                                    }))
                                     ->default(fn () => auth()->id())
                                     ->hidden(fn () => ! auth()->user()?->isAdmin())
                                     ->dehydrated(true)
@@ -99,6 +101,11 @@ trait HasTrackerSchema
                                     })
                                     ->live()
                                     ->required()
+                                    ->afterStateHydrated(function (Forms\Set $set, $state, $record) {
+                                        if (blank($state) && $record?->account?->platform) {
+                                            $set('platform', $record->account->platform);
+                                        }
+                                    })
                                     ->afterStateUpdated(function (Forms\Set $set) {
                                         $set('account_email', null);
                                         $set('account_password_display', null);
@@ -138,6 +145,11 @@ trait HasTrackerSchema
                                     ->preload()
                                     ->live()
                                     ->required()
+                                    ->afterStateHydrated(function (Forms\Set $set, $state, $record) {
+                                        if (blank($state) && $record?->account?->email?->email) {
+                                            $set('account_email', $record->account->email->email);
+                                        }
+                                    })
                                     ->suffixAction(
                                         Forms\Components\Actions\Action::make('copyEmail')
                                             ->icon('heroicon-m-clipboard-document')
@@ -213,7 +225,11 @@ trait HasTrackerSchema
                             ->content(function ($get) {
                                 // ... (Giữ nguyên toàn bộ nội dung HtmlString bên trong của Sếp)
                                 $emailState = $get('account_email');
-                                $account = Account::whereHas('email', fn ($q) => $q->where('email', $emailState))->first();
+                                // 🟢 FIX: 1 email có thể được dùng cho Account ở NHIỀU platform khác nhau,
+                                // nếu chỉ lọc theo email sẽ lấy nhầm Account (và status) của platform khác.
+                                $account = Account::whereHas('email', fn ($q) => $q->where('email', $emailState))
+                                    ->where('platform', $get('platform'))
+                                    ->first();
                                 if (! $account) {
                                     return new HtmlString("<div class='text-danger'>⚠️ ".__('system.notifications.no_records_found').'</div>');
                                 }
@@ -264,32 +280,79 @@ trait HasTrackerSchema
                     ->schema([
                         Forms\Components\Grid::make(3)
                             ->schema([
-                                DatePicker::make('transaction_date')
+                                Forms\Components\TextInput::make('transaction_date')
                                     ->label(__('system.labels.transaction_date'))
                                     ->placeholder('dd/mm/yyyy')
-                                    ->displayFormat('d/m/Y')
-                                    ->format('Y-m-d') // Định dạng chuẩn để lưu vào MySQL
-                                    ->native(false)
-                                    ->closeOnDateSelection()
+                                    ->mask('99/99/9999')
+                                    ->rules(['nullable', 'date_format:d/m/Y'])
+                                    ->afterStateHydrated(function ($component, $state) {
+                                        if ($state) {
+                                            $ymd = \Carbon\Carbon::parse($state)->setTimezone(config('app.timezone'))->format('Y-m-d');
+                                            [$year, $month, $day] = explode('-', substr($ymd, 0, 10));
+                                            $component->state("{$day}/{$month}/{$year}");
+                                        }
+                                    })
+                                    ->dehydrateStateUsing(function ($state) {
+                                        if (blank($state)) {
+                                            return null;
+                                        }
+
+                                        if (! preg_match('#^(\d{2})/(\d{2})/(\d{4})$#', $state, $m)) {
+                                            return null;
+                                        }
+
+                                        return "{$m[3]}-{$m[2]}-{$m[1]}";
+                                    })
                                     ->reactive() // Quan trọng: Để Payout Date có thể nhận diện thay đổi của Transaction Date
                                     ->nullable() // Cho phép để trống
-                                    ->default(null)
                                     ->columns(5), // Đảm bảo không tự động lấy ngày hiện tại
 
-                                DatePicker::make('payout_date')
+                                Forms\Components\TextInput::make('payout_date')
                                     ->label(__('system.labels.payout_date'))
                                     ->placeholder('dd/mm/yyyy')
-                                    ->displayFormat('d/m/Y')
-                                    ->format('Y-m-d') // Định dạng chuẩn để lưu vào MySQL
-                                    ->native(false)
-                                    ->closeOnDateSelection()
+                                    ->mask('99/99/9999')
+                                    ->afterStateHydrated(function ($component, $state) {
+                                        if ($state) {
+                                            $ymd = \Carbon\Carbon::parse($state)->setTimezone(config('app.timezone'))->format('Y-m-d');
+                                            [$year, $month, $day] = explode('-', substr($ymd, 0, 10));
+                                            $component->state("{$day}/{$month}/{$year}");
+                                        }
+                                    })
+                                    ->dehydrateStateUsing(function ($state) {
+                                        if (blank($state)) {
+                                            return null;
+                                        }
+
+                                        if (! preg_match('#^(\d{2})/(\d{2})/(\d{4})$#', $state, $m)) {
+                                            return null;
+                                        }
+
+                                        return "{$m[3]}-{$m[2]}-{$m[1]}";
+                                    })
                                     // Logic Validation: Phải sau hoặc bằng ngày giao dịch
-                                    ->after('transaction_date')
-                                    ->validationMessages([
-                                        'after' => __('system.notifications.date_updated_sync'), // Tạm dùng key này hoặc tạo mới
+                                    ->rules([
+                                        'nullable',
+                                        'date_format:d/m/Y',
+                                        fn (Forms\Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                            $transactionDate = $get('transaction_date');
+
+                                            if (blank($value) || blank($transactionDate)) {
+                                                return;
+                                            }
+
+                                            try {
+                                                $payout = Carbon::createFromFormat('d/m/Y', $value);
+                                                $transaction = Carbon::createFromFormat('d/m/Y', $transactionDate);
+                                            } catch (\Exception $e) {
+                                                return;
+                                            }
+
+                                            if ($payout->lt($transaction)) {
+                                                $fail(__('system.notifications.date_updated_sync'));
+                                            }
+                                        },
                                     ])
                                     ->nullable() // Cho phép để trống
-                                    ->default(null)
                                     ->columns(5), // Đảm bảo không tự động lấy ngày hiện tại
 
                                 Forms\Components\Select::make('status')
@@ -317,24 +380,33 @@ trait HasTrackerSchema
                                     ->label(__('system.labels.order_value'))
                                     ->numeric()
                                     ->prefix('$')
-                                    ->reactive()
-                                    ->required(),
+                                    // 🟢 Dùng live(onBlur: true) thay cho reactive() để tránh re-render mỗi keystroke
+                                    // làm nhảy/lùi số khi đang gõ — chỉ tính lại Rebate Amount khi rời khỏi ô.
+                                    ->live(onBlur: true)
+                                    ->required()
+                                    ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get) {
+                                        $total = (float) $get('order_value') * ((float) $get('cashback_percent') / 100);
+                                        $set('rebate_amount', round($total, 2));
+                                    }),
 
                                 Forms\Components\TextInput::make('cashback_percent')
                                     ->label(__('system.labels.cashback_percent'))
                                     ->numeric()
                                     ->suffix('%')
-                                    ->reactive()
-                                    ->default(10),
-
-                                Forms\Components\Placeholder::make('rebate_amount_display')
-                                    ->label(__('system.labels.rebate_amount'))
-                                    ->content(function ($get) {
+                                    ->live(onBlur: true)
+                                    ->default(10)
+                                    ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get) {
                                         $total = (float) $get('order_value') * ((float) $get('cashback_percent') / 100);
+                                        $set('rebate_amount', round($total, 2));
+                                    }),
 
-                                        return '$ '.number_format($total, 2);
-                                    })
-                                    ->extraAttributes(['class' => 'text-success font-bold text-xl']),
+                                // 🟢 Auto tính theo Order Value × Cashback % nhưng vẫn cho sửa tay trực tiếp
+                                Forms\Components\TextInput::make('rebate_amount')
+                                    ->label(__('system.labels.rebate_amount'))
+                                    ->numeric()
+                                    ->prefix('$')
+                                    ->required()
+                                    ->extraInputAttributes(['class' => 'text-success font-bold text-xl']),
                             ]),
                     ])->columnSpanFull(),
 
@@ -562,8 +634,23 @@ trait HasTrackerSchema
                     ->collapsible()
                     ->titlePrefixedWithLabel(false)
                     ->orderQueryUsing(function (Builder $query, string $direction) {
-                        $query->orderBy('account_id', $direction)
-                              ->orderBy('batch_id', $direction);
+                        $table = $query->getModel()->getTable();
+                        // <=> là NULL-safe equals trong MySQL/MariaDB
+                        $query->orderByRaw("(SELECT MAX(t2.transaction_date) FROM `{$table}` t2 WHERE t2.account_id = `{$table}`.account_id AND t2.batch_id <=> `{$table}`.batch_id) DESC")
+                              ->orderBy('account_id', $direction)
+                              ->orderBy('batch_id', $direction)
+                              ->orderBy('transaction_date', 'desc');
+                    })
+                    ->getKeyFromRecordUsing(fn ($record) => $record->account_id.'_'.($record->batch_id ?? 'uncategorized'))
+                    ->scopeQueryByKeyUsing(function (Builder $query, string $key) {
+                        [$accountId, $batchId] = explode('_', $key, 2);
+
+                        $query->where('account_id', $accountId)
+                            ->when(
+                                $batchId === 'uncategorized',
+                                fn (Builder $q) => $q->whereNull('batch_id'),
+                                fn (Builder $q) => $q->where('batch_id', $batchId)
+                            );
                     })
                     ->getTitleFromRecordUsing(function ($record) {
                         $email = $record->account?->email?->email ?? 'N/A';
@@ -731,9 +818,13 @@ trait HasTrackerSchema
                             ->modalSubmitActionLabel(__('system.actions.submit'))
                             ->modalCancelActionLabel(__('system.actions.cancel'))
                             ->form([
-                                DatePicker::make('payout_date')
+                                Forms\Components\TextInput::make('payout_date')
                                     ->label(__('system.labels.select_payout_date'))
-                                    ->default(fn ($record) => $record->payout_date ?? now())
+                                    ->placeholder('dd/mm/yyyy')
+                                    ->mask('99/99/9999')
+                                    ->default(fn ($record) => optional($record->payout_date ?? now())->format('d/m/Y'))
+                                    ->rules(['date_format:d/m/Y'])
+                                    ->dehydrateStateUsing(fn ($state) => Carbon::createFromFormat('d/m/Y', $state)->format('Y-m-d'))
                                     ->required(),
                             ])
                             ->action(function ($record, array $data) {
@@ -882,8 +973,8 @@ trait HasTrackerSchema
                 // Lọc theo Ngày Giao dịch (Từ ngày - Đến ngày)
                 Tables\Filters\Filter::make('transaction_date')
                     ->form([
-                        DatePicker::make('transaction_from')->label(__('system.trackers.filters.transaction_from')),
-                        DatePicker::make('transaction_to')->label(__('system.trackers.filters.transaction_to')),
+                        DatePicker::make('transaction_from')->label(__('system.trackers.filters.transaction_from'))->displayFormat('d/m/Y')->native(false),
+                        DatePicker::make('transaction_to')->label(__('system.trackers.filters.transaction_to'))->displayFormat('d/m/Y')->native(false),
                     ])
                     ->columns(2)     // 👈 Ép 2 ô Date nằm ngang nhau
                     ->columnSpan(2)  // 👈 Chiếm 2 phần lưới
@@ -896,8 +987,8 @@ trait HasTrackerSchema
                 // Lọc theo Ngày Payout (Từ ngày - Đến ngày)
                 Tables\Filters\Filter::make('payout_date')
                     ->form([
-                        DatePicker::make('payout_from')->label(__('system.trackers.filters.payout_from')),
-                        DatePicker::make('payout_to')->label(__('system.trackers.filters.payout_to')),
+                        DatePicker::make('payout_from')->label(__('system.trackers.filters.payout_from'))->displayFormat('d/m/Y')->native(false),
+                        DatePicker::make('payout_to')->label(__('system.trackers.filters.payout_to'))->displayFormat('d/m/Y')->native(false),
                     ])
                     ->columns(2)     // 👈 Ép 2 ô Date nằm ngang nhau
                     ->columnSpan(2)  // 👈 Chiếm 2 phần lưới
@@ -930,24 +1021,93 @@ trait HasTrackerSchema
                         ->color('success')
                         // Có thể yêu cầu điền thông tin mới trước khi tạo
                         ->form([
-                            Forms\Components\TextInput::make('store_name')
-                                ->label(__('system.labels.store_name'))
-                                ->placeholder(__('system.placeholders.store_name_example'))
-                                ->required()
-                                ->maxLength(255),
-                            Forms\Components\TextInput::make('order_id')
-                                ->label(__('system.labels.order_id')),
-                            Forms\Components\TextInput::make('order_value')
-                                ->label(__('system.labels.order_value'))
-                                ->placeholder(__('system.placeholders.order_value_example'))
-                                ->numeric()
-                                ->required(),
-                            Forms\Components\TextInput::make('cashback_percent')
-                                ->label(__('system.labels.cashback_percent'))
-                                ->numeric()
-                                ->suffix('%')
-                                ->reactive()
-                                ->default(10),
+                            Forms\Components\Grid::make(4)
+                                ->schema([
+                                    Forms\Components\TextInput::make('store_name')
+                                        ->label(__('system.labels.store_name'))
+                                        ->placeholder(__('system.placeholders.store_name_example'))
+                                        ->required()
+                                        ->maxLength(255),
+                                    Forms\Components\TextInput::make('order_id')
+                                        ->label(__('system.labels.order_id')),
+                                    Forms\Components\TextInput::make('order_value')
+                                        ->label(__('system.labels.order_value'))
+                                        ->placeholder(__('system.placeholders.order_value_example'))
+                                        ->numeric()
+                                        ->required(),
+                                    Forms\Components\TextInput::make('cashback_percent')
+                                        ->label(__('system.labels.cashback_percent'))
+                                        ->numeric()
+                                        ->suffix('%')
+                                        ->reactive()
+                                        ->default(10),
+                                ]),
+                            Forms\Components\Grid::make(4)
+                                ->schema([
+                                    Forms\Components\TextInput::make('transaction_date')
+                                        ->label(__('system.labels.transaction_date'))
+                                        ->placeholder('dd/mm/yyyy')
+                                        ->mask('99/99/9999')
+                                        ->rules(['nullable', 'date_format:d/m/Y'])
+                                        ->afterStateHydrated(function ($component, $state) {
+                                            if ($state) {
+                                                $ymd = \Carbon\Carbon::parse($state)->setTimezone(config('app.timezone'))->format('Y-m-d');
+                                                [$year, $month, $day] = explode('-', substr($ymd, 0, 10));
+                                                $component->state("{$day}/{$month}/{$year}");
+                                            }
+                                        })
+                                        ->dehydrateStateUsing(function ($state) {
+                                            if (blank($state)) {
+                                                return null;
+                                            }
+
+                                            if (! preg_match('#^(\d{2})/(\d{2})/(\d{4})$#', $state, $m)) {
+                                                return null;
+                                            }
+
+                                            return "{$m[3]}-{$m[2]}-{$m[1]}";
+                                        }),
+                                    Forms\Components\TextInput::make('payout_date')
+                                        ->label(__('system.labels.payout_date'))
+                                        ->placeholder('dd/mm/yyyy')
+                                        ->mask('99/99/9999')
+                                        ->rules(['nullable', 'date_format:d/m/Y'])
+                                        ->afterStateHydrated(function ($component, $state) {
+                                            if ($state) {
+                                                $ymd = \Carbon\Carbon::parse($state)->setTimezone(config('app.timezone'))->format('Y-m-d');
+                                                [$year, $month, $day] = explode('-', substr($ymd, 0, 10));
+                                                $component->state("{$day}/{$month}/{$year}");
+                                            }
+                                        })
+                                        ->dehydrateStateUsing(function ($state) {
+                                            if (blank($state)) {
+                                                return null;
+                                            }
+
+                                            if (! preg_match('#^(\d{2})/(\d{2})/(\d{4})$#', $state, $m)) {
+                                                return null;
+                                            }
+
+                                            return "{$m[3]}-{$m[2]}-{$m[1]}";
+                                        }),
+                                    Forms\Components\Select::make('status')
+                                        ->label(__('system.labels.status'))
+                                        ->options([
+                                            'pending' => __('system.status.pending'),
+                                            'confirmed' => __('system.status.confirmed'),
+                                            'ineligible' => __('system.status.ineligible'),
+                                            'missing' => __('system.status.missing'),
+                                            'clicked' => __('system.status.clicked'),
+                                        ])
+                                        ->default('clicked')
+                                        ->required(),
+                                    Forms\Components\TextInput::make('device')
+                                        ->label(__('system.labels.device'))
+                                        ->placeholder('iOS, VMware, BitBrowser Antidetect...'),
+                                ]),
+                            Forms\Components\Textarea::make('note')
+                                ->label(__('system.labels.note'))
+                                ->rows(5),
                             Forms\Components\Textarea::make('detail_transaction')
                                 ->label(__('system.labels.transaction_details'))
                                 ->rows(5),
@@ -955,7 +1115,6 @@ trait HasTrackerSchema
                         ->beforeReplicaSaved(function ($replica, $data) {
                             // Ghi đè dữ liệu mới vào bản sao
                             $replica->fill($data);
-                            $replica->status = 'clicked'; // Reset trạng thái về mặc định
                             $replica->rebate_amount = (float) $data['order_value'] * ($replica->cashback_percent / 100);
                         }),
                     Tables\Actions\RestoreAction::make(), // 🟢 Nút khôi phục dòng bị xóa

@@ -41,7 +41,7 @@ class AdminPanelProvider extends PanelProvider
             ->brandName('RebateOps')
             ->brandLogo(fn () => view('filament.components.brand-logo'))
             ->brandLogoHeight('48px')
-                ->favicon(asset('images/rebateops-logo.png').'?v='.time())
+                ->favicon(asset('images/favicon-stack.svg').'?v='.time())
 
             ->sidebarCollapsibleOnDesktop()
 

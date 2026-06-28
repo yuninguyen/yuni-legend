@@ -42,7 +42,7 @@ class TopCashbackTrackerResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return !auth()->user()?->isFinance();
+        return !auth()->user()?->isFinance() && self::isPlatformActive(['TopCashback', 'topcashback']);
     }
 
     public static function canAccess(): bool

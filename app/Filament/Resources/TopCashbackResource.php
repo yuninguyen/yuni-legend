@@ -39,6 +39,11 @@ class TopCashbackResource extends Resource
         return __('system.all_platforms');
     }
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return self::isPlatformActive(['TopCashback', 'topcashback']);
+    }
+
     // Thêm dòng này để thu gọn menu bên trái, nhường chỗ cho bảng
     protected static bool $isScopedToTenant = false;
     // THÊM DÒNG NÀY: Đổi đường dẫn URL thành /topcashback

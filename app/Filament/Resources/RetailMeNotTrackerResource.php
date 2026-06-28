@@ -42,7 +42,7 @@ class RetailMeNotTrackerResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return !auth()->user()?->isFinance();
+        return !auth()->user()?->isFinance() && self::isPlatformActive(['RetailMeNot', 'retailmenot']);
     }
 
     public static function canAccess(): bool

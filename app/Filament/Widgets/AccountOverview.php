@@ -12,6 +12,11 @@ class AccountOverview extends BaseWidget
 {
     protected int|string|array $columnSpan = 'full';
 
+    protected function getColumns(): int
+    {
+        return 3;
+    }
+
     public static function canView(): bool
     {
         return !auth()->user()?->isFinance();

@@ -302,9 +302,9 @@ class GoogleSyncService
         array_shift($rows);
 
         foreach ($rows as $index => $row) {
-            // Mapping dữ liệu theo cấu trúc Tab Emails:
-            // 0: ID, 1: Status, 2: Email, 3: Password, 4: Recovery Email, 5: 2FA Code, ...
-            $emailRaw = trim($row[2] ?? '');
+            // Mapping dữ liệu theo cấu trúc Tab Email_Import:
+            // 0: Status, 1: Email, 2: Password, 3: Recovery Email, 4: 2FA Code, 5: Date Create, 6: Note
+            $emailRaw = trim($row[1] ?? '');
 
             // Nếu cột Email trống thì bỏ qua
             if (empty($emailRaw) || !str_contains($emailRaw, '@')) {
@@ -325,24 +325,24 @@ class GoogleSyncService
 
                 // 3. Mapping dữ liệu:
                 // Status mapping
-                $emailRecord->status = $this->sanitizeStatus($row[1] ?? 'active');
+                $emailRecord->status = $this->sanitizeStatus($row[0] ?? 'active');
 
                 // Password
-                if (!empty($row[3])) $emailRecord->email_password = trim($row[3]);
+                if (!empty($row[2])) $emailRecord->email_password = trim($row[2]);
 
                 // Recovery Email
-                if (isset($row[4])) $emailRecord->recovery_email = trim($row[4]) ?: null;
+                if (isset($row[3])) $emailRecord->recovery_email = trim($row[3]) ?: null;
 
                 // 2FA Code
-                if (isset($row[5])) $emailRecord->two_factor_code = trim($row[5]) ?: null;
+                if (isset($row[4])) $emailRecord->two_factor_code = trim($row[4]) ?: null;
 
                 // Date Create
-                if (!empty($row[6])) {
-                    $emailRecord->email_created_at = $this->parseDate($row[6]);
+                if (!empty($row[5])) {
+                    $emailRecord->email_created_at = $this->parseDate($row[5]);
                 }
 
-                // Note (giả sử cột 10 là Note)
-                if (isset($row[10])) $emailRecord->note = trim($row[10]);
+                // Note
+                if (isset($row[6])) $emailRecord->note = trim($row[6]);
 
                 $emailRecord->save();
 

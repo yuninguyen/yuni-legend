@@ -70,7 +70,7 @@ class UserPlatformMatrixTable extends BaseWidget
                         DB::raw("SUM(CASE WHEN rebate_trackers.status = 'Confirmed' THEN rebate_amount ELSE 0 END) as total_confirmed"),
                         DB::raw('SUM(rebate_amount) as grand_total')
                     )
-                    ->groupBy('users.name', DB::raw("COALESCE(NULLIF(platforms.name, ''), accounts.platform)"))
+                    ->groupBy('users.name', 'accounts.platform', 'platforms.name')
             )
             // CẤU HÌNH BỘ LỌC NẰM NGANG
             ->filters([
@@ -123,9 +123,13 @@ class UserPlatformMatrixTable extends BaseWidget
                             })
                             ->live(),
                         DatePicker::make('from_date')
-                            ->label(__('system.revenue_report.from_date')),
+                            ->label(__('system.revenue_report.from_date'))
+                            ->displayFormat('d/m/Y')
+                            ->native(false),
                         DatePicker::make('to_date')
-                            ->label(__('system.revenue_report.to_date')),
+                            ->label(__('system.revenue_report.to_date'))
+                            ->displayFormat('d/m/Y')
+                            ->native(false),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         return $query

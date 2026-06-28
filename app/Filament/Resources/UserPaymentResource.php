@@ -73,6 +73,8 @@ class UserPaymentResource extends Resource
             })
             ->selectRaw("COALESCE(user_payments.batch_id, 'no_batch') as batch_label")
             ->reorder()
+            ->orderByRaw('user_payments.payment_date IS NULL')
+            ->orderBy('user_payments.payment_date', 'desc')
             ->orderByRaw("user_payments.status = 'pending' DESC")
             ->orderBy('user_payments.batch_id', 'desc')
             ->orderBy('user_payments.created_at', 'desc');
@@ -144,6 +146,7 @@ class UserPaymentResource extends Resource
 
                         Forms\Components\DatePicker::make('payment_date')
                             ->label(__('system.labels.payment_date'))
+                            ->displayFormat('d/m/Y')
                             ->native(false),
 
                         Forms\Components\Textarea::make('note')
@@ -164,23 +167,34 @@ class UserPaymentResource extends Resource
                         return str_replace(['(', ')'], ['- ', ''], $state);
                     })
                     ->description(function ($record) {
-                        // 🟢 DÒNG 2: Danh sách email account
-                        $emails = $record->payoutLogs->map(fn ($log) => $log->account?->email?->email)->filter()->unique();
+                        // 🟢 DÒNG 2: Danh sách email account + tổng USD gốc của giao dịch
+                        $relatedLogs = $record->payoutLogs;
 
-                        // 🟢 FIX: Nếu là Leader Split (không có payoutLogs trực tiếp), tìm theo batch_id
-                        if ($emails->isEmpty() && ! empty($record->batch_id)) {
-                            $emails = PayoutLog::whereHas('userPayment', function ($q) use ($record) {
-                                $q->where('batch_id', $record->batch_id);
+                        // 🟢 FIX: Nếu là Leader/Handler Split (không có payoutLogs trực tiếp), tìm theo settlement_group_id
+                        // — dùng cột riêng (cố định từ lúc Settle) thay vì batch_id, vì batch_id có thể bị gộp lại
+                        // thủ công qua action "Batch Selected" và làm lẫn dữ liệu của nhiều giao dịch khác nhau.
+                        if ($relatedLogs->isEmpty() && ! empty($record->settlement_group_id)) {
+                            $relatedLogs = PayoutLog::whereHas('userPayment', function ($q) use ($record) {
+                                $q->where('settlement_group_id', $record->settlement_group_id);
                             })
-                                ->with('account.email')
-                                ->get()
-                                ->map(fn ($log) => $log->account?->email?->email)
-                                ->filter()
-                                ->unique();
+                                ->with(['account.email', 'partnerWithdrawal'])
+                                ->get();
                         }
 
+                        $emails = $relatedLogs->map(fn ($log) => $log->account?->email?->email ?? $log->partnerWithdrawal?->email)->filter()->unique();
+                        // 🟢 Mỗi nhóm chỉ gắn user_payment_id vào MỘT trong 2: bản ghi cha (withdrawal) HOẶC con (liquidation),
+                        // không bao giờ cả hai cùng lúc -> cộng toàn bộ net_amount_usd không sợ tính trùng.
+                        $usdAmount = $relatedLogs->sum('net_amount_usd');
+
                         $emailList = $emails->isNotEmpty() ? e($emails->implode(', ')) : __('system.n/a');
-                        $accLine = "📧 Account: {$emailList}";
+                        $platformName = e($record->platform ?: __('system.labels.n/a'));
+                        $accLine = "📧 Account: {$emailList} - {$platformName}";
+
+                        // 🟢 Chỉ hiện số tiền $ với người xử lý (Leader/Staff), không hiện cho Partner
+                        if ($record->user?->role !== 'partner') {
+                            $amountStr = '$'.number_format((float) $usdAmount, 2);
+                            $accLine .= " - {$amountStr}";
+                        }
 
                         // 🟢 DÒNG 3: Tỉ giá (Market rate & Payout rate)
                         $rateLine = '';
@@ -215,6 +229,7 @@ class UserPaymentResource extends Resource
                     ->color('danger')
                     ->alignment(Alignment::Center)
                     ->copyable()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->summarize(
                         Tables\Columns\Summarizers\Sum::make()
                             ->label('')
@@ -227,6 +242,7 @@ class UserPaymentResource extends Resource
                     ->color('danger')
                     ->alignment(Alignment::Center)
                     ->copyable()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->summarize(
                         Tables\Columns\Summarizers\Sum::make()
                             ->label('')
@@ -239,6 +255,7 @@ class UserPaymentResource extends Resource
                     ->color('danger')
                     ->alignment(Alignment::Center)
                     ->copyable()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->summarize(
                         Tables\Columns\Summarizers\Sum::make()
                             ->label('')
@@ -277,8 +294,8 @@ class UserPaymentResource extends Resource
                         Tables\Actions\Action::make('quick_set_status')
                             ->label(__('system.labels.quick_set_status'))
                             ->modalHeading(__('system.labels.quick_set_status'))
-                            ->modalSubmitActionLabel('Gửi')
-                            ->modalCancelActionLabel('Hủy bỏ')
+                            ->modalSubmitActionLabel(__('system.actions.submit'))
+                            ->modalCancelActionLabel(__('system.actions.cancel'))
                             ->form([
                                 Forms\Components\Select::make('status')
                                     ->label(__('system.labels.status'))
@@ -317,16 +334,21 @@ class UserPaymentResource extends Resource
                         Tables\Actions\Action::make('quick_set_payment_date')
                             ->label(__('system.labels.quick_set_date'))
                             ->modalHeading(__('system.labels.quick_set_date'))
-                            ->modalSubmitActionLabel('Gửi')
-                            ->modalCancelActionLabel('Hủy bỏ')
+                            ->modalSubmitActionLabel(__('system.actions.submit'))
+                            ->modalCancelActionLabel(__('system.actions.cancel'))
                             ->form([
-                                Forms\Components\DatePicker::make('payment_date')
+                                Forms\Components\TextInput::make('payment_date')
                                     ->label(__('system.labels.payment_date'))
-                                    ->default(fn ($record) => $record->payment_date ?? now())
+                                    ->placeholder('dd/mm/yyyy')
+                                    ->mask('99/99/9999')
+                                    ->rules(['required', 'date_format:d/m/Y'])
+                                    ->default(fn ($record) => Carbon::parse($record->payment_date ?? now())->format('d/m/Y'))
                                     ->required(),
                             ])
                             ->action(function ($record, array $data) {
-                                $record->update($data);
+                                $record->update([
+                                    'payment_date' => Carbon::createFromFormat('d/m/Y', $data['payment_date']),
+                                ]);
 
                                 Notification::make()
                                     ->title(__('system.notifications.date_updated_sync'))
@@ -383,7 +405,9 @@ class UserPaymentResource extends Resource
                 Tables\Filters\Filter::make('created_from')
                     ->form([
                         Forms\Components\DatePicker::make('from')
-                            ->label(__('system.labels.payment_date').' - '.__('system.labels.from')),
+                            ->label(__('system.labels.payment_date').' - '.__('system.labels.from'))
+                            ->displayFormat('d/m/Y')
+                            ->native(false),
                     ])
                     ->query(fn (Builder $query, array $data): Builder => $query->when($data['from'], fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date)))
                     ->indicateUsing(fn (array $data): array => ($data['from'] ?? null) ? ['From '.Carbon::parse($data['from'])->format('d/m/Y')] : []),
@@ -392,7 +416,9 @@ class UserPaymentResource extends Resource
                 Tables\Filters\Filter::make('created_until')
                     ->form([
                         Forms\Components\DatePicker::make('until')
-                            ->label(__('system.labels.payment_date').' - '.__('system.labels.until')),
+                            ->label(__('system.labels.payment_date').' - '.__('system.labels.until'))
+                            ->displayFormat('d/m/Y')
+                            ->native(false),
                     ])
                     ->query(fn (Builder $query, array $data): Builder => $query->when($data['until'], fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date)))
                     ->indicateUsing(fn (array $data): array => ($data['until'] ?? null) ? ['Until '.Carbon::parse($data['until'])->format('d/m/Y')] : []),

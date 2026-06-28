@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PartnerWithdrawalResource\Pages;
 use App\Models\PartnerWithdrawal;
 use App\Models\PayoutLog;
+use App\Models\PayoutMethod;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -242,12 +243,15 @@ class PartnerWithdrawalResource extends Resource
                                 Grid::make(2)->schema([
                                     TextEntry::make('platform_password')
                                         ->label(__('system.partner_withdrawals.platform_password'))
+                                        ->placeholder('N/A')
                                         ->copyable(),
                                     TextEntry::make('email_password')
                                         ->label(__('system.partner_withdrawals.email_password'))
+                                        ->placeholder('N/A')
                                         ->copyable(),
-                                    TextEntry::make('two_factor_auth')
+                                    TextEntry::make('two_fa')
                                         ->label(__('system.partner_withdrawals.two_factor_auth'))
+                                        ->placeholder('N/A')
                                         ->copyable(),
                                 ]),
                             ]),
@@ -461,11 +465,23 @@ class PartnerWithdrawalResource extends Resource
                             'amount' => $record->amount_usd,
                         ]))
                         ->visible(fn ($record) => $record->status === 'completed' && auth()->user()?->isAdmin())
-                        ->action(function ($record) {
-                            $exists = PayoutLog::where('user_id', $record->partner_id)
-                                ->where('transaction_type', 'partner_withdrawal')
-                                ->where('note', 'Partner withdrawal #'.$record->id)
-                                ->exists();
+                        ->form([
+                            Forms\Components\Select::make('payout_method_id')
+                                ->label(__('system.labels.wallet'))
+                                ->options(PayoutMethod::query()->get()->mapWithKeys(function ($method) {
+                                    $typeLabel = match ($method->type) {
+                                        'paypal_us' => 'PAYPAL US',
+                                        'paypal_vn' => 'PAYPAL VN',
+                                        default => strtoupper(str_replace('_', ' ', $method->type)),
+                                    };
+
+                                    return [$method->id => "{$typeLabel} - {$method->name}"];
+                                }))
+                                ->searchable()
+                                ->required(),
+                        ])
+                        ->action(function ($record, array $data) {
+                            $exists = PayoutLog::where('partner_withdrawal_id', $record->id)->exists();
 
                             if ($exists) {
                                 Notification::make()
@@ -478,10 +494,13 @@ class PartnerWithdrawalResource extends Resource
 
                             PayoutLog::create([
                                 'user_id' => $record->partner_id,
+                                'partner_withdrawal_id' => $record->id,
+                                'payout_method_id' => $data['payout_method_id'],
                                 'transaction_type' => 'partner_withdrawal',
                                 'asset_type' => 'currency',
                                 'status' => 'pending',
                                 'amount_usd' => $record->amount_usd,
+                                'net_amount_usd' => $record->amount_usd,
                                 'note' => 'Partner withdrawal #'.$record->id,
                             ]);
 

@@ -40,7 +40,12 @@ class RetailMeNotResource extends Resource
     {
         return __('system.all_platforms');
     }
-    
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return self::isPlatformActive(['RetailMeNot', 'retailmenot']);
+    }
+
     // Thêm dòng này để thu gọn menu bên trái, nhường chỗ cho bảng
     protected static bool $isScopedToTenant = false;
     // THÊM DÒNG NÀY: Đổi đường dẫn URL từ /retailmenot thành /retailmenot
