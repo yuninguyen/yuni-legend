@@ -318,6 +318,7 @@ return [
 
     // NOTIFICATIONS & MODALS
     'notifications' => [
+        'sync_confirm_submit' => 'Confirm',
         'sync_to_google_sheet' => 'Sync to Google Sheet',
         'sync_confirm_msg' => 'The system will synchronize all currently displayed records (including filters) to Google Sheets. Do you want to continue?',
         'sync_success' => 'Sync Success!',

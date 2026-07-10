@@ -318,6 +318,7 @@ return [
 
     // THÔNG BÁO & MODAL
     'notifications' => [
+        'sync_confirm_submit' => 'Xác nhận',
         'sync_to_google_sheet' => 'Đồng bộ lên Google Sheet',
         'sync_confirm_msg' => 'Hệ thống sẽ đồng bộ toàn bộ các bản ghi đang hiển thị (bao gồm cả các bộ lọc) lên Google Sheets. Bạn có muốn tiếp tục?',
         'sync_success' => 'Đồng bộ thành công!',

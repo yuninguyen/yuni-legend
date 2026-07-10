@@ -27,7 +27,7 @@ trait HasSyncToSheetAction
             ->requiresConfirmation()
             ->modalHeading(__('system.notifications.sync_to_google_sheet'))
             ->modalDescription(__('system.notifications.sync_confirm_msg'))
-            ->modalSubmitActionLabel(__('system.account_claim.submit')) // Dùng chung nút confirm
+            ->modalSubmitActionLabel(__('system.notifications.sync_confirm_submit'))
             // 🟢 CHỈ HIỆN CHO ADMIN
             ->visible(fn() => auth()->user()?->isAdmin())
             ->action(function () use ($serviceMethod, $modelLabel) {
@@ -73,7 +73,7 @@ trait HasSyncToSheetAction
             ->requiresConfirmation()
             ->modalHeading(__('system.notifications.sync_from_google_sheet'))
             ->modalDescription(__('system.notifications.sync_from_confirm_msg'))
-            ->modalSubmitActionLabel(__('system.account_claim.submit')) // Dùng chung nút confirm
+            ->modalSubmitActionLabel(__('system.notifications.sync_confirm_submit'))
             ->visible(fn() => auth()->user()?->isAdmin())
             ->action(function () use ($serviceMethod, $modelLabel) {
                 abort_unless(auth()->user()?->isAdmin(), 403);
