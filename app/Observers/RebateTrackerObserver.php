@@ -14,6 +14,11 @@ class RebateTrackerObserver implements ShouldHandleEventsAfterCommit
      */
     public function saved(RebateTracker $tracker): void
     {
+        // Không dispatch ngược lại Sheet khi đang import TỪ Sheet (tránh spam quota Google API)
+        if (RebateTracker::$syncingFromSheet) {
+            return;
+        }
+
         SyncGoogleSheetJob::dispatch($tracker->id, get_class($tracker));
     }
 

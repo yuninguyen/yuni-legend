@@ -13,6 +13,10 @@ class Email extends Model
     use LogsActivity; // Kích hoạt máy quay cho Email
     use SoftDeletes;
 
+    /**
+     * CỜ ĐỒNG BỘ: Ngăn chặn vòng lặp vô tận khi đồng bộ từ Google Sheets.
+     */
+    public static bool $syncingFromSheet = false;
 
     //public $timestamps = false; // Tắt tự động cập nhật created_at và updated_at
 

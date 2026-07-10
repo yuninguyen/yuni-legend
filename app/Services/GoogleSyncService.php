@@ -344,7 +344,13 @@ class GoogleSyncService
                 // Note
                 if (isset($row[6])) $emailRecord->note = trim($row[6]);
 
-                $emailRecord->save();
+                // Chặn Observer dispatch ngược lại Sheet để tránh spam quota Google API
+                Email::$syncingFromSheet = true;
+                try {
+                    $emailRecord->save();
+                } finally {
+                    Email::$syncingFromSheet = false;
+                }
 
                 if ($isNew) {
                     $created++;
@@ -1121,7 +1127,14 @@ class GoogleSyncService
 
                             $statusEmailRaw = strtolower(trim($row[5] ?? 'active'));
                             $email->status = ($statusEmailRaw === 'live' || $statusEmailRaw === 'active') ? 'active' : $statusEmailRaw;
-                            $email->save();
+
+                            // Chặn Observer dispatch ngược lại Sheet để tránh spam quota Google API
+                            Email::$syncingFromSheet = true;
+                            try {
+                                $email->save();
+                            } finally {
+                                Email::$syncingFromSheet = false;
+                            }
 
                             // 2. Sync Account
                             $account = Account::firstOrNew([
@@ -1273,10 +1286,14 @@ class GoogleSyncService
                     }
 
                     try {
+                        // Chặn Observer dispatch ngược lại Sheet để tránh spam quota Google API
+                        Email::$syncingFromSheet = true;
+                        RebateTracker::$syncingFromSheet = true;
+                        try {
                         DB::transaction(function () use ($row, $platform, &$totalCreated, &$totalUpdated, &$totalFailed) {
                             // 1. Resolve Email & Account (Giống importAccounts)
                             $email = Email::firstOrCreate(['email' => trim($row[0])]);
-                            
+
                             $account = Account::firstOrCreate([
                                 'email_id' => $email->id,
                                 'platform' => $platform
@@ -1351,6 +1368,10 @@ class GoogleSyncService
                                 $totalUpdated++;
                             }
                         });
+                        } finally {
+                            Email::$syncingFromSheet = false;
+                            RebateTracker::$syncingFromSheet = false;
+                        }
                     } catch (\Exception $e) {
                         Log::error("Row Import Error [{$sheetName}] row " . ($index + 2) . ": " . $e->getMessage());
                         $totalFailed++;
@@ -1454,7 +1475,13 @@ class GoogleSyncService
                     $payoutMethod->status = 'active';
                 }
 
-                $payoutMethod->save();
+                // Chặn Observer dispatch ngược lại Sheet để tránh spam quota Google API
+                PayoutMethod::$syncingFromSheet = true;
+                try {
+                    $payoutMethod->save();
+                } finally {
+                    PayoutMethod::$syncingFromSheet = false;
+                }
 
                 if ($isNew) {
                     $totalCreated++;

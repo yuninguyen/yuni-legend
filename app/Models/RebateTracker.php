@@ -15,6 +15,11 @@ class RebateTracker extends Model
 
     use SoftDeletes;
 
+    /**
+     * CỜ ĐỒNG BỘ: Ngăn chặn vòng lặp vô tận khi đồng bộ từ Google Sheets.
+     */
+    public static bool $syncingFromSheet = false;
+
     protected $casts = [
         'order_value'      => 'decimal:2',
         'cashback_percent' => 'decimal:2',

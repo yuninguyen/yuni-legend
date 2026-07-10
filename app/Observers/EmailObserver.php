@@ -11,6 +11,11 @@ class EmailObserver implements ShouldHandleEventsAfterCommit
 {
     public function saved(Email $email): void
     {
+        // Không dispatch ngược lại Sheet khi đang import TỪ Sheet (tránh spam quota Google API)
+        if (Email::$syncingFromSheet) {
+            return;
+        }
+
         // Gọi Job đa năng để cập nhật dòng Email này lên Sheet
         \App\Jobs\SyncGoogleSheetJob::dispatch($email->id, \App\Models\Email::class);
     }

@@ -12,6 +12,11 @@ class PayoutMethodObserver implements ShouldHandleEventsAfterCommit
     // Chạy sau khi Save (cả Create và Update)
     public function saved(PayoutMethod $payoutMethod): void
     {
+        // Không dispatch ngược lại Sheet khi đang import TỪ Sheet (tránh spam quota Google API)
+        if (PayoutMethod::$syncingFromSheet) {
+            return;
+        }
+
         // Gửi ID và Class sang Job để chạy ngầm
         SyncGoogleSheetJob::dispatch($payoutMethod->id, PayoutMethod::class);
     }

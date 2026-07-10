@@ -13,6 +13,11 @@ class PayoutMethod extends Model
 {
     use LogsActivity, HasFactory, SoftDeletes;
 
+    /**
+     * CỜ ĐỒNG BỘ: Ngăn chặn vòng lặp vô tận khi đồng bộ từ Google Sheets.
+     */
+    public static bool $syncingFromSheet = false;
+
     // Tên bảng trong Database (để chắc chắn không lệch)
     protected $table = 'payout_methods';
 
