@@ -1,0 +1,9 @@
+{
+  "default": "speckit",
+  "workflows": {
+    "speckit": {
+      "path": ".specify/workflows/speckit/workflow.yml",
+      "steps": ["specify", "clarify", "plan", "tasks", "review", "implement", "verify"]
+    }
+  }
+}
