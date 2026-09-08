@@ -1,0 +1,22 @@
+{
+  "name": "speckit",
+  "version": "0.16.3.dev0",
+  "feature_numbering": "sequential",
+  "feature_directory": "specs",
+  "skills": [
+    "speckit-specify",
+    "speckit-clarify",
+    "speckit-plan",
+    "speckit-tasks",
+    "speckit-analyze",
+    "speckit-checklist",
+    "speckit-implement",
+    "speckit-constitution",
+    "speckit-converge",
+    "speckit-taskstoissues"
+  ],
+  "workflow": ".specify/workflows/speckit/workflow.yml",
+  "templates": ".specify/templates",
+  "scripts": ".specify/scripts/powershell",
+  "constitution": ".specify/memory/constitution.md"
+}
