@@ -1,0 +1,23 @@
+name: speckit
+version: 1
+steps:
+  - id: specify
+    skill: speckit-specify
+  - id: clarify
+    skill: speckit-clarify
+    optional: true
+  - id: plan
+    skill: speckit-plan
+  - id: tasks
+    skill: speckit-tasks
+  - id: review
+    document: PLAN-REVIEW.md
+    required_before: implement
+  - id: implement
+    skill: speckit-implement
+  - id: verify
+    document: BUILD.md
+handoff:
+  document: HANDOFF.md
+constitution:
+  path: .specify/memory/constitution.md
