@@ -1,0 +1,29 @@
+{
+  "name": "claude",
+  "display_name": "Claude Code",
+  "version": "0.16.3.dev0",
+  "type": "ai-integration",
+  "command_style": "skills",
+  "script": "ps",
+  "invoke_separator": "-",
+  "skill_directory": ".claude/skills",
+  "supports": [
+    "speckit-specify",
+    "speckit-clarify",
+    "speckit-plan",
+    "speckit-tasks",
+    "speckit-analyze",
+    "speckit-checklist",
+    "speckit-implement",
+    "speckit-constitution",
+    "speckit-converge",
+    "speckit-taskstoissues"
+  ],
+  "project_rules": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "BUILD.md",
+    "PLAN-REVIEW.md",
+    "HANDOFF.md"
+  ]
+}
