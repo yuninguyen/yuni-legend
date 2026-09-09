@@ -1,8 +1,6 @@
 # RebateOps — Handoff Protocol
 
-Use this file when pausing substantial work, transferring between agents/sessions, or handing implementation/review to another model.
-
-Do not overwrite business history with guesses. Record only verified current state.
+Use when pausing substantial work, transferring agents/sessions, or handing implementation/review to another model. Record verified state only.
 
 ## Required Handoff Fields
 
@@ -28,7 +26,14 @@ SPEC-KIT STATE:
 - spec:
 - plan:
 - tasks:
+- checklist/analyze state:
 - plan-review verdict:
+
+SKILLS USED:
+- Spec-Kit:
+- RebateOps domain:
+- GitNexus:
+- Superpowers/ECC if used:
 
 FILES CHANGED:
 
@@ -54,7 +59,7 @@ DO NOT DO:
 
 ## Status Vocabulary
 
-Prefer one of:
+Prefer:
 
 ```text
 PLANNING
@@ -67,11 +72,11 @@ READY FOR REVIEW
 COMPLETE
 ```
 
-Do not write `COMPLETE` if required verification is missing.
+Do not write COMPLETE when required verification is missing.
 
 ## Financial-Critical Handoff
 
-For payout/settlement/exchange/balance/profit/RBAC work, always include:
+Always record, when applicable:
 
 ```text
 economic group
@@ -85,38 +90,36 @@ role/ownership constraints
 delete/restore impact
 ```
 
-Explicitly state whether these invariants remain verified:
+Explicitly state whether these remain verified:
 
 ```text
-user_payment_id stamped on parent OR liquidation children, never both
+user_payment_id on parent OR liquidation children, never both
 settlement_group_id remains immutable provenance
 batch_id remains editable grouping only
 no duplicate/full liquidation
 wallet balance derived from completed authoritative rows
 ```
 
-## Handoff Rules
+## Rules
 
 - Never claim tests passed if they were not run.
 - Distinguish test failure from environment/tool failure.
-- Include exact error/command for missing evidence.
+- Preserve unresolved PLAN-REVIEW blockers.
+- Record HIGH/CRITICAL GitNexus blast radius and whether continuation was approved.
 - Never authorize destructive financial migration implicitly.
-- Never expose secrets/PII in handoff text.
-- Preserve unresolved PLAN-REVIEW blockers verbatim enough for the next agent to act on them.
-- If GitNexus reports HIGH/CRITICAL risk, include the blast radius and whether the user approved continuation.
-- If context is being compacted, update this file before losing implementation-specific state when practical.
+- Never expose secrets/PII.
+- A handoff transfers context; it does not broaden scope.
 
 ## Completion Handoff
 
-At completion, record:
+Record:
 
 ```text
 what changed
 why it changed
+skills used
 which tests prove it
 what was intentionally not changed
-remaining risks / follow-ups
+remaining risks/follow-ups
 final gitnexus_detect_changes scope
 ```
-
-A handoff is context transfer, not permission to broaden scope.

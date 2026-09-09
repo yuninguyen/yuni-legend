@@ -1,117 +1,120 @@
 # RebateOps — Claude Code Instructions
 
-## 1. Read AGENTS.md First
+## 1. Mandatory Read Order
 
-Before any non-trivial task:
-
-1. read `AGENTS.md`;
-2. treat its financial, security, authorization, sync, and data-integrity rules as mandatory;
-3. then apply this file's Claude-specific workflow.
-
-If `CLAUDE.md` conflicts with `AGENTS.md` on project policy, `AGENTS.md` wins unless the user explicitly approves a newer rule.
-
-## 2. Authority
-
-Do not invent a roadmap gate or architecture document that does not exist.
-
-Current authority model:
+Before non-trivial work:
 
 ```text
-explicit current user decision
-→ AGENTS.md hard invariants
-→ README.md workflow/product intent
-→ current schema/migrations/policies/models/services/tests
-→ historical docs plans only when explicitly reactivated
+AGENTS.md
+→ CLAUDE.md
+→ BUILD.md
+→ relevant current code/tests/docs
 ```
 
-For financial behavior, inspect current code and tests before planning a change.
+For features, meaningful behavior changes, or financial-critical work, also read the active Spec-Kit artifacts and `PLAN-REVIEW.md` before implementation. Use `HANDOFF.md` when pausing or transferring substantial work.
+
+`AGENTS.md` wins on project policy unless the user explicitly approves a newer rule.
+
+## 2. Skill Families
+
+This repository has separate workflow families. Do not confuse them.
+
+### Spec-Kit — feature specification/execution
+
+```text
+speckit-specify
+speckit-clarify
+speckit-plan
+speckit-tasks
+speckit-analyze
+speckit-checklist
+speckit-implement
+speckit-constitution
+speckit-converge
+speckit-taskstoissues
+```
+
+### RebateOps domain skills
+
+```text
+rebateops-financial-safety
+rebateops-google-sync
+rebateops-filament-rbac
+rebateops-financial-migrations
+```
+
+### GitNexus
+
+```text
+gitnexus-exploring
+gitnexus-impact-analysis
+gitnexus-debugging
+gitnexus-refactoring
+gitnexus-guide
+gitnexus-cli
+```
+
+### Superpowers / ECC
+
+Superpowers commands are a separate plugin/workflow family and do not share Spec-Kit state. Do not confuse `/speckit-plan` with a generic `/plan` or `/executing-plans` workflow. `.superpowers/` may contain generated SDD artifacts, not the source of RebateOps financial authority.
 
 ## 3. Spec-Kit Auto-Activation
 
-For a **new feature** or meaningful behavior change, use the Spec-Kit flow automatically **when Spec-Kit commands/skills are actually available in the current workspace**:
+For a new feature or meaningful behavior change, automatically run:
 
 ```text
 financial/security eligibility check
-↓
-speckit-specify
-↓
-speckit-plan
-↓
-speckit-tasks
-↓
-speckit-implement
-↓
-verification
+→ speckit-specify
+→ speckit-clarify when needed
+→ speckit-plan
+→ speckit-tasks
+→ speckit-analyze/checklist when relevant
+→ PLAN-REVIEW.md acceptance
+→ speckit-implement only after approval
+→ verification
 ```
 
-Do not wait for the user to manually invoke each step.
+Do not wait for the user to manually invoke every step.
 
-If Spec-Kit is not installed/available:
+Do not force full Spec-Kit for typo/copy changes, tiny Filament styling, obvious one-line fixes, straightforward low-risk bugs, or narrow documentation-only edits.
 
-- do not pretend it ran;
-- perform the equivalent Specify → Plan → Tasks → Implement workflow directly;
-- keep generated planning artifacts minimal and inside repository conventions approved by the user.
+## 4. PLAN-REVIEW Is a Gate
 
-### Before Spec-Kit or equivalent planning
+Before `speckit-implement` for feature/meaningful/financial-critical work:
 
-Resolve:
+- review `spec.md`, `plan.md`, and `tasks.md` using `PLAN-REVIEW.md`;
+- resolve BLOCKER/HIGH issues that prevent safe implementation;
+- record the exact implementation authorization scope.
 
-1. which economic records/roles are affected;
-2. whether settlement/balance/concurrency semantics change;
-3. whether external Google Sheets behavior changes;
-4. whether the task weakens any invariant from `AGENTS.md`.
+Only `APPROVED FOR IMPLEMENTATION` authorizes execution of that reviewed scope. Approval does not waive `AGENTS.md`, GitNexus, tests, locks, RBAC, migration safety, or secret handling.
 
-If a conflict exists, stop before implementation and report it.
+## 5. Domain Skill Auto-Selection
 
-### Do not force full Spec-Kit for
+Use `rebateops-financial-safety` when touching payout, settlement, exchange/liquidation, balances, profit/margin, locks, financial delete/restore, or financial RBAC.
 
-- typo/copy fixes;
-- tiny Filament styling;
-- one-line fixes;
-- straightforward low-risk bugs with obvious scope;
-- documentation-only edits.
+Use `rebateops-google-sync` when touching `GoogleSheetService`, `GoogleSyncService`, sync Jobs/observers, Sheet import/export, mapping, conflict handling, or sync retries.
 
-## 4. TDD for Financial-Critical Work
+Use `rebateops-filament-rbac` when touching Filament Resources/Actions/Policies/Gates/role visibility or ownership.
 
-Financial-critical changes include anything affecting:
+Use `rebateops-financial-migrations` for financial schema changes, raw SQL, cross-engine query behavior, backfills, or destructive migration risk.
+
+Multiple skills may apply to one task.
+
+## 6. TDD for Financial-Critical Work
 
 ```text
-PayoutLog
-PayoutMethod
-UserPayment
-PartnerWithdrawal
-exchange/liquidation
-settlement
-wallet balance
-payout rates
-profit/margin
-record locking
-financial RBAC
+reproduce/define the financial failure
+→ focused regression test
+→ observe semantic RED
+→ verify transaction/lock design
+→ minimum implementation
+→ GREEN
+→ related financial/policy/concurrency/sync regressions
 ```
 
-Use:
+Do not count tool failures, permissions issues, missing commands, or unrelated ENOENT as RED.
 
-```text
-reproduce the financial failure
-↓
-write focused regression test
-↓
-observe semantic RED
-↓
-minimum implementation
-↓
-GREEN
-↓
-related regression suite
-```
-
-Do not accept environment/tool failures as RED.
-
-When concurrency is involved, verify the lock/transaction scope rather than only the happy-path result.
-
-## 5. GitNexus Workflow
-
-The GitNexus rules in `AGENTS.md` are mandatory.
+## 7. GitNexus Workflow
 
 Before editing every function/class/method:
 
@@ -126,192 +129,68 @@ gitnexus_query(concept)
 → gitnexus_context(symbol)
 ```
 
-For HIGH/CRITICAL impact:
+For HIGH/CRITICAL impact, report the blast radius before editing. Before commit/completion run `gitnexus_detect_changes()`.
 
-- report the blast radius before editing;
-- do not silently proceed.
+Use the installed GitNexus skills under `.claude/skills/gitnexus/` for exploration, impact analysis, debugging, refactoring, CLI, and reference guidance.
 
-Before commit:
+## 8. Financial Change Checklist
 
-```text
-gitnexus_detect_changes()
-```
-
-After commit, refresh the index while preserving embeddings according to the managed GitNexus instructions.
-
-## 6. Financial Change Checklist
-
-Before writing code, answer internally:
+Before writing financial code, determine:
 
 ```text
-What is the economic group?
-What row(s) are authoritative?
-What can be edited vs immutable?
-What must be locked?
-What is recomputed inside the lock?
-Could this double-count?
-Could this settle/link both parent and children?
-Could batch regrouping corrupt provenance?
-Could a retry/sync duplicate money/state?
-Which role is allowed to do this?
-What happens on delete/restore?
+economic group
+authoritative rows
+editable vs immutable fields
+transaction boundary
+lockForUpdate scope
+values recomputed inside lock
+double-counting risk
+parent/child settlement linkage
+settlement_group_id provenance
+retry/idempotency behavior
+role/ownership boundary
+delete/restore impact
 ```
 
-If any answer is uncertain, inspect the relevant flow before editing.
+If any material answer is uncertain, inspect current code/tests before editing.
 
-## 7. Google Sheets Changes
+## 9. Google Sheets / Filament / Database
 
-Before changing `GoogleSheetService`, `GoogleSyncService`, sync Jobs, observers, or import/export actions:
+For Sheet changes, preserve loop prevention, duplicate/conflict rules, database validation, and fake external APIs in normal tests.
 
-- identify direction: DB→Sheet, Sheet→DB, or both;
-- preserve loop-prevention state;
-- preserve unique/conflict rules;
-- preserve financial validation;
-- fake API/queue in automated tests;
-- do not test against a live production sheet unless explicitly requested.
+For Filament changes, UI visibility is not authorization; verify Policy/Gate/server-side ownership, including bulk/relation/modal paths.
 
-## 8. Filament Changes
-
-For Filament Resources/Actions:
-
-- do not infer security from visibility;
-- verify Policy/Gate/server-side checks;
-- financial bulk actions require the same locking/integrity guarantees as single-record actions;
-- modal refactors must not change business semantics accidentally;
-- maintain EN/VI labels for touched UI.
-
-## 9. Database Changes
-
-For migrations or query changes:
-
-- inspect production MySQL/MariaDB impact;
-- check whether SQLite tests or existing PostgreSQL-compatible paths are affected;
-- prefer Eloquent/query builder over dialect-specific expressions;
-- for destructive financial migrations, stop for explicit user approval and migration/backup plan.
+For migrations, assess production MySQL/MariaDB, local/test SQLite, and existing PostgreSQL-compatible behavior. Destructive financial migrations require explicit user approval and a backup/migration/rollback plan.
 
 ## 10. Security Stop Conditions
 
 Stop before implementation if a request would:
 
-- expose decrypted passwords/2FA/PII in logs or public UI;
+- expose decrypted passwords/2FA/tokens/PII in logs or public UI;
 - weaken Finance/Staff/Partner ownership boundaries;
-- remove DB-backed financial delete restrictions in favor of UI-only guards;
-- remove required transaction/locking from money-moving actions;
-- permit double settlement/liquidation;
-- link settlement parent and liquidation children in a way that double-counts;
+- replace DB-backed delete protections with UI-only guards;
+- remove required transactions/locks from money-changing logic;
+- permit duplicate settlement/liquidation or double-counting parent/child links;
 - treat `batch_id` as immutable settlement provenance;
 - index the internal admin app publicly;
 - write to production Sheets/databases during tests without explicit authorization.
 
-## 11. Small Tasks
+## 11. Handoff
 
-For a clear, low-risk, authorized task:
+When pausing/transferring substantial work, update `HANDOFF.md` with:
 
-- do not ask for approval at every obvious step;
-- make the smallest change;
-- verify the affected surface;
-- report the exact result.
+- status, branch/HEAD/worktree;
+- active spec/plan/tasks/review verdict;
+- skills used;
+- GitNexus impact/change scope;
+- tests actually run;
+- missing evidence/blockers;
+- next exact step and explicit DO NOT DO items.
 
-Ask only for material ambiguity, destructive operations, security/financial policy changes, or HIGH/CRITICAL impact.
+Do not mark work COMPLETE when required verification is missing.
 
-<!-- gitnexus:start -->
-# GitNexus — Code Intelligence
+## 12. Small Tasks
 
-This project is indexed by GitNexus as **RebateOps** (6157 symbols, 18765 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+For a clear low-risk task, do not ask for approval at every obvious step. Make the smallest change, verify the affected surface, and report the result. Ask only for material ambiguity, destructive operations, financial/security policy changes, or HIGH/CRITICAL impact.
 
-> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
-
-## Always Do
-
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
-
-## When Debugging
-
-1. `gitnexus_query({query: "<error or symptom>"})` — find execution flows related to the issue
-2. `gitnexus_context({name: "<suspect function>"})` — see all callers, callees, and process participation
-3. `READ gitnexus://repo/RebateOps/process/{processName}` — trace the full execution flow step by step
-4. For regressions: `gitnexus_detect_changes({scope: "compare", base_ref: "main"})` — see what your branch changed
-
-## When Refactoring
-
-- **Renaming**: MUST use `gitnexus_rename({symbol_name: "old", new_name: "new", dry_run: true})` first. Review the preview — graph edits are safe, text_search edits need manual review. Then run with `dry_run: false`.
-- **Extracting/Splitting**: MUST run `gitnexus_context({name: "target"})` to see all incoming/outgoing refs, then `gitnexus_impact({target: "target", direction: "upstream"})` to find all external callers before moving code.
-- After any refactor: run `gitnexus_detect_changes({scope: "all"})` to verify only expected files changed.
-
-## Never Do
-
-- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
-- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
-
-## Tools Quick Reference
-
-| Tool | When to use | Command |
-|------|-------------|---------|
-| `query` | Find code by concept | `gitnexus_query({query: "auth validation"})` |
-| `context` | 360-degree view of one symbol | `gitnexus_context({name: "validateUser"})` |
-| `impact` | Blast radius before editing | `gitnexus_impact({target: "X", direction: "upstream"})` |
-| `detect_changes` | Pre-commit scope check | `gitnexus_detect_changes({scope: "staged"})` |
-| `rename` | Safe multi-file rename | `gitnexus_rename({symbol_name: "old", new_name: "new", dry_run: true})` |
-| `cypher` | Custom graph queries | `gitnexus_cypher({query: "MATCH ..."})` |
-
-## Impact Risk Levels
-
-| Depth | Meaning | Action |
-|-------|---------|--------|
-| d=1 | WILL BREAK — direct callers/importers | MUST update these |
-| d=2 | LIKELY AFFECTED — indirect deps | Should test |
-| d=3 | MAY NEED TESTING — transitive | Test if critical path |
-
-## Resources
-
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/RebateOps/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/RebateOps/clusters` | All functional areas |
-| `gitnexus://repo/RebateOps/processes` | All execution flows |
-| `gitnexus://repo/RebateOps/process/{name}` | Step-by-step execution trace |
-
-## Self-Check Before Finishing
-
-Before completing any code modification task, verify:
-1. `gitnexus_impact` was run for all modified symbols
-2. No HIGH/CRITICAL risk warnings were ignored
-3. `gitnexus_detect_changes()` confirms changes match expected scope
-4. All d=1 (WILL BREAK) dependents were updated
-
-## Keeping the Index Fresh
-
-After committing code changes, the GitNexus index becomes stale. Re-run analyze to update it:
-
-```bash
-npx gitnexus analyze
-```
-
-If the index previously included embeddings, preserve them by adding `--embeddings`:
-
-```bash
-npx gitnexus analyze --embeddings
-```
-
-To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.embeddings` field shows the count (0 means no embeddings). **Running analyze without `--embeddings` will delete any previously generated embeddings.**
-
-> Claude Code users: A PostToolUse hook handles this automatically after `git commit` and `git merge`.
-
-## CLI
-
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
-
-<!-- gitnexus:end -->
+Karpathy Coding Hygiene and mandatory GitNexus rules are inherited from `AGENTS.md`.

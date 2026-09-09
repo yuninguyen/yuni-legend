@@ -1,29 +1,50 @@
 # RebateOps — Plan Review Gate
 
-Use this file to review any implementation plan before execution when the task is a new feature, a meaningful behavior change, or financial-critical work.
+Use this file before implementing a new feature, meaningful behavior change, or financial-critical change.
 
-## Verdicts
+## Verdict
 
-Return exactly one implementation verdict:
+Return exactly one:
 
 ```text
 APPROVED FOR IMPLEMENTATION
 REQUEST CHANGES
 ```
 
-Approval means the plan may proceed to implementation. It does not waive `AGENTS.md`, tests, GitNexus impact analysis, financial locks, RBAC, or migration safety.
+Approval authorizes only the reviewed scope. It does not waive `AGENTS.md`, `BUILD.md`, tests, GitNexus, financial locks, RBAC, migration safety, audit rules, or secret handling.
 
-## 1. Scope & Authority
+## 1. Scope / Authority
 
-Check:
+Verify:
 
-- plan matches the user's requested scope;
-- no unrelated refactor or speculative feature;
-- active README/current code/tests are not contradicted without an explicit decision;
-- historical `docs/PLAN-*.md` files are not treated as current authority automatically;
-- small fixes are not over-engineered into a broad rewrite.
+- plan matches requested scope;
+- no unrelated refactor/speculative feature;
+- current README/code/tests are not contradicted without an explicit decision;
+- historical `docs/PLAN-*.md` are not treated as current authority automatically;
+- active spec/plan/tasks are mutually consistent.
 
-## 2. Financial Model
+## 2. Skill Selection
+
+Confirm applicable installed skills are selected:
+
+```text
+Spec-Kit:
+  speckit-specify / clarify / plan / tasks / analyze / checklist / implement
+  speckit-converge when reconciling review feedback
+
+RebateOps:
+  rebateops-financial-safety
+  rebateops-google-sync
+  rebateops-filament-rbac
+  rebateops-financial-migrations
+
+GitNexus:
+  exploring / impact-analysis / debugging / refactoring / guide / cli
+```
+
+Missing an applicable domain skill is a review finding when it leaves a material risk unaddressed.
+
+## 3. Financial Model
 
 For financial-critical plans, identify explicitly:
 
@@ -31,79 +52,75 @@ For financial-critical plans, identify explicitly:
 economic group
 authoritative rows
 editable vs immutable fields
-lock scope
 transaction scope
-recomputed values
-idempotency / retry behavior
-delete / restore behavior
+lockForUpdate scope
+values recomputed inside lock
+idempotency/retry behavior
+delete/restore behavior
 ```
 
 Reject plans that leave material accounting semantics implicit.
 
-## 3. Double-Counting / Settlement Safety
+## 4. Double Counting / Settlement Safety
 
 Verify:
 
-- settlement does not link both parent and liquidation children in a double-counting shape;
+- parent and liquidation children are not linked in a double-counting shape;
 - `settlement_group_id` remains immutable provenance;
 - `batch_id` remains editable grouping only;
 - duplicate/full liquidation is prevented;
-- settled records cannot regain destructive actions through another resource path;
+- settled records cannot regain destructive actions via another resource path;
 - Partner/Staff payout is not reused as Leader/Handler margin income.
 
-## 4. Concurrency
+## 5. Concurrency
 
-For balance/settlement/exchange changes, verify the plan describes:
+For balance/settlement/exchange changes, require:
 
 ```text
 DB transaction
-→ required lockForUpdate() rows/group
+→ required lockForUpdate rows/group
 → authoritative recomputation inside lock
 → atomic writes
 ```
 
-Reject read-compute-write plans that perform the critical calculation outside the lock.
+Reject critical read-compute-write logic outside required locking.
 
-## 5. RBAC / Filament
+## 6. RBAC / Filament
 
 Verify:
 
-- server-side Policy/Gate checks remain authoritative;
+- Policy/Gate/server-side checks remain authoritative;
 - Admin/Finance/Staff/Operator/Partner boundaries are preserved;
-- hiding/disabling a UI action is not used as the only security control;
-- bulk/relation/modal action paths are considered when relevant.
+- UI hiding/disabling is not the only security control;
+- bulk/relation/modal alternate paths are considered.
 
-## 6. Google Sheets
+## 7. Google Sheets
 
 If sync is affected, verify:
 
-- direction is identified: DB→Sheet, Sheet→DB, or both;
+- direction is explicit: DB→Sheet, Sheet→DB, or both;
 - loop prevention remains intact;
-- conflict/duplicate behavior is explicit;
-- external sync cannot bypass database financial validation;
-- tests fake external APIs/queues unless a designated integration environment is explicitly requested.
+- duplicate/conflict behavior is explicit;
+- Sheet operations cannot bypass DB financial validation;
+- automated tests fake APIs/queues unless a designated integration environment is explicitly requested.
 
-## 7. Database / Migration Safety
+## 8. Database / Migration
 
 Verify:
 
-- MySQL/MariaDB production behavior is considered;
-- SQLite local/test behavior is considered;
+- MySQL/MariaDB production impact;
+- SQLite local/test impact;
 - current PostgreSQL-compatible code is not accidentally broken;
-- raw SQL is justified when used;
+- raw SQL is justified;
 - destructive financial migrations have explicit approval + backup/migration/rollback strategy.
 
-## 8. Sensitive Data / Audit
+## 9. Sensitive Data / Audit
 
-Verify the plan does not:
+Verify the plan does not expose/log decrypted credentials, 2FA, tokens, service-account contents, unnecessary PII, or remove materially useful audit logging without justification.
 
-- log decrypted passwords, 2FA, security answers, tokens, service-account data, or PII unnecessarily;
-- expose sensitive fields in tables/exports/activity logs;
-- remove materially useful audit logging without justification.
+## 10. Testing Strategy
 
-## 9. Testing Strategy
-
-Financial-critical plans should include focused tests covering the failure/behavior, plus relevant existing regression anchors such as:
+Financial-critical plans should include a focused semantic RED plus relevant regression anchors such as:
 
 ```text
 FinancialDeleteRestrictionTest
@@ -111,26 +128,9 @@ FinancialPolicyTest
 PayoutLogExchangeTest
 ```
 
-The plan must define a meaningful RED where TDD is used. Tool/environment failures do not count as RED.
-
-## 10. Skill Selection
-
-Confirm the plan uses relevant installed skills when applicable:
-
-```text
-speckit-specify / clarify / plan / tasks / implement
-speckit-analyze
-speckit-checklist
-rebateops-financial-safety
-rebateops-google-sync
-rebateops-filament-rbac
-rebateops-financial-migrations
-gitnexus impact/debug/refactor skills
-```
+Tool/environment failures do not count as RED.
 
 ## Review Output
-
-Use this structure:
 
 ```text
 VERDICT: APPROVED FOR IMPLEMENTATION | REQUEST CHANGES
@@ -147,8 +147,11 @@ MEDIUM:
 CONFIRMED INVARIANTS:
 - ...
 
+SKILLS REQUIRED:
+- ...
+
 IMPLEMENTATION AUTHORIZATION:
 - exact allowed scope
 ```
 
-If there are no blockers/high issues that prevent safe implementation, approve without inventing new architecture requirements.
+If no blocker/high issue prevents safe implementation, approve without inventing new architecture requirements.

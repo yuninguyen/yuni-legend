@@ -4,8 +4,6 @@ This file defines the default implementation workflow for RebateOps.
 
 ## 1. Read Order
 
-Before non-trivial implementation, read:
-
 ```text
 AGENTS.md
 → CLAUDE.md (Claude only)
@@ -13,20 +11,50 @@ AGENTS.md
 → relevant current code/tests/docs
 ```
 
-For new features or meaningful behavior changes, also use the installed Spec-Kit skills under `.claude/skills/`.
+For feature/meaningful/financial-critical work, use the installed `.claude/skills/` system and the active `.specify/` feature artifacts.
 
-## 2. Classify the Task
+## 2. Installed Skills
+
+### Spec-Kit
+
+```text
+speckit-specify
+speckit-clarify
+speckit-plan
+speckit-tasks
+speckit-analyze
+speckit-checklist
+speckit-implement
+speckit-constitution
+speckit-converge
+speckit-taskstoissues
+```
+
+### RebateOps
+
+```text
+rebateops-financial-safety
+rebateops-google-sync
+rebateops-filament-rbac
+rebateops-financial-migrations
+```
+
+### GitNexus
+
+```text
+gitnexus-exploring
+gitnexus-impact-analysis
+gitnexus-debugging
+gitnexus-refactoring
+gitnexus-guide
+gitnexus-cli
+```
+
+## 3. Task Classification
 
 ### Small fix
 
-Examples:
-
-- typo/copy fix;
-- tiny Filament styling adjustment;
-- one-line obvious bug;
-- narrow non-financial documentation edit.
-
-Workflow:
+Examples: typo/copy, tiny Filament styling, obvious one-line bug, narrow non-financial docs.
 
 ```text
 scope
@@ -36,44 +64,29 @@ scope
 → gitnexus_detect_changes
 ```
 
-Do not force full Spec-Kit for these.
+Do not force full Spec-Kit.
 
-### Feature / meaningful behavior change
-
-Workflow:
+### New feature / meaningful behavior change
 
 ```text
-financial/security eligibility check
+eligibility + invariant check
 → speckit-specify
-→ speckit-clarify when needed
+→ speckit-clarify if needed
 → speckit-plan
 → speckit-tasks
-→ PLAN-REVIEW.md acceptance review
+→ speckit-analyze/checklist as relevant
+→ PLAN-REVIEW.md
+→ APPROVED FOR IMPLEMENTATION
 → speckit-implement
 → verification
-→ HANDOFF.md update when handing off or pausing
+→ HANDOFF.md if paused/transferred
 ```
 
-Do not run `speckit-implement` while the plan review has unresolved BLOCKER findings.
+Do not run `speckit-implement` while plan review has unresolved blocking findings.
 
-## 3. Financial-Critical Build Rule
+## 4. Financial-Critical Build Rule
 
-Treat changes touching the following as financial-critical:
-
-```text
-PayoutLog
-PayoutMethod
-UserPayment
-PartnerWithdrawal
-exchange / liquidation
-settlement
-wallet balance
-payout rates
-profit / margin
-record locking
-financial RBAC
-Google Sheets sync that can change financial state
-```
+Treat payout/settlement/exchange/balance/profit/financial-RBAC/financial-migration/financial-sync changes as financial-critical. Use `rebateops-financial-safety` plus any other applicable domain skill.
 
 Required shape:
 
@@ -84,12 +97,12 @@ reproduce/define failure
 → transaction/lock design review
 → minimum implementation
 → GREEN
-→ related financial/policy regression tests
+→ related financial/policy/concurrency/sync regressions
 ```
 
-Never count environment/tool failures as semantic RED.
+Never count environment/tool failure as semantic RED.
 
-## 4. GitNexus Gate
+## 5. GitNexus Gate
 
 Before modifying a function/class/method:
 
@@ -104,58 +117,43 @@ gitnexus_query(concept)
 → gitnexus_context(symbol)
 ```
 
-HIGH/CRITICAL blast radius must be reported before editing.
+HIGH/CRITICAL blast radius must be reported before editing. Before commit/completion run `gitnexus_detect_changes()`.
 
-Before commit/completion:
+## 6. Database / Migration Gate
 
-```text
-gitnexus_detect_changes()
-```
-
-## 5. Database / Migration Gate
-
-For schema/query changes:
+Use `rebateops-financial-migrations`.
 
 - assess MySQL/MariaDB production impact;
-- assess SQLite test/local impact;
-- preserve PostgreSQL-compatible paths where current code supports them;
+- assess SQLite local/test impact;
+- preserve current PostgreSQL-compatible paths;
 - prefer Eloquent/query builder over dialect-specific SQL;
-- destructive financial migrations require explicit approval, backup/migration strategy, and verification.
+- destructive financial migrations require explicit approval + backup/migration/rollback strategy.
 
-Use `.claude/skills/rebateops-financial-migrations/SKILL.md`.
+## 7. Google Sheets Gate
 
-## 6. Google Sheets Gate
-
-For Sheet sync changes:
+Use `rebateops-google-sync`.
 
 - identify DB→Sheet, Sheet→DB, or bidirectional scope;
-- preserve loop prevention;
-- preserve duplicate/conflict rules;
-- never bypass database financial invariants;
+- preserve loop prevention and duplicate/conflict rules;
+- never bypass DB financial invariants;
 - fake external API/queues in normal automated tests.
 
-Use `.claude/skills/rebateops-google-sync/SKILL.md`.
+## 8. Authorization Gate
 
-## 7. Authorization Gate
-
-For Filament/resources/actions:
+Use `rebateops-filament-rbac`.
 
 - UI visibility is not authorization;
-- verify Policy/Gate/server-side ownership rules;
-- bulk actions need the same financial integrity as single-record actions.
+- verify Policy/Gate/server-side ownership;
+- bulk/relation/modal actions need the same protections as single-record actions.
 
-Use `.claude/skills/rebateops-filament-rbac/SKILL.md`.
-
-## 8. Definition of Done
-
-A task is complete only when the verification appropriate to its scope passes.
+## 9. Definition of Done
 
 Financial-critical work normally requires:
 
 ```text
 focused tests
 relevant policy tests
-relevant financial/concurrency/accounting tests
+relevant financial/concurrency/accounting/sync tests
 php artisan test when scope permits
 vendor/bin/pint --test
 npm run build if frontend/assets changed
